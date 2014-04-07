@@ -757,14 +757,29 @@ install -D -p -m 0644 extras/glusterfs-logrotate \
     %{buildroot}%{_sysconfdir}/logrotate.d/glusterfs
 
 %if ( 0%{!?_without_georeplication:1} )
-# geo-rep ghosts
 mkdir -p %{buildroot}%{_sharedstatedir}/glusterd/geo-replication
 touch %{buildroot}%{_sharedstatedir}/glusterd/geo-replication/gsyncd_template.conf
 install -D -p -m 0644 extras/glusterfs-georep-logrotate \
     %{buildroot}%{_sysconfdir}/logrotate.d/glusterfs-georep
 %endif
 
-# the rest of the ghosts
+%if ( 0%{!?_without_syslog:1} )
+%if ( 0%{?fedora} ) || ( 0%{?rhel} && 0%{?rhel} > 6 )
+install -D -p -m 0644 extras/gluster-rsyslog-7.2.conf \
+    %{buildroot}%{_sysconfdir}/rsyslog.d/gluster.conf.example
+%endif
+
+%if ( 0%{?rhel} && 0%{?rhel} == 6 )
+install -D -p -m 0644 extras/gluster-rsyslog-5.8.conf \
+    %{buildroot}%{_sysconfdir}/rsyslog.d/gluster.conf.example
+%endif
+
+%if ( 0%{?fedora} ) || ( 0%{?rhel} && 0%{?rhel} >= 6 )
+install -D -p -m 0644 extras/logger.conf.example \
+    %{buildroot}%{_sysconfdir}/glusterfs/logger.conf.example
+%endif
+%endif
+
 touch %{buildroot}%{_sharedstatedir}/glusterd/glusterd.info
 touch %{buildroot}%{_sharedstatedir}/glusterd/options
 subdirs=(add-brick create copy-file delete gsync-create remove-brick reset set start stop)
@@ -1262,6 +1277,7 @@ exit 0
 %{_sbindir}/gcron.py
 %{_sbindir}/conf.py
 
+<<<<<<< 2944c7b6656a36a79551f9f9f24ab7a10467f13a
 # /var/lib/glusterd, e.g. hookscripts, etc.
 %ghost      %attr(0644,-,-) %config(noreplace) %{_sharedstatedir}/glusterd/glusterd.info
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd
