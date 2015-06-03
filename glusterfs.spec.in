@@ -709,6 +709,24 @@ GlusterFS Events
 CFLAGS=-DUSE_INSECURE_OPENSSL
 export CFLAGS
 %endif
+# In RHEL7 few hardening flags are available by default, however the RELRO
+# default behaviour is partial, convert to full
+%if ( 0%{?rhel} && 0%{?rhel} >= 7 )
+LDFLAGS="$RPM_LD_FLAGS -Wl,-z,relro,-z,now"
+export LDFLAGS
+%else
+%if ( 0%{?rhel} && 0%{?rhel} == 6 )
+CFLAGS="$RPM_OPT_FLAGS -fPIE -DPIE"
+LDFLAGS="$RPM_LD_FLAGS -pie -Wl,-z,relro,-z,now"
+%else
+#It appears that with gcc-4.1.2 in RHEL5 there is an issue using both -fPIC and
+ # -fPIE that makes -z relro not work; -fPIE seems to undo what -fPIC does
+CFLAGS="$CFLAGS $RPM_OPT_FLAGS"
+LDFLAGS="$RPM_LD_FLAGS -Wl,-z,relro,-z,now"
+%endif
+export CFLAGS
+export LDFLAGS
+%endif
 
 ./autogen.sh && %configure \
         %{?_with_cmocka} \
@@ -2110,8 +2128,11 @@ end
 * Fri Jun 12 2015 Aravinda VK <avishwan@redhat.com>
 - Added rsync as dependency to georeplication rpm (#1231205)
 
-* Tue Jun 02 2015 Aravinda VK <avishwan@redhat.com>
-- Added post hook for volume delete as part of glusterfind (#1225465)
+* Thu Jun 11 2015 Atin Mukherjee <amukherj@redhat.com>
+- Security hardening flags inclusion (#1200815)
+
+* Thu Jun 11 2015 Aravinda VK <avishwan@redhat.com>
+- Added post hook for volume delete as part of glusterfind (#1225551)
 
 * Wed May 27 2015 Aravinda VK <avishwan@redhat.com>
 - Added stop-all-gluster-processes.sh in glusterfs-server section (#1204641)
