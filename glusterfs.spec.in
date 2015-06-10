@@ -92,6 +92,7 @@
 %global _build_server 1
 %else
 %global _build_server 0
+%global _without_georeplication --disable-georeplication
 %endif
 
 %global _without_extra_xlators 1
@@ -1068,17 +1069,14 @@ exit 0
 %if ( ! 0%{?_build_server} )
 # exclude ganesha files
 %exclude %{_prefix}/lib/ocf/*
-# exclude geo-replication files
-%exclude %{_sysconfdir}/logrotate.d/glusterfs-georep
+# exclude incrementalapi
 %exclude %{_libexecdir}/glusterfs/*
 %exclude %{_sbindir}/gfind_missing_files
-%exclude %{_datadir}/glusterfs/scripts/get-gfid.sh
-%exclude %{_datadir}/glusterfs/scripts/slave-upgrade.sh
-%exclude %{_datadir}/glusterfs/scripts/gsync-upgrade.sh
-%exclude %{_datadir}/glusterfs/scripts/generate-gfid-file.sh
-%exclude %{_datadir}/glusterfs/scripts/gsync-sync-gfid
-%exclude %{_sharedstatedir}/glusterd/*
+%exclude %{_libexecdir}/glusterfs/glusterfind
+%exclude %{_bindir}/glusterfind
+%exclude %{_libexecdir}/glusterfs/peer_add_secret_pub
 # exclude server files
+%exclude %{_sharedstatedir}/glusterd/*
 %exclude %{_sysconfdir}/glusterfs
 %exclude %{_sysconfdir}/glusterfs/glusterd.vol
 %exclude %{_sysconfdir}/glusterfs/glusterfs-georep-logrotate
@@ -1093,7 +1091,9 @@ exit 0
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/arbiter.so
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/bit-rot.so
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/bitrot-stub.so
+%if ( 0%{!?_without_tiering:1} )
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/changetimerecorder.so
+%endif
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/index.so
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/leases.so
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/locks.so
@@ -1107,7 +1107,9 @@ exit 0
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/performance/decompounder.so
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/protocol/server*
 %exclude %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/storage*
+%if ( 0%{!?_without_tiering:1} )
 %exclude %{_libdir}/libgfdb.so.*
+%endif
 %exclude %{_sbindir}/gcron.py
 %exclude %{_sbindir}/glfsheal
 %exclude %{_sbindir}/glusterd
