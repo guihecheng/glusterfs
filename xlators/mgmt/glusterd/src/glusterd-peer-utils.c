@@ -554,7 +554,7 @@ out:
  * @prefix. All the parameters are compulsory.
  *
  * The complete address list is added to the dict only if the cluster op-version
- * is >= GD_OP_VERSION_3_6_0
+ * is >= GD_OP_VERSION_3_7_0
  */
 int
 gd_add_friend_to_dict (glusterd_peerinfo_t *friend, dict_t *dict,
@@ -609,7 +609,7 @@ gd_add_friend_to_dict (glusterd_peerinfo_t *friend, dict_t *dict,
                 goto out;
         }
 
-        if (conf->op_version < GD_OP_VERSION_3_6_0) {
+        if (conf->op_version < GD_OP_VERSION_3_7_0) {
                 ret = 0;
                 goto out;
         }
@@ -799,7 +799,7 @@ gd_update_peerinfo_from_dict (glusterd_peerinfo_t *peerinfo, dict_t *dict,
                 GF_FREE (peerinfo->hostname);
         peerinfo->hostname = gf_strdup (hostname);
 
-        if (conf->op_version < GD_OP_VERSION_3_6_0) {
+        if (conf->op_version < GD_OP_VERSION_3_7_0) {
                 ret = 0;
                 goto out;
         }
@@ -913,7 +913,7 @@ gd_add_peer_hostnames_to_dict (glusterd_peerinfo_t *peerinfo, dict_t *dict,
         conf = this->private;
         GF_VALIDATE_OR_GOTO (this->name, (conf != NULL), out);
 
-        if (conf->op_version < GD_OP_VERSION_3_6_0) {
+        if (conf->op_version < GD_OP_VERSION_3_7_0) {
                 ret = 0;
                 goto out;
         }

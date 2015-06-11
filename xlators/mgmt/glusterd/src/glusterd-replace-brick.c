@@ -305,7 +305,7 @@ glusterd_op_stage_replace_brick (dict_t *dict, char **op_errstr,
                 if (ret)
                         goto out;
 
-        } else if (priv->op_version >= GD_OP_VERSION_3_6_0) {
+        } else if (priv->op_version >= GD_OP_VERSION_RHS_3_0) {
                 /* A bricks mount dir is required only by snapshots which were
                  * introduced in gluster-3.6.0
                  */
@@ -389,7 +389,7 @@ glusterd_op_perform_replace_brick (glusterd_volinfo_t  *volinfo,
         /* A bricks mount dir is required only by snapshots which were
          * introduced in gluster-3.6.0
          */
-        if (conf->op_version >= GD_OP_VERSION_3_6_0) {
+        if (conf->op_version >= GD_OP_VERSION_RHS_3_0) {
                 ret = dict_get_str (dict, "brick1.mount_dir", &brick_mount_dir);
                 if (ret) {
                         gf_msg (this->name, GF_LOG_ERROR, errno,

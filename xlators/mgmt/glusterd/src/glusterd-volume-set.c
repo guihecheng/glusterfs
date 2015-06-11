@@ -1263,7 +1263,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key         = "cluster.subvols-per-directory",
           .voltype     = "cluster/distribute",
           .option      = "directory-layout-spread",
-          .op_version  = 2,
+          .op_version  = 1,
           .validate_fn = validate_subvols_per_directory,
           .flags       = OPT_FLAG_CLIENT_OPT
         },
@@ -1275,27 +1275,27 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key        = "cluster.rsync-hash-regex",
           .voltype    = "cluster/distribute",
           .type       = NO_DOC,
-          .op_version = 3,
+          .op_version = 2,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "cluster.extra-hash-regex",
           .voltype    = "cluster/distribute",
           .type       = NO_DOC,
-          .op_version = 3,
+          .op_version = 2,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "cluster.dht-xattr-name",
           .voltype    = "cluster/distribute",
           .option     = "xattr-name",
           .type       = NO_DOC,
-          .op_version = 3,
+          .op_version = 2,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "cluster.randomize-hash-range-by-gfid",
           .voltype    = "cluster/distribute",
           .option     = "randomize-hash-range-by-gfid",
           .type       = NO_DOC,
-          .op_version = GD_OP_VERSION_3_6_0,
+          .op_version = GD_OP_VERSION_3_7_0,
           .flags      = OPT_FLAG_CLIENT_OPT,
         },
         { .key         = "cluster.rebal-throttle",
@@ -1327,12 +1327,12 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype    = "cluster/nufa",
           .option     = "local-volume-name",
           .type       = NO_DOC,
-          .op_version = 3,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "cluster.weighted-rebalance",
           .voltype    = "cluster/distribute",
-          .op_version = GD_OP_VERSION_3_6_0,
+          .op_version = GD_OP_VERSION_3_7_0,
         },
 
         /* Switch xlator options (Distribute special case) */
@@ -1340,14 +1340,14 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype    = "cluster/distribute",
           .option     = "!switch",
           .type       = NO_DOC,
-          .op_version = 3,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "cluster.switch-pattern",
           .voltype    = "cluster/switch",
           .option     = "pattern.switch.case",
           .type       = NO_DOC,
-          .op_version = 3,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
 
@@ -1475,18 +1475,18 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         },
         { .key        = "cluster.readdir-failover",
           .voltype    = "cluster/replicate",
-          .op_version = 2,
+          .op_version = 1,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "cluster.ensure-durability",
           .voltype    = "cluster/replicate",
-          .op_version = 3,
+          .op_version = 2,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "cluster.consistent-metadata",
           .voltype    = "cluster/replicate",
           .type       = DOC,
-          .op_version = GD_OP_VERSION_3_7_0,
+          .op_version = GD_OP_VERSION_RHS_3_0_4,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "cluster.heal-wait-queue-length",
@@ -1562,45 +1562,45 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key         = "diagnostics.brick-logger",
           .voltype     = "debug/io-stats",
           .option      = "!logger",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key        = "diagnostics.client-logger",
           .voltype    = "debug/io-stats",
           .option     = "!logger",
-          .op_version = GD_OP_VERSION_3_6_0,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key         = "diagnostics.brick-log-format",
           .voltype     = "debug/io-stats",
           .option      = "!log-format",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key        = "diagnostics.client-log-format",
           .voltype    = "debug/io-stats",
           .option     = "!log-format",
-          .op_version = GD_OP_VERSION_3_6_0,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key         = "diagnostics.brick-log-buf-size",
           .voltype     = "debug/io-stats",
           .option      = "!log-buf-size",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key        = "diagnostics.client-log-buf-size",
           .voltype    = "debug/io-stats",
           .option     = "!log-buf-size",
-          .op_version = GD_OP_VERSION_3_6_0,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key         = "diagnostics.brick-log-flush-timeout",
           .voltype     = "debug/io-stats",
           .option      = "!log-flush-timeout",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key        = "diagnostics.client-log-flush-timeout",
           .voltype    = "debug/io-stats",
           .option     = "!log-flush-timeout",
-          .op_version = GD_OP_VERSION_3_6_0,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key         = "diagnostics.stats-dump-interval",
@@ -1688,6 +1688,10 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "performance/io-threads",
           .op_version  = 1
         },
+        { .key         = "performance.least-rate-limit",
+          .voltype     = "performance/io-threads",
+          .op_version  = 1
+        },
 
         /* Other perf xlators' options */
         { .key        = "performance.cache-size",
@@ -1705,7 +1709,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key        = "performance.nfs.flush-behind",
           .voltype    = "performance/write-behind",
           .option     = "flush-behind",
-          .op_version = 1,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "performance.write-behind-window-size",
@@ -1731,43 +1735,43 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key        = "performance.nfs.write-behind-window-size",
           .voltype    = "performance/write-behind",
           .option     = "cache-size",
-          .op_version = 1,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "performance.strict-o-direct",
           .voltype    = "performance/write-behind",
           .option     = "strict-O_DIRECT",
-          .op_version = 2,
+          .op_version = 1,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "performance.nfs.strict-o-direct",
           .voltype    = "performance/write-behind",
           .option     = "strict-O_DIRECT",
-          .op_version = 2,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "performance.strict-write-ordering",
           .voltype    = "performance/write-behind",
           .option     = "strict-write-ordering",
-          .op_version = 2,
+          .op_version = 1,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "performance.nfs.strict-write-ordering",
           .voltype    = "performance/write-behind",
           .option     = "strict-write-ordering",
-          .op_version = 2,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "performance.lazy-open",
           .voltype    = "performance/open-behind",
           .option     = "lazy-open",
-          .op_version = 3,
+          .op_version = 2,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "performance.read-after-open",
           .voltype    = "performance/open-behind",
           .option     = "read-after-open",
-          .op_version = 3,
+          .op_version = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key        = "performance.read-ahead-page-count",
@@ -1815,29 +1819,29 @@ struct volopt_map_entry glusterd_volopt_map[] = {
 
          /* Crypt xlator options */
 
-        { .key         = "features.encryption",
-          .voltype     = "encryption/crypt",
-          .option      = "!feat",
-          .value       = "off",
-          .op_version  = 3,
-          .description = "enable/disable client-side encryption for "
+	{ .key         = "features.encryption",
+	  .voltype     = "encryption/crypt",
+	  .option      = "!feat",
+	  .value       = "off",
+	  .op_version  = GD_OP_VERSION_RHS_3_0,
+	  .description = "enable/disable client-side encryption for "
                          "the volume.",
           .flags       = OPT_FLAG_CLIENT_OPT | OPT_FLAG_XLATOR_OPT
         },
 
         { .key         = "encryption.master-key",
           .voltype     = "encryption/crypt",
-          .op_version  = 3,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key         = "encryption.data-key-size",
           .voltype     = "encryption/crypt",
-          .op_version  = 3,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key         = "encryption.block-size",
           .voltype     = "encryption/crypt",
-          .op_version  = 3,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
 
@@ -1881,7 +1885,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key        = "network.remote-dio",
           .voltype    = "protocol/client",
           .option     = "filter-O_DIRECT",
-          .op_version = 2,
+          .op_version = 1,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
         { .key         = "client.own-thread",
@@ -1892,7 +1896,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         },
         { .key         = "client.event-threads",
           .voltype     = "protocol/client",
-          .op_version  = GD_OP_VERSION_3_7_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0_4,
         },
         { .key         = "client.tcp-user-timeout",
           .voltype     = "protocol/client",
@@ -1960,17 +1964,17 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key         = "server.root-squash",
           .voltype     = "protocol/server",
           .option      = "root-squash",
-          .op_version  = 2
+          .op_version  = 1
         },
         { .key         = "server.anonuid",
           .voltype     = "protocol/server",
           .option      = "anonuid",
-          .op_version  = 3
+          .op_version  = GD_OP_VERSION_RHS_3_0
         },
         { .key         = "server.anongid",
           .voltype     = "protocol/server",
           .option      = "anongid",
-          .op_version  = 3
+          .op_version  = GD_OP_VERSION_RHS_3_0
         },
         { .key         = "server.statedump-path",
           .voltype     = "protocol/server",
@@ -1981,7 +1985,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "protocol/server",
           .option      = "rpc.outstanding-rpc-limit",
           .type        = GLOBAL_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "features.lock-heal",
           .voltype     = "protocol/server",
@@ -2007,11 +2011,11 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .option      = "!ssl-allow",
           .value       = "*",
           .type        = NO_DOC,
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_3_7_0,
         },
         { .key         = "server.manage-gids",
           .voltype     = "protocol/server",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = "server.dynamic-auth",
           .voltype     = "protocol/server",
@@ -2020,11 +2024,11 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key         = "client.send-gids",
           .voltype     = "protocol/client",
           .type        = NO_DOC,
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = "server.gid-timeout",
           .voltype     = "protocol/server",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = "server.own-thread",
           .voltype     = "protocol/server",
@@ -2034,7 +2038,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         },
         { .key         = "server.event-threads",
           .voltype     = "protocol/server",
-          .op_version  = GD_OP_VERSION_3_7_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0_4,
         },
         { .key         = "server.tcp-user-timeout",
           .voltype     = "protocol/server",
@@ -2095,12 +2099,12 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key         = SSL_CERT_DEPTH_OPT,
           .voltype     = "rpc-transport/socket",
           .option      = "!ssl-cert-depth",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_3_7_0,
         },
         { .key         = SSL_CIPHER_LIST_OPT,
           .voltype     = "rpc-transport/socket",
           .option      = "!ssl-cipher-list",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_3_7_0,
         },
         { .key        = SSL_DH_PARAM_OPT,
           .voltype     = "rpc-transport/socket",
@@ -2140,8 +2144,8 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key         = "performance.readdir-ahead",
           .voltype     = "performance/readdir-ahead",
           .option      = "!perf",
-          .value       = "on",
-          .op_version  = 3,
+          .value       = "off",
+          .op_version  = GD_OP_VERSION_RHS_3_0,
           .description = "enable/disable readdir-ahead translator in the volume.",
           .flags       = OPT_FLAG_CLIENT_OPT | OPT_FLAG_XLATOR_OPT
         },
@@ -2263,7 +2267,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         /* Feature translators */
         { .key         = "features.uss",
           .voltype     = "features/snapview-server",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
           .value       = "off",
           .flags       = OPT_FLAG_CLIENT_OPT | OPT_FLAG_XLATOR_OPT,
           .validate_fn = validate_uss,
@@ -2273,7 +2277,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
 
         { .key         = "features.snapshot-directory",
           .voltype     = "features/snapview-client",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
           .value       = ".snaps",
           .flags       = OPT_FLAG_CLIENT_OPT | OPT_FLAG_XLATOR_OPT,
           .validate_fn = validate_uss_dir,
@@ -2284,7 +2288,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
 
         { .key         = "features.show-snapshot-directory",
           .voltype     = "features/snapview-client",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
           .value       = "off",
           .flags       = OPT_FLAG_CLIENT_OPT | OPT_FLAG_XLATOR_OPT,
           .description = "show entry point in readdir output of "
@@ -2299,35 +2303,35 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "features/cdc",
           .option      = "!feat",
           .value       = "off",
-          .op_version  = 3,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
           .description = "enable/disable network compression translator",
           .flags       = OPT_FLAG_XLATOR_OPT
         },
         { .key         = "network.compression.window-size",
           .voltype     = "features/cdc",
           .option      = "window-size",
-          .op_version  = 3
+          .op_version  = GD_OP_VERSION_RHS_3_0
         },
         { .key         = "network.compression.mem-level",
           .voltype     = "features/cdc",
           .option      = "mem-level",
-          .op_version  = 3
+          .op_version  = GD_OP_VERSION_RHS_3_0
         },
         { .key         = "network.compression.min-size",
           .voltype     = "features/cdc",
           .option      = "min-size",
-          .op_version  = 3
+          .op_version  = GD_OP_VERSION_RHS_3_0
         },
         { .key         = "network.compression.compression-level",
           .voltype     = "features/cdc",
           .option      = "compression-level",
-          .op_version  = 3
+          .op_version  = GD_OP_VERSION_RHS_3_0
         },
         { .key         = "network.compression.debug",
           .voltype     = "features/cdc",
           .option      = "debug",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = GD_OP_VERSION_RHS_3_0
         },
 #endif
 
@@ -2342,25 +2346,25 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype       = "features/quota",
           .option        = "default-soft-limit",
           .type          = NO_DOC,
-          .op_version    = 3,
+          .op_version    = 2,
         },
         { .key           = "features.soft-timeout",
           .voltype       = "features/quota",
           .option        = "soft-timeout",
           .type          = NO_DOC,
-          .op_version    = 3,
+          .op_version    = 2,
         },
         { .key           = "features.hard-timeout",
           .voltype       = "features/quota",
           .option        = "hard-timeout",
           .type          = NO_DOC,
-          .op_version    = 3,
+          .op_version    = 2,
         },
         { .key           = "features.alert-time",
           .voltype       = "features/quota",
           .option        = "alert-time",
           .type          = NO_DOC,
-          .op_version    = 3,
+          .op_version    = 2,
         },
         { .key           = "features.quota-deem-statfs",
           .voltype       = "features/quota",
@@ -2474,25 +2478,25 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "debug/error-gen",
           .option      = "failure",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "debug.error-number",
           .voltype     = "debug/error-gen",
           .option      = "error-no",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "debug.random-failure",
           .voltype     = "debug/error-gen",
           .option      = "random-failure",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "debug.error-fops",
           .voltype     = "debug/error-gen",
           .option      = "enable",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
 
 
@@ -2543,7 +2547,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "nfs/server",
           .option      = "rpc.outstanding-rpc-limit",
           .type        = GLOBAL_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "nfs.port",
           .voltype     = "nfs/server",
@@ -2619,7 +2623,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "nfs/server",
           .option      = "nfs.acl",
           .type        = GLOBAL_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "nfs.mount-udp",
           .voltype     = "nfs/server",
@@ -2637,13 +2641,13 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "nfs/server",
           .option      = "nfs.rpc-statd",
           .type        = NO_DOC,
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = "nfs.log-level",
           .voltype     = "nfs/server",
           .option      = "nfs.log-level",
           .type        = NO_DOC,
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = "nfs.server-aux-gids",
           .voltype     = "nfs/server",
@@ -2655,31 +2659,31 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "nfs/server",
           .option      = "nfs.drc",
           .type        = GLOBAL_DOC,
-          .op_version  = 3
+          .op_version  = 1
         },
         { .key         = "nfs.drc-size",
           .voltype     = "nfs/server",
           .option      = "nfs.drc-size",
           .type        = GLOBAL_DOC,
-          .op_version  = 3
+          .op_version  = 1
         },
         { .key         = "nfs.read-size",
           .voltype     = "nfs/server",
           .option      = "nfs3.read-size",
           .type        = GLOBAL_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "nfs.write-size",
           .voltype     = "nfs/server",
           .option      = "nfs3.write-size",
           .type        = GLOBAL_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "nfs.readdir-size",
           .voltype     = "nfs/server",
           .option      = "nfs3.readdir-size",
           .type        = GLOBAL_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "nfs.rdirplus",
           .voltype     = "nfs/server",
@@ -2714,7 +2718,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key        = "features.read-only",
           .voltype    = "features/read-only",
           .option     = "read-only",
-          .op_version = 1,
+          .op_version = 2,
           .flags      = OPT_FLAG_CLIENT_OPT | OPT_FLAG_XLATOR_OPT
         },
         { .key         = "features.worm",
@@ -2757,15 +2761,15 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         },
         { .key         = "storage.batch-fsync-mode",
           .voltype     = "storage/posix",
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "storage.batch-fsync-delay-usec",
           .voltype     = "storage/posix",
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "storage.xattr-user-namespace-mode",
           .voltype     = "storage/posix",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = "storage.owner-uid",
           .voltype     = "storage/posix",
@@ -2779,16 +2783,16 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         },
         { .key         = "storage.node-uuid-pathinfo",
           .voltype     = "storage/posix",
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "storage.health-check-interval",
           .voltype     = "storage/posix",
-          .op_version  = 3
+          .op_version  = 2
         },
         { .option      = "update-link-count-parent",
           .key         = "storage.build-pgfid",
           .voltype     = "storage/posix",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .option      = "gfid2path",
           .key         = "storage.gfid2path",
@@ -2803,7 +2807,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         },
         { .key         = "storage.bd-aio",
           .voltype     = "storage/bd",
-          .op_version  = 3
+          .op_version  = GD_OP_VERSION_RHS_3_0
         },
         { .key        = "config.memory-accounting",
           .voltype    = "mgmt/glusterd",
@@ -2819,43 +2823,43 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key         = GLUSTERD_QUORUM_TYPE_KEY,
           .voltype     = "mgmt/glusterd",
           .value       = "off",
-          .op_version  = 2
+          .op_version  = 1
         },
         { .key         = GLUSTERD_QUORUM_RATIO_KEY,
           .voltype     = "mgmt/glusterd",
           .value       = "0",
-          .op_version  = 2
+          .op_version  = 1
         },
         /* changelog translator - global tunables */
         { .key         = "changelog.changelog",
           .voltype     = "features/changelog",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "changelog.changelog-dir",
           .voltype     = "features/changelog",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "changelog.encoding",
           .voltype     = "features/changelog",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "changelog.rollover-time",
           .voltype     = "features/changelog",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "changelog.fsync-interval",
           .voltype     = "features/changelog",
           .type        = NO_DOC,
-          .op_version  = 3
+          .op_version  = 2
         },
         { .key         = "changelog.changelog-barrier-timeout",
           .voltype     = "features/changelog",
           .value       = BARRIER_TIMEOUT,
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = "changelog.capture-del-path",
           .voltype     = "features/changelog",
@@ -2866,16 +2870,16 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .voltype     = "features/barrier",
           .value       = "disable",
           .type        = NO_DOC,
-          .op_version  = GD_OP_VERSION_3_7_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = "features.barrier-timeout",
           .voltype     = "features/barrier",
           .value       = BARRIER_TIMEOUT,
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         { .key         = GLUSTERD_GLOBAL_OP_VERSION_KEY,
           .voltype     = "mgmt/glusterd",
-          .op_version  = GD_OP_VERSION_3_6_0,
+          .op_version  = GD_OP_VERSION_RHS_3_0,
         },
         {
           .key         = GLUSTERD_MAX_OP_VERSION_KEY,

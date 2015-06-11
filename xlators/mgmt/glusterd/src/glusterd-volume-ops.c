@@ -1325,7 +1325,7 @@ glusterd_op_stage_create_volume (dict_t *dict, char **op_errstr,
                         /* A bricks mount dir is required only by snapshots which were
                          * introduced in gluster-3.6.0
                          */
-                        if (priv->op_version >= GD_OP_VERSION_3_6_0) {
+                        if (priv->op_version >= GD_OP_VERSION_RHS_3_0) {
                                 ret = glusterd_get_brick_mount_dir
                                         (brick_info->path, brick_info->hostname,
                                          brick_info->mount_dir);
@@ -1611,7 +1611,7 @@ glusterd_op_stage_start_volume (dict_t *dict, char **op_errstr,
                 /* A bricks mount dir is required only by snapshots which were
                  * introduced in gluster-3.6.0
                  */
-                if (priv->op_version >= GD_OP_VERSION_3_6_0) {
+                if (priv->op_version >= GD_OP_VERSION_RHS_3_0) {
                         if (strlen(brickinfo->mount_dir) < 1) {
                                 ret = glusterd_get_brick_mount_dir
                                         (brickinfo->path, brickinfo->hostname,
@@ -2320,10 +2320,10 @@ glusterd_op_create_volume (dict_t *dict, char **op_errstr)
                                  "redundancy count for volume %s", volname);
                         goto out;
                 }
-                if (priv->op_version < GD_OP_VERSION_3_6_0) {
+                if (priv->op_version < GD_OP_VERSION_3_7_0) {
                         gf_msg (this->name, GF_LOG_ERROR, 0,
                                 GD_MSG_UNSUPPORTED_VERSION, "Disperse volume "
-                                "needs op-version 3.6.0 or higher");
+                                "needs op-version 30700 or higher");
                         ret = -1;
                         goto out;
                 }
@@ -2428,7 +2428,7 @@ glusterd_op_create_volume (dict_t *dict, char **op_errstr)
                 /* A bricks mount dir is required only by snapshots which were
                  * introduced in gluster-3.6.0
                  */
-                if (priv->op_version >= GD_OP_VERSION_3_6_0) {
+                if (priv->op_version >= GD_OP_VERSION_RHS_3_0) {
                         brick_mount_dir = NULL;
                         snprintf (key, sizeof(key), "brick%d.mount_dir", i);
                         ret = dict_get_str (dict, key, &brick_mount_dir);
@@ -2623,7 +2623,7 @@ glusterd_op_start_volume (dict_t *dict, char **op_errstr)
         /* A bricks mount dir is required only by snapshots which were
          * introduced in gluster-3.6.0
          */
-        if (conf->op_version >= GD_OP_VERSION_3_6_0) {
+        if (conf->op_version >= GD_OP_VERSION_RHS_3_0) {
                 cds_list_for_each_entry (brickinfo, &volinfo->bricks,
                                          brick_list) {
                         brick_count++;

@@ -921,7 +921,7 @@ glusterd_op_stage_tier (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
          * 'force'
          */
         ret = glusterd_check_client_op_version_support
-                (volname, GD_OP_VERSION_3_6_0, NULL);
+                (volname, GD_OP_VERSION_RHS_3_0, NULL);
         if (ret) {
                 ret = gf_asprintf (op_errstr, "Volume %s has one or "
                                    "more connected clients of a version"

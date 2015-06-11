@@ -191,7 +191,7 @@ glusterd_generate_txn_id (dict_t *dict, uuid_t **txn_id)
         if (!*txn_id)
                 goto out;
 
-        if (priv->op_version < GD_OP_VERSION_3_6_0)
+        if (priv->op_version < GD_OP_VERSION_RHS_3_0)
                 gf_uuid_copy (**txn_id, priv->global_txn_id);
         else
                 gf_uuid_generate (**txn_id);
@@ -1824,11 +1824,11 @@ glusterd_op_stage_status_volume (dict_t *dict, char **op_errstr)
         }
 
         if ((cmd & GF_CLI_STATUS_SNAPD) &&
-            (priv->op_version < GD_OP_VERSION_3_6_0)) {
+            (priv->op_version < GD_OP_VERSION_RHS_3_0)) {
                 snprintf (msg, sizeof (msg), "The cluster is operating at "
                           "version less than %d. Getting the "
                           "status of snapd is not allowed in this state.",
-                          GD_OP_VERSION_3_6_0);
+                          GD_OP_VERSION_RHS_3_0);
                 ret = -1;
                 goto out;
         }
@@ -3872,7 +3872,7 @@ glusterd_op_ac_send_lock (glusterd_op_sm_event_t *event, void *ctx)
                         continue;
 
                 /* Based on the op_version, acquire a cluster or mgmt_v3 lock */
-                if (priv->op_version < GD_OP_VERSION_3_6_0) {
+                if (priv->op_version < GD_OP_VERSION_RHS_3_0) {
                         proc = &peerinfo->mgmt->proctable
                                           [GLUSTERD_MGMT_CLUSTER_LOCK];
                         if (proc->fn) {
@@ -3983,7 +3983,7 @@ glusterd_op_ac_send_unlock (glusterd_op_sm_event_t *event, void *ctx)
                         continue;
                 /* Based on the op_version,
                  * release the cluster or mgmt_v3 lock */
-                if (priv->op_version < GD_OP_VERSION_3_6_0) {
+                if (priv->op_version < GD_OP_VERSION_RHS_3_0) {
                         proc = &peerinfo->mgmt->proctable
                                           [GLUSTERD_MGMT_CLUSTER_UNLOCK];
                         if (proc->fn) {
@@ -5010,7 +5010,7 @@ glusterd_op_modify_op_ctx (glusterd_op_t op, void *ctx)
                 count = brick_index_max + other_count + 1;
 
                 /*
-                 * a glusterd lesser than version 3.7 will be sending the
+                 * a glusterd lesser than version RHS-3.0.4 will be sending the
                  * rdma port in older key. Changing that value from here
                  * to support backward compatibility
                  */
@@ -5029,7 +5029,7 @@ glusterd_op_modify_op_ctx (glusterd_op_t op, void *ctx)
                          }
                  }
                  glusterd_volinfo_find (volname, &volinfo);
-                 if (conf->op_version < GD_OP_VERSION_3_7_0 &&
+                 if (conf->op_version < GD_OP_VERSION_RHS_3_0_4 &&
                      volinfo->transport_type == GF_TRANSPORT_RDMA) {
                          ret = glusterd_op_modify_port_key (op_ctx,
                                                             brick_index_max);
@@ -5670,7 +5670,7 @@ glusterd_op_txn_complete (uuid_t *txn_id)
         glusterd_op_clear_errstr ();
 
         /* Based on the op-version, we release the cluster or mgmt_v3 lock */
-        if (priv->op_version < GD_OP_VERSION_3_6_0) {
+        if (priv->op_version < GD_OP_VERSION_RHS_3_0) {
                 ret = glusterd_unlock (MY_UUID);
                 /* unlock cant/shouldnt fail here!! */
                 if (ret)

@@ -1863,7 +1863,7 @@ gd_sync_task_begin (dict_t *op_ctx, rpcsvc_request_t * req)
                 goto out;
         }
 
-        if (conf->op_version < GD_OP_VERSION_3_6_0)
+        if (conf->op_version < GD_OP_VERSION_RHS_3_0)
                 cluster_lock = _gf_true;
 
         /* Based on the op_version, acquire a cluster or mgmt_v3 lock */

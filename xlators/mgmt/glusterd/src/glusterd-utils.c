@@ -11758,10 +11758,10 @@ gd_update_volume_op_versions (glusterd_volinfo_t *volinfo)
         }
 
         if (volinfo->type == GF_CLUSTER_TYPE_DISPERSE) {
-                if (volinfo->op_version < GD_OP_VERSION_3_6_0)
-                        volinfo->op_version = GD_OP_VERSION_3_6_0;
-                if (volinfo->client_op_version < GD_OP_VERSION_3_6_0)
-                        volinfo->client_op_version = GD_OP_VERSION_3_6_0;
+                if (volinfo->op_version < GD_OP_VERSION_3_7_0)
+                        volinfo->op_version = GD_OP_VERSION_3_7_0;
+                if (volinfo->client_op_version < GD_OP_VERSION_3_7_0)
+                        volinfo->client_op_version = GD_OP_VERSION_3_7_0;
         }
 
         return;

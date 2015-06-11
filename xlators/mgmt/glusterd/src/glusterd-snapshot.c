@@ -9341,7 +9341,7 @@ glusterd_handle_snapshot_fn (rpcsvc_request_t *req)
                 goto out;
         }
 
-        if (conf->op_version < GD_OP_VERSION_3_6_0) {
+        if (conf->op_version < GD_OP_VERSION_RHS_3_0) {
                 snprintf (err_str, sizeof (err_str), "Cluster operating version"
                           " is lesser than the supported version "
                           "for a snapshot");
@@ -9349,7 +9349,7 @@ glusterd_handle_snapshot_fn (rpcsvc_request_t *req)
                 gf_msg (this->name, GF_LOG_ERROR, 0,
                         GD_MSG_UNSUPPORTED_VERSION,
                         "%s (%d < %d)", err_str,
-                        conf->op_version, GD_OP_VERSION_3_6_0);
+                        conf->op_version, GD_OP_VERSION_RHS_3_0);
                 ret = -1;
                 goto out;
         }

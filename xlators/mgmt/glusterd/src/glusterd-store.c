@@ -302,7 +302,7 @@ gd_store_brick_snap_details_write (int fd, glusterd_brickinfo_t *brickinfo)
         GF_VALIDATE_OR_GOTO (this->name, (fd > 0), out);
         GF_VALIDATE_OR_GOTO (this->name, (brickinfo != NULL), out);
 
-        if (conf->op_version < GD_OP_VERSION_3_6_0) {
+        if (conf->op_version < GD_OP_VERSION_RHS_3_0) {
                 ret = 0;
                 goto out;
         }
@@ -799,7 +799,7 @@ glusterd_volume_write_snap_details (int fd, glusterd_volinfo_t *volinfo)
         GF_VALIDATE_OR_GOTO (this->name, (fd > 0), out);
         GF_VALIDATE_OR_GOTO (this->name, (volinfo != NULL), out);
 
-        if (conf->op_version < GD_OP_VERSION_3_6_0) {
+        if (conf->op_version < GD_OP_VERSION_RHS_3_0) {
                 ret = 0;
                 goto out;
         }
@@ -968,7 +968,7 @@ glusterd_volume_exclude_options_write (int fd, glusterd_volinfo_t *volinfo)
                         goto out;
         }
 
-        if (conf->op_version >= GD_OP_VERSION_3_6_0) {
+        if (conf->op_version >= GD_OP_VERSION_RHS_3_0) {
                 snprintf (buf, sizeof (buf), "%d", volinfo->disperse_count);
                 ret = gf_store_save_value (fd,
                                            GLUSTERD_STORE_KEY_VOL_DISPERSE_CNT,
@@ -2339,7 +2339,7 @@ glusterd_store_retrieve_snapd (glusterd_volinfo_t *volinfo)
         conf = THIS->private;
         GF_ASSERT (volinfo);
 
-        if (conf->op_version < GD_OP_VERSION_3_6_0) {
+        if (conf->op_version < GD_OP_VERSION_RHS_3_0) {
                 ret = 0;
                 goto out;
         }
@@ -2347,15 +2347,16 @@ glusterd_store_retrieve_snapd (glusterd_volinfo_t *volinfo)
         /*
          * This is needed for upgrade situations. Say a volume is created with
          * older version of glusterfs and upgraded to a glusterfs version equal
-         * to or greater than GD_OP_VERSION_3_6_0. The older glusterd would not
-         * have created the snapd.info file related to snapshot daemon for user
-         * serviceable snapshots. So as part of upgrade when the new glusterd
-         * starts, as part of restore (restoring the volume to be precise), it
-         * tries to snapd related info from snapd.info file. But since there was
-         * no such file till now, the restore operation fails. Thus, to prevent
-         * it from happening check whether user serviceable snapshots features
-         * is enabled before restoring snapd. If its disbaled, then simply
-         * exit by returning success (without even checking for the snapd.info).
+         * to or greater than GD_OP_VERSION_RHS_3_0. The older glusterd would
+         * not have created the snapd.info file related to snapshot daemon for
+         * user serviceable snapshots. So as part of upgrade when the new
+         * glusterd starts, as part of restore (restoring the volume to be
+         * precise), it tries to snapd related info from snapd.info file. But
+         * since there was no such file till now, the restore operation fails.
+         * Thus, to prevent it from happening check whether user serviceable
+         * snapshots features is enabled before restoring snapd. If its
+         * disbaled, then simply exit by returning success (without even
+         * checking for the snapd.info).
          */
 
         if (!dict_get_str_boolean (volinfo->dict, "features.uss", _gf_false)) {

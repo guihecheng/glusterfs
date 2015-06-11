@@ -302,11 +302,11 @@ __glusterd_probe_cbk (struct rpc_req *req, struct iovec *iov,
          * we need to add the new hostname to the peer.
          *
          * This addition should only be done for cluster op-version >=
-         * GD_OP_VERSION_3_6_0 as address lists are only supported from then on.
+         * GD_OP_VERSION_3_7_0 as address lists are only supported from then on.
          * Also, this update should only be done when an explicit CLI probe
          * command was used to begin the probe process.
          */
-        if ((conf->op_version >= GD_OP_VERSION_3_6_0) &&
+        if ((conf->op_version >= GD_OP_VERSION_3_7_0) &&
             (gf_uuid_compare (rsp.uuid, peerinfo->uuid) == 0)) {
                 ctx = ((call_frame_t *)myframe)->local;
                 /* Presence of ctx->req implies this probe was started by a cli
@@ -1591,7 +1591,7 @@ glusterd_rpc_friend_add (call_frame_t *frame, xlator_t *this,
                 goto out;
         }
 
-        if (priv->op_version >= GD_OP_VERSION_3_6_0) {
+        if (priv->op_version >= GD_OP_VERSION_RHS_3_0) {
                 ret = glusterd_add_missed_snaps_to_export_dict (peer_data);
                 if (ret) {
                         gf_msg (this->name, GF_LOG_ERROR, 0,

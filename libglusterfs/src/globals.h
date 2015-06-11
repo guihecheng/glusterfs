@@ -18,23 +18,28 @@
 #define GD_MIN_OP_VERSION_KEY "minimum-operating-version"
 #define GD_MAX_OP_VERSION_KEY "maximum-operating-version"
 
-/* Gluster versions - OP-VERSION mapping
+/* RHS versions - OP-VERSION mapping
  *
- * 3.3.x                - 1
- * 3.4.x                - 2
- * 3.5.0                - 3
- * 3.5.1                - 30501
- * 3.6.0                - 30600
- * 3.7.0                - 30700
- * 3.7.1                - 30701
- * 3.7.2                - 30702
+ * RHS-2.0 Z    - 1
+ * RHS-2.1 Z    - 2
+ * RHS-2.1 u5   - 20105
+ * RHS-3.0      - 30000
+ * RHS-3.0.4    - 30004
+ * RHGS-3.1     - 30702
  *
- * Starting with Gluster v3.6, the op-version will be multi-digit integer values
- * based on the Glusterfs version, instead of a simply incrementing integer
- * value. The op-version for a given X.Y.Z release will be an integer XYZ, with
- * Y and Z 2 digit always 2 digits wide and padded with 0 when needed. This
- * should allow for some gaps between two Y releases for backports of features
- * in Z releases.
+ *
+ * NOTE:
+ * Starting with RHS-3.0, the op-version will be multi-digit integer values
+ * based on the RHS version, instead of a simply incrementing integer value. The
+ * op-version for a given RHS X(Major).Y(Minor).Z(Update) release will be an
+ * integer with digits XYZ. The Y and Z values will be 2 digits wide always
+ * padded with 0 as needed. This should allow for some gaps between two Y
+ * releases for backports of features in Z releases.
+ *
+ * NOTE:
+ * Starting with RHGS-3.1, the op-version will be the same as the upstream
+ * GlusterFS op-versions. This is to allow proper access to upstream clients of
+ * version 3.7.x or greater, proper access to the RHGS volumes.
  */
 #define GD_OP_VERSION_MIN  1 /* MIN is the fresh start op-version, mostly
                                 should not change */
@@ -44,7 +49,13 @@
                                                   introduction of newer
                                                   versions */
 
-#define GD_OP_VERSION_3_6_0    30600 /* Op-Version for GlusterFS 3.6.0 */
+#define GD_OP_VERSION_RHS_3_0    30000 /* Op-Version of RHS 3.0 */
+
+#define GD_OP_VER_PERSISTENT_AFR_XATTRS GD_OP_VERSION_RHS_3_0
+
+#define GD_OP_VERSION_RHS_2_1_5  20105 /* RHS 2.1 update 5 */
+
+#define GD_OP_VERSION_RHS_3_0_4  30004 /* Op-Version of RHS 3.0.4 */
 
 #define GD_OP_VERSION_3_7_0    30700 /* Op-version for GlusterFS 3.7.0 */
 
@@ -89,8 +100,6 @@
 #define GD_OP_VERSION_3_12_0   31200 /* Op-version for GlusterFS 3.12.0 */
 
 #define GD_OP_VERSION_3_12_2   31202 /* Op-version for GlusterFS 3.12.2 */
-
-#define GD_OP_VER_PERSISTENT_AFR_XATTRS GD_OP_VERSION_3_6_0
 
 #include "xlator.h"
 

@@ -1379,7 +1379,7 @@ glusterd_op_perform_add_bricks (glusterd_volinfo_t *volinfo, int32_t count,
                 /* A bricks mount dir is required only by snapshots which were
                  * introduced in gluster-3.6.0
                  */
-                if (conf->op_version >= GD_OP_VERSION_3_6_0) {
+                if (conf->op_version >= GD_OP_VERSION_RHS_3_0) {
                         brick_mount_dir = NULL;
 
                         snprintf (key, sizeof(key), "brick%d.mount_dir", i);
@@ -1926,7 +1926,7 @@ glusterd_op_stage_add_brick (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
                         /* A bricks mount dir is required only by snapshots which were
                          * introduced in gluster-3.6.0
                          */
-                        if (conf->op_version >= GD_OP_VERSION_3_6_0) {
+                        if (conf->op_version >= GD_OP_VERSION_RHS_3_0) {
                                 ret = glusterd_get_brick_mount_dir
                                         (brickinfo->path, brickinfo->hostname,
                                          brickinfo->mount_dir);
@@ -2266,12 +2266,12 @@ glusterd_op_stage_remove_brick (dict_t *dict, char **op_errstr)
                 }
 
                 /* Check if the connected clients are all of version
-                 * glusterfs-3.6 and higher. This is needed to prevent some data
+                 * RHS-2.1u5 and higher. This is needed to prevent some data
                  * loss issues that could occur when older clients are connected
                  * when rebalance is run.
                  */
                 ret = glusterd_check_client_op_version_support
-                        (volname, GD_OP_VERSION_3_6_0, NULL);
+                        (volname, GD_OP_VERSION_RHS_2_1_5, NULL);
                 if (ret) {
                         ret = gf_asprintf (op_errstr, "Volume %s has one or "
                                            "more connected clients of a version"
