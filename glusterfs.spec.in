@@ -1196,9 +1196,10 @@ exit 0
 %{_tmpfilesdir}/gluster.conf
 %endif
 %if ( ! 0%{?_build_server} )
-%{_libdir}/pkgconfig/libgfchangelog.pc
-%{_libdir}/pkgconfig/libgfdb.pc
-%{_sbindir}/gluster-setgfid2path
+%exclude %{_libdir}/pkgconfig/libgfchangelog.pc
+%exclude %{_libdir}/pkgconfig/libgfdb.pc
+%exclude %{_sbindir}/gluster-setgfid2path
+%exclude %{_mandir}/man8/gluster-setgfid2path.8*
 %endif
 
 %files api
@@ -1226,6 +1227,12 @@ exit 0
      %{_includedir}/glusterfs/*
 %exclude %{_includedir}/glusterfs/api
 %exclude %{_libdir}/libgfapi.so
+%if ( ! 0%{?_build_server} )
+%exclude %{_libdir}/libgfchangelog.so
+%endif
+%if ( 0%{!?_without_tiering:1} && ! 0%{?_build_server})
+%exclude %{_libdir}/libgfdb.so
+%endif
 %{_libdir}/*.so
 # Glupy Translator examples
 %dir %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator
@@ -1235,10 +1242,14 @@ exit 0
      %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/glupy/helloworld.*
      %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/glupy/negative.*
 %if ( 0%{?_build_server} )
+%{_libdir}/pkgconfig/libgfchangelog.pc
+%else
 %exclude %{_libdir}/pkgconfig/libgfchangelog.pc
+%endif
+%if ( 0%{!?_without_tiering:1} && 0%{?_build_server})
+%{_libdir}/pkgconfig/libgfdb.pc
+%else
 %exclude %{_libdir}/pkgconfig/libgfdb.pc
-%exclude %{_sbindir}/gluster-setgfid2path
-%exclude %{_mandir}/man8/gluster-setgfid2path.8*
 %endif
 
 %files client-xlators
@@ -2160,6 +2171,9 @@ end
 
 * Tue Aug 18 2015 Niels de Vos <ndevos@redhat.com>
 - Include missing directories for glusterfind hooks scripts (#1225465)
+
+* Thu Jun 18 2015 Niels de Vos <ndevos@redhat.com>
+- glusterfs-devel for client-builds should not depend on -server (#1227029)
 
 * Mon Jun 15 2015 Niels de Vos <ndevos@redhat.com>
 - Replace hook script S31ganesha-set.sh by S31ganesha-start.sh (#1231738)
