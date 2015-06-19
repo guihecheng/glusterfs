@@ -1058,12 +1058,14 @@ fi
 %postun libs
 /sbin/ldconfig
 
+%if ( 0%{?_build_server} )
 %postun server
 /sbin/ldconfig
 %if (0%{?_with_firewalld:1})
     %firewalld_reload
 %endif
 exit 0
+%endif
 
 ##-----------------------------------------------------------------------------
 ## All %%files should be placed here and keep them grouped
@@ -1249,7 +1251,9 @@ exit 0
 %if ( 0%{!?_without_tiering:1} && 0%{?_build_server})
 %{_libdir}/pkgconfig/libgfdb.pc
 %else
+%if ( 0%{?rhel} && 0%{?rhel} >= 6 )
 %exclude %{_libdir}/pkgconfig/libgfdb.pc
+%endif
 %endif
 
 %files client-xlators
@@ -1259,7 +1263,7 @@ exit 0
 %dir %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/protocol
      %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/protocol/client.so
 
-+%if ( 0%{!?_without_extra_xlators:1} )
+%if ( 0%{!?_without_extra_xlators:1} )
 %files extra-xlators
 %dir %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator
 %dir %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/encryption
@@ -1378,12 +1382,14 @@ exit 0
 %endif
 
 %if ( 0%{?_build_server} )
+%if ( 0%{!?_without_regression_tests:1} )
 %files regression-tests
 %dir %{_datadir}/glusterfs
      %{_datadir}/glusterfs/run-tests.sh
      %{_datadir}/glusterfs/tests
 %exclude %{_datadir}/glusterfs/tests/vagrant
 %exclude %{_datadir}/share/glusterfs/tests/basic/rpm.t
+%endif
 %endif
 
 %if ( 0%{?_build_server} )
@@ -2294,6 +2300,9 @@ end
 
 * Tue Aug 18 2015 Niels de Vos <ndevos@redhat.com>
 - Include missing directories for glusterfind hooks scripts (#1225465)
+
+* Fri Jun 19 2015 Bala.FA <barumuga@redhat.com>
+- exclude libgfdb.pc conditionally for rhel-5 (#1233486)
 
 * Thu Jun 18 2015 Bala.FA <barumuga@redhat.com>
 - add pretrans check for client-xlators, ganesha and python-gluster
