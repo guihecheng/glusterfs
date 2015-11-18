@@ -1014,16 +1014,19 @@ glusterd_volume_exclude_options_write (int fd, glusterd_volinfo_t *volinfo)
                         goto out;
         }
 
-        snprintf (buf, sizeof (buf), "%d", volinfo->op_version);
-        ret = gf_store_save_value (fd, GLUSTERD_STORE_KEY_VOL_OP_VERSION, buf);
-        if (ret)
-                goto out;
+        if (conf->op_version >= GD_OP_VERSION_RHS_3_0) {
+                snprintf (buf, sizeof (buf), "%d", volinfo->op_version);
+                ret = gf_store_save_value (fd, GLUSTERD_STORE_KEY_VOL_OP_VERSION, buf);
+                if (ret)
+                        goto out;
 
-        snprintf (buf, sizeof (buf), "%d", volinfo->client_op_version);
-        ret = gf_store_save_value (fd, GLUSTERD_STORE_KEY_VOL_CLIENT_OP_VERSION,
-                                   buf);
-        if (ret)
-                goto out;
+                snprintf (buf, sizeof (buf), "%d", volinfo->client_op_version);
+                ret = gf_store_save_value (fd, GLUSTERD_STORE_KEY_VOL_CLIENT_OP_VERSION,
+                                           buf);
+                if (ret)
+                        goto out;
+        }
+
         if (volinfo->caps) {
                 snprintf (buf, sizeof (buf), "%d", volinfo->caps);
                 ret = gf_store_save_value (fd, GLUSTERD_STORE_KEY_VOL_CAPS,
