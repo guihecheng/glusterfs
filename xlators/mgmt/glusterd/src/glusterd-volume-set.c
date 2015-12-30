@@ -3152,7 +3152,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
                          "changetimerecorder xlator."
                          "The input to this option is in pages."
                          "Each page is 4096 bytes. Default value is 12500 "
-                         "pages."
+                         "pages i.e ~ 49 MB. "
                          "The max value is 262144 pages i.e 1 GB and "
                          "the min value is 1000 pages i.e ~ 4 MB. "
         },
@@ -3166,7 +3166,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
                          " changetimerecorder. "
                          "The input to this option is in pages. "
                          "Each page is 4096 bytes. Default value is 25000 "
-                         "pages."
+                         "pages i.e ~ 98 MB."
                          "The max value is 262144 pages i.e 1 GB and "
                          "the min value is 1000 pages i.e ~4 MB."
         },
