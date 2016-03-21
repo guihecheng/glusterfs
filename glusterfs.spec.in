@@ -651,12 +651,7 @@ CFLAGS=-DUSE_INSECURE_OPENSSL
 export CFLAGS
 %endif
 
-# RHEL6 and earlier need to manually replace config.guess and config.sub
-%if ( 0%{?rhel} && 0%{?rhel} <= 6 )
-./autogen.sh
-%endif
-
-%configure \
+./autogen.sh && %configure \
         %{?_with_cmocka} \
         %{?_with_debug} \
         %{?_with_firewalld} \
