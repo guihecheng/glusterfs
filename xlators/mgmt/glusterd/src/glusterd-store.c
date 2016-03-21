@@ -968,7 +968,7 @@ glusterd_volume_exclude_options_write (int fd, glusterd_volinfo_t *volinfo)
                         goto out;
         }
 
-        if (conf->op_version >= GD_OP_VERSION_RHS_3_0) {
+        if (conf->op_version >= GD_OP_VERSION_3_7_0) {
                 snprintf (buf, sizeof (buf), "%d", volinfo->disperse_count);
                 ret = gf_store_save_value (fd,
                                            GLUSTERD_STORE_KEY_VOL_DISPERSE_CNT,
