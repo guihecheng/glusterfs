@@ -258,8 +258,8 @@ rpc_transport_load (glusterfs_ctx_t *ctx, dict_t *options, char *trans_name)
                 else
                         trans->bind_insecure = 0;
         } else {
-                /* By default allow bind insecure */
-                trans->bind_insecure = 1;
+                /* Turning off bind insecure by default*/
+                trans->bind_insecure = 0;
         }
 
 	ret = dict_get_str (options, "transport-type", &type);
