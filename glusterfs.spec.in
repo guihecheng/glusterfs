@@ -840,23 +840,6 @@ install -D -p -m 0644 extras/glusterfs-georep-logrotate \
     %{buildroot}%{_sysconfdir}/logrotate.d/glusterfs-georep
 %endif
 
-%if ( 0%{!?_without_syslog:1} )
-%if ( 0%{?fedora} ) || ( 0%{?rhel} && 0%{?rhel} > 6 )
-install -D -p -m 0644 extras/gluster-rsyslog-7.2.conf \
-    %{buildroot}%{_sysconfdir}/rsyslog.d/gluster.conf.example
-%endif
-
-%if ( 0%{?rhel} && 0%{?rhel} == 6 )
-install -D -p -m 0644 extras/gluster-rsyslog-5.8.conf \
-    %{buildroot}%{_sysconfdir}/rsyslog.d/gluster.conf.example
-%endif
-
-%if ( 0%{?fedora} ) || ( 0%{?rhel} && 0%{?rhel} >= 6 )
-install -D -p -m 0644 extras/logger.conf.example \
-    %{buildroot}%{_sysconfdir}/glusterfs/logger.conf.example
-%endif
-%endif
-
 touch %{buildroot}%{_sharedstatedir}/glusterd/glusterd.info
 touch %{buildroot}%{_sharedstatedir}/glusterd/options
 subdirs=(add-brick create copy-file delete gsync-create remove-brick reset set start stop)
