@@ -1234,6 +1234,9 @@ exit 0
 %else
 %exclude %{_libdir}/pkgconfig/libgfchangelog.pc
 %endif
+%if ( 0%{!?_without_tiering:1} && ! 0%{?_build_server})
+%exclude %{_libdir}/libgfdb.so
+%endif
 %if ( 0%{!?_without_tiering:1} && 0%{?_build_server})
 %{_libdir}/pkgconfig/libgfdb.pc
 %else
