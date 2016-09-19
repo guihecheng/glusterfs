@@ -208,12 +208,6 @@ int
 sys_fallocate(int fd, int mode, off_t offset, off_t len);
 
 ssize_t
-sys_preadv (int fd, const struct iovec *iov, int iovcnt, off_t offset);
-
-ssize_t
-sys_pwritev (int fd, const struct iovec *iov, int iovcnt, off_t offset);
-
-ssize_t
 sys_pread(int fd, void *buf, size_t count, off_t offset);
 
 ssize_t

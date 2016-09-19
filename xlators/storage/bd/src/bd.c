@@ -1782,7 +1782,7 @@ __bd_pwritev (int fd, struct iovec *vector, int count, off_t offset,
         if (!vector)
                 return -EFAULT;
 
-        retval = sys_pwritev (fd, vector, count, offset);
+        retval = pwritev (fd, vector, count, offset);
         if (retval == -1) {
                 int64_t off = offset;
                 gf_log (THIS->name, GF_LOG_WARNING,
@@ -1805,7 +1805,7 @@ __bd_pwritev (int fd, struct iovec *vector, int count, off_t offset,
                         vector[index].iov_len = bd_size - internal_offset;
                         no_space = 1;
                 }
-                retval = sys_pwritev (fd, vector[index].iov_base,
+                retval = pwritev (fd, vector[index].iov_base,
                                       vector[index].iov_len, internal_offset);
                 if (retval == -1) {
                         gf_log (THIS->name, GF_LOG_WARNING,
