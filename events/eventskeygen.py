@@ -207,33 +207,36 @@ ERRORS = (
 
 if gen_header_type == "C_HEADER":
     # Generate eventtypes.h
-    with open(eventtypes_h, "w") as f:
-        f.write("#ifndef __EVENTTYPES_H__\n")
-        f.write("#define __EVENTTYPES_H__\n\n")
-        f.write("typedef enum {\n")
-        for k in ERRORS:
-            f.write("    {0},\n".format(k))
-        f.write("} event_errors_t;\n")
+    f = open(eventtypes_h, "w")
+    f.write("#ifndef __EVENTTYPES_H__\n")
+    f.write("#define __EVENTTYPES_H__\n\n")
+    f.write("typedef enum {\n")
+    for k in ERRORS:
+        f.write("    %s,\n" % k)
+    f.write("} event_errors_t;\n")
 
-        f.write("\n")
+    f.write("\n")
 
-        f.write("typedef enum {\n")
-        for k in keys:
-            f.write("    {0},\n".format(k))
+    f.write("typedef enum {\n")
+    for k in keys:
+        f.write("    %s,\n" % k)
 
-        f.write("    {0}\n".format(LAST_EVENT))
-        f.write("} eventtypes_t;\n")
-        f.write("\n#endif /* __EVENTTYPES_H__ */\n")
+    f.write("    %s\n" % LAST_EVENT)
+    f.write("} eventtypes_t;\n")
+    f.write("\n#endif /* __EVENTTYPES_H__ */\n")
+    f.close()
 
 if gen_header_type == "PY_HEADER":
     # Generate eventtypes.py
-    with open(eventtypes_py, "w") as f:
-        f.write("# -*- coding: utf-8 -*-\n")
-        f.write("all_events = [\n")
-        for ev in keys:
-            f.write('    "{0}",\n'.format(ev))
+    f = open(eventtypes_py, "w")
+    f.write("# -*- coding: utf-8 -*-\n")
+    f.write("all_events = [\n")
+    for ev in keys:
+        f.write('    "%s",\n' % ev)
 
-        f.write("]\n\n")
+    f.write("]\n\n")
 
-        for idx, ev in enumerate(keys):
-            f.write("{0} = {1}\n".format(ev.replace("EVENT_", ""), idx))
+    for idx, ev in enumerate(keys):
+        f.write("%s = %s\n" % (ev.replace("EVENT_", ""), idx))
+
+    f.close()
