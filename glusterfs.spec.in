@@ -1118,6 +1118,7 @@ exit 0
 %exclude %{_sbindir}/glusterd
 %exclude %{_sbindir}/snap_scheduler.py
 %exclude %{_datadir}/glusterfs/scripts/stop-all-gluster-processes.sh
+%exclude %{_sbindir}/conf.py*
 %if 0%{?_tmpfilesdir:1}
 %exclude %{_tmpfilesdir}/gluster.conf
 %endif
