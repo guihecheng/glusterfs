@@ -1579,9 +1579,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1620,9 +1621,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-api_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1661,9 +1663,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-api-devel_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1702,9 +1705,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-cli_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1743,9 +1747,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-client-xlators_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1784,9 +1789,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-devel_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1825,9 +1831,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-fuse_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1866,9 +1873,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-ganesha_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1908,9 +1916,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-geo-replication_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1950,9 +1959,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-libs_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -1991,9 +2001,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/python-gluster_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -2033,9 +2044,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-rdma_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -2076,9 +2088,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-resource-agents_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -2118,9 +2131,10 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- rpm in RHEL5 does not have os.tmpname()
--- io.tmpfile() can not be resolved to a filename to pass to bash :-/
-tmpname = "/tmp/glusterfs-server_pretrans_" .. os.date("%s")
+-- Since we run pretrans scripts only for RPMs built for a server build,
+-- we can now use os.tmpname() since it is available on RHEL6 and later
+-- platforms which are server platforms.
+tmpname = os.tmpname()
 tmpfile = io.open(tmpname, "w")
 tmpfile:write(script)
 tmpfile:close()
@@ -2210,6 +2224,13 @@ end
 
 * Thu Nov 24 2016 Jiffin Tony Thottan <jhottan@redhat.com>
 - remove S31ganesha-reset.sh from hooks (#1397795)
+
+* Fri Oct 14 2016 Milind Changire <mchangir@redhat.com>
+- Changed pretrans scripts to use os.tmpname() for enhanced security
+  for server builds only (#1362044)
+
+* Tue Sep 27 2016 Milind Changire <mchangir@redhat.com>
+- Added systemd requirement to glusterfs-server and glusterfs-events packages
 
 * Thu Sep 22 2016 Kaleb S. KEITHLEY <kkeithle@redhat.com>
 - python-ctypes no long exists, now in python stdlib (#1378436)
@@ -2330,6 +2351,7 @@ end
 
 * Mon May 18 2015 Milind Changire <mchangir@redhat.com>
 - Move file peer_add_secret_pub to the server RPM to support glusterfind (#1221544)
+
 * Sun May 17 2015 Niels de Vos <ndevos@redhat.com>
 - Fix building on RHEL-5 based distributions (#1222317)
 
