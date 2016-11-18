@@ -414,6 +414,11 @@ Requires:         nfs-ganesha-gluster, pcs, dbus
 %if ( 0%{?rhel} && 0%{?rhel} == 6 )
 Requires:         cman, pacemaker, corosync
 %endif
+%if ( 0%{?fedora} ) || ( 0%{?rhel} && 0%{?rhel} > 5 )
+# we need portblock resource-agent in 3.9.5 and later.
+Requires:         resource-agents >= 3.9.5
+Requires:         net-tools
+%endif
 
 %description ganesha
 GlusterFS is a distributed file-system capable of scaling to several
@@ -2224,6 +2229,14 @@ end
 
 * Thu Nov 24 2016 Jiffin Tony Thottan <jhottan@redhat.com>
 - remove S31ganesha-reset.sh from hooks (#1397795)
+
+* Fri Nov 18 2016 Soumya Koduri <skoduri@redhat.com>
+- As an interim fix add dependency on netstat(/net-tools) for glusterfs-ganesha package (#1395574)
+
+* Fri Nov 11 2016 Soumya Koduri <skoduri@redhat.com>
+- Add dependency on portblock resource agent for ganesha package (#1278336)
+- Fix incorrect Requires for portblock resource agent (#1278336)
+- Update version checks for portblock resource agent on RHEL (#1278336)
 
 * Fri Oct 14 2016 Milind Changire <mchangir@redhat.com>
 - Changed pretrans scripts to use os.tmpname() for enhanced security
