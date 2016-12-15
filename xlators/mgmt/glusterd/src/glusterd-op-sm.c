@@ -2438,9 +2438,9 @@ glusterd_update_volumes_dict (glusterd_volinfo_t *volinfo)
 
         /* 3.9.0 onwards gNFS will be disabled by default. In case of an upgrade
          * from anything below than 3.9.0 to 3.9.x, the value for nfs.disable is
-         * set to 'on' for all volumes even if it is explicitly set to 'off' in
+         * set to 'off' for all volumes even if it is not explicitly set in the
          * previous version. This change is only applicable to downstream code.
-         * Setting nfs.disable to 'on' at op-version bump up flow is the ideal
+         * Setting nfs.disable to 'off' at op-version bump up flow is the ideal
          * way here. The same is also applicable for transport.address-family
          * where if the transport type is set to tcp then transport.address-family
          * is defaulted to 'inet'.
@@ -2448,23 +2448,18 @@ glusterd_update_volumes_dict (glusterd_volinfo_t *volinfo)
         if (conf->op_version >= GD_OP_VERSION_3_9_0) {
                 if (!(dict_get_str_boolean (volinfo->dict, NFS_DISABLE_MAP_KEY,
                                             0))) {
-                        gf_msg (this->name, GF_LOG_INFO, 0, 0, "Gluster NFS is"
-                                " being deprecated in favor of NFS-Ganesha, "
-                                "hence setting nfs.disable to 'on' for volume "
-                                "%s. Please re-enable it if requires",
-                                volinfo->volname);
+                        ret = dict_set_dynstr_with_alloc (volinfo->dict,
+                                                           NFS_DISABLE_MAP_KEY,
+                                                           "off");
+                        if (ret) {
+                                gf_msg (this->name, GF_LOG_ERROR, errno,
+                                        GD_MSG_DICT_SET_FAILED, "Failed to turn "
+                                        "off ' NFS_DISABLE_MAP_KEY ' option for "
+                                        "volume %s", volinfo->volname);
+                                goto out;
+                        }
                 }
 
-                ret = dict_set_dynstr_with_alloc (volinfo->dict,
-                                                   NFS_DISABLE_MAP_KEY,
-                                                   "on");
-                if (ret) {
-                        gf_msg (this->name, GF_LOG_ERROR, errno,
-                                GD_MSG_DICT_SET_FAILED, "Failed to set "
-                                "option ' NFS_DISABLE_MAP_KEY ' on "
-                                "volume %s", volinfo->volname);
-                        goto out;
-                }
                 ret = dict_get_str (volinfo->dict, "transport.address-family",
                                     &address_family_str);
                 if (ret) {
