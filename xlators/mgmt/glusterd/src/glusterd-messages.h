@@ -4937,6 +4937,14 @@
  */
 #define GD_MSG_GARBAGE_ARGS                         (GLUSTERD_COMP_BASE + 611)
 
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_SVC_START_FAIL                      (GLUSTERD_COMP_BASE + 590)
+
 /*------------*/
 
 #define glfs_msg_end_x GLFS_MSGID_END, "Invalid: End of messages"
