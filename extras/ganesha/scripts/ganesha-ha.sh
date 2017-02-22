@@ -342,6 +342,7 @@ cleanup_ganesha_config ()
     rm -f /etc/corosync/corosync.conf
     rm -rf /etc/cluster/cluster.conf*
     rm -rf /var/lib/pacemaker/cib/*
+    sed -r -i -e '/^%include[[:space:]]+".+\.conf"$/d'  $HA_CONFDIR/ganesha.conf
 }
 
 do_create_virt_ip_constraints()
