@@ -41,7 +41,7 @@
 
 #define GLUSTERD_COMP_BASE      GLFS_MSGID_GLUSTERD
 
-#define GLFS_NUM_MESSAGES       612
+#define GLFS_NUM_MESSAGES       613
 
 #define GLFS_MSGID_END          (GLUSTERD_COMP_BASE + GLFS_NUM_MESSAGES + 1)
 /* Messaged with message IDs */
@@ -4960,6 +4960,14 @@
  *
  */
 #define GD_MSG_PORTS_EXHAUSTED (GLUSTERD_COMP_BASE + 612)
+
+#define GD_MSG_GANESHA_NOT_RUNNING                  (GLUSTERD_COMP_BASE + 613)
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
 
 /*------------*/
 
