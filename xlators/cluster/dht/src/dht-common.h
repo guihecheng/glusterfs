@@ -28,6 +28,7 @@
 #define GF_XATTR_FIX_LAYOUT_KEY         "distribute.fix.layout"
 #define GF_XATTR_TIER_LAYOUT_FIXED_KEY  "trusted.tier.fix.layout.complete"
 #define GF_XATTR_FILE_MIGRATE_KEY       "trusted.distribute.migrate-data"
+#define DHT_MDS_STR                     "mds"
 #define GF_DHT_LOOKUP_UNHASHED_ON       1
 #define GF_DHT_LOOKUP_UNHASHED_AUTO     2
 #define DHT_PATHINFO_HEADER             "DISTRIBUTE:"
@@ -42,6 +43,12 @@
 
 #define DHT_DIR_STAT_BLOCKS          8
 #define DHT_DIR_STAT_SIZE            4096
+
+/* Array to hold custom xattr keys
+*/
+extern char *xattrs_to_heal[];
+
+
 
 #include <fnmatch.h>
 
@@ -116,6 +123,7 @@ struct dht_inode_ctx {
         dht_layout_t    *layout;
         dht_stat_time_t  time;
         xlator_t        *lock_subvol;
+        xlator_t        *mds_subvol;     /* This is only used for directories */
 };
 
 typedef struct dht_inode_ctx dht_inode_ctx_t;
@@ -262,6 +270,7 @@ struct dht_local {
         /* Use stbuf as the postbuf, when we require both
          * pre and post attrs */
         struct iatt              stbuf;
+        struct iatt              mds_stbuf;
         struct iatt              prebuf;
         struct iatt              preoldparent;
         struct iatt              postoldparent;
@@ -273,6 +282,8 @@ struct dht_local {
         inode_t                 *inode;
         dict_t                  *params;
         dict_t                  *xattr;
+        dict_t                  *mds_xattr;
+        dict_t                  *xdata;      /* dict used to save xdata response by xattr fop */
         dict_t                  *xattr_req;
         dht_layout_t            *layout;
         size_t                   size;
@@ -281,7 +292,9 @@ struct dht_local {
         xlator_t                *dst_hashed, *dst_cached;
         xlator_t                *cached_subvol;
         xlator_t                *hashed_subvol;
+        xlator_t                *mds_subvol; /* This is use for dir only */
         char                     need_selfheal;
+        char                     need_xattr_heal;
         int                      file_count;
         int                      dir_count;
         call_frame_t            *main_frame;
@@ -365,6 +378,9 @@ struct dht_local {
 
         /* fd open check */
         gf_boolean_t fd_checked;
+        /* This is use only for directory operation */
+        int32_t valid;
+        gf_boolean_t heal_layout;
 };
 typedef struct dht_local dht_local_t;
 
@@ -651,6 +667,7 @@ struct dht_conf {
 
         /* Support variable xattr names. */
         char            *xattr_name;
+        char            *mds_xattr_key;
         char            *link_xattr_name;
         char            *commithash_xattr_name;
         char            *wild_xattr_name;
@@ -1333,9 +1350,6 @@ dht_normalize_stats (struct statvfs *buf, unsigned long bsize,
 int
 add_opt(char **optsp, const char *opt);
 
-char *
-getChoices (const char *value);
-
 int
 dht_aggregate_split_brain_xattr (dict_t *dst, char *key, data_t *value);
 
@@ -1345,17 +1359,11 @@ dht_remove_stale_linkto (void *data);
 int
 dht_remove_stale_linkto_cbk (int ret, call_frame_t *sync_frame, void *data);
 
-
 int
 dht_fd_ctx_set (xlator_t *this, fd_t *fd, xlator_t *subvol);
 
 int
 dht_check_and_open_fd_on_subvol (xlator_t *this, call_frame_t *frame);
-
-
-
-
-
 
 /* FD fop callbacks */
 
@@ -1409,11 +1417,9 @@ int
 dht_file_attr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                    int op_ret, int op_errno, struct iatt *stbuf, dict_t *xdata);
 
-
 int
 dht_file_removexattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                           int op_ret, int op_errno, dict_t *xdata);
-
 
 int
 dht_file_setxattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
@@ -1426,4 +1432,48 @@ int dht_request_iatt_in_xdata (xlator_t *this, dict_t *xattr_req);
 
 int dht_read_iatt_from_xdata (xlator_t *this, dict_t *xdata,
                               struct iatt *stbuf);
+
+/* All custom xattr heal functions */
+int
+dht_dir_heal_xattrs (void *data);
+
+int
+dht_dir_heal_xattrs_done (int ret, call_frame_t *sync_frame, void *data);
+
+void
+dht_aggregate_xattr (dict_t *dst, dict_t *src);
+
+int32_t
+dht_dict_set_array(dict_t *dict, char *key, int32_t value[], int32_t size);
+
+int
+dht_set_user_xattr (dict_t *dict, char *k, data_t *v, void *data);
+
+void
+dht_dir_set_heal_xattr (xlator_t *this, dht_local_t *local, dict_t *dst,
+                        dict_t *src, int *uret, int *uflag);
+
+int
+dht_dir_xattr_heal (xlator_t *this, dht_local_t *local);
+
+int32_t
+dht_dict_get_array (dict_t *dict, char *key, int32_t value[], int32_t size, int *errst);
+
+xlator_t *
+dht_inode_get_hashed_subvol (inode_t *inode, xlator_t *this, loc_t *loc);
+
+int
+dht_mark_mds_subvolume (call_frame_t *frame, xlator_t *this);
+
+int
+dht_mds_internal_setxattr_cbk (call_frame_t *frame, void *cookie,
+                               xlator_t *this, int op_ret, int op_errno,
+                               dict_t *xdata);
+int
+dht_inode_ctx_mdsvol_set (inode_t *inode, xlator_t *this,
+                          xlator_t *mds_subvol);
+int
+dht_inode_ctx_mdsvol_get (inode_t *inode, xlator_t *this,
+                          xlator_t **mdsvol);
+
 #endif/* _DHT_H */
