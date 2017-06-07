@@ -787,6 +787,22 @@ setup_state_volume()
 }
 
 
+enable_pacemaker()
+{
+    while [[ ${1} ]]; do
+        if [ "${SERVICE_MAN}" == "/usr/bin/systemctl" ]; then
+${SECRET_PEM} root@${1} ${SERVICE_MAN} enable pacemaker"
+            ssh -oPasswordAuthentication=no -oStrictHostKeyChecking=no -i \
+${SECRET_PEM} root@${1} "${SERVICE_MAN} enable pacemaker"
+        else
+            ssh -oPasswordAuthentication=no -oStrictHostKeyChecking=no -i \
+${SECRET_PEM} root@${1} "${SERVICE_MAN} pacemaker enable"
+        fi
+        shift
+    done
+}
+
+
 addnode_state_volume()
 {
     local newnode=${1}; shift
@@ -1011,6 +1027,8 @@ main()
 
         if [ "X${HA_NUM_SERVERS}X" != "X1X" ]; then
 
+            determine_service_manager
+
             setup_cluster ${HA_NAME} ${HA_NUM_SERVERS} "${HA_SERVERS}"
 
             setup_create_resources ${HA_SERVERS}
@@ -1018,6 +1036,8 @@ main()
             setup_finalize_ha
 
             setup_state_volume ${HA_SERVERS}
+
+            enable_pacemaker ${HA_SERVERS}
 
         else
 
