@@ -791,7 +791,6 @@ enable_pacemaker()
 {
     while [[ ${1} ]]; do
         if [ "${SERVICE_MAN}" == "/usr/bin/systemctl" ]; then
-${SECRET_PEM} root@${1} ${SERVICE_MAN} enable pacemaker"
             ssh -oPasswordAuthentication=no -oStrictHostKeyChecking=no -i \
 ${SECRET_PEM} root@${1} "${SERVICE_MAN} enable pacemaker"
         else
