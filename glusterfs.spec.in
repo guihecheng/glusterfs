@@ -411,6 +411,7 @@ Requires:         pcs, dbus
 Requires:         cman, pacemaker, corosync
 %endif
 %if ( 0%{?fedora} && 0%{?fedora} > 25 )
+Requires: selinux-policy >= 3.13.1-160
 Requires(post):   policycoreutils-python-utils
 Requires(postun): policycoreutils-python-utils
 %endif
