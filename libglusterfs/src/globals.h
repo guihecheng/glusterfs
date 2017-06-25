@@ -43,7 +43,7 @@
  */
 #define GD_OP_VERSION_MIN  1 /* MIN is the fresh start op-version, mostly
                                 should not change */
-#define GD_OP_VERSION_MAX  GD_OP_VERSION_3_12_2 /* MAX VERSION is the maximum
+#define GD_OP_VERSION_MAX  GD_OP_VERSION_3_13_0 /* MAX VERSION is the maximum
                                                   count in VME table, should
                                                   keep changing with
                                                   introduction of newer
@@ -100,6 +100,8 @@
 #define GD_OP_VERSION_3_12_0   31200 /* Op-version for GlusterFS 3.12.0 */
 
 #define GD_OP_VERSION_3_12_2   31202 /* Op-version for GlusterFS 3.12.2 */
+
+#define GD_OP_VERSION_3_13_0   31300 /* Op-version for GlusterFS 3.13.0 */
 
 #include "xlator.h"
 
