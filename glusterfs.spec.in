@@ -1135,6 +1135,7 @@ exit 0
 %exclude %{_sbindir}/gcron.py
 %exclude %{_sbindir}/glfsheal
 %exclude %{_sbindir}/glusterd
+%exclude %{_sbindir}/gf_attach
 %exclude %{_sbindir}/snap_scheduler.py
 %exclude %{_datadir}/glusterfs/scripts/stop-all-gluster-processes.sh
 %if ( 0%{?_with_systemd:1} )
@@ -2197,6 +2198,12 @@ end
 
 * Thu Jul 13 2017 Kaleb S. KEITHLEY <kkeithle@redhat.com>
 - various directories not owned by any package
+
+* Tue Jul 04 2017 Milind Changire <mchangir@redhat.com>
+- moved %{_sbindir}/gf_attach from glusterfs-fuse to glusterfs-server
+
+* Fri Jun 23 2017 Kaleb S. KEITHLEY <kkeithle@redhat.com>
+- DOWNSTREAM ONLY remove Requires: selinux-policy for puddle generation
 
 * Wed Jun 21 2017 Jiffin Tony Thottan <jthottan@redhat.com>
 - Exclude glusterfssharedstorage.service and mount-shared-storage.sh from client builds
