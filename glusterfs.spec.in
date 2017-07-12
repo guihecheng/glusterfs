@@ -1027,6 +1027,24 @@ exit 0
 %endif
 
 ##-----------------------------------------------------------------------------
+## All %%trigger should be placed here and keep them sorted
+##
+%if ( 0%{?fedora} && 0%{?fedora} > 25 )
+%trigger ganesha -- selinux-policy-targeted
+semanage boolean -m ganesha_use_fusefs --on
+exit 0
+%endif
+
+##-----------------------------------------------------------------------------
+## All %%triggerun should be placed here and keep them sorted
+##
+%if ( 0%{?fedora} && 0%{?fedora} > 25 )
+%triggerun ganesha -- selinux-policy-targeted
+semanage boolean -m ganesha_use_fusefs --off
+exit 0
+%endif
+
+##-----------------------------------------------------------------------------
 ## All %%files should be placed here and keep them grouped
 ##
 %files
