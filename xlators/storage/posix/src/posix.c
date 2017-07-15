@@ -766,6 +766,7 @@ posix_do_fallocate (call_frame_t *frame, xlator_t *this, fd_t *fd,
         struct posix_fd    *pfd    = NULL;
         gf_boolean_t        locked = _gf_false;
         posix_inode_ctx_t  *ctx    = NULL;
+        struct  posix_private *priv = NULL;
 
         DECLARE_OLD_FS_ID_VAR;
 
@@ -774,6 +775,9 @@ posix_do_fallocate (call_frame_t *frame, xlator_t *this, fd_t *fd,
         VALIDATE_OR_GOTO (frame, out);
         VALIDATE_OR_GOTO (this, out);
         VALIDATE_OR_GOTO (fd, out);
+
+        priv = this->private;
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, ret, ret, out);
 
         ret = posix_fd_ctx_get (fd, this, &pfd, &op_errno);
         if (ret < 0) {
@@ -1073,20 +1077,27 @@ posix_zerofill(call_frame_t *frame, xlator_t *this, fd_t *fd, off_t offset,
         int32_t ret                      =  0;
         struct  iatt statpre             = {0,};
         struct  iatt statpost            = {0,};
+        struct  posix_private *priv      = NULL;
+        int     op_ret                   = -1;
+        int     op_errno                 = -1;
+
+        VALIDATE_OR_GOTO (frame, out);
+        VALIDATE_OR_GOTO (this, out);
+
+        priv = this->private;
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         ret = posix_do_zerofill (frame, this, fd, offset, len,
                                  &statpre, &statpost, xdata);
-        if (ret < 0) {
-                goto err;
-        }
+        if (ret < 0)
+                goto out;
 
         STACK_UNWIND_STRICT(zerofill, frame, 0, 0, &statpre, &statpost, NULL);
         return 0;
 
-err:
-        STACK_UNWIND_STRICT(zerofill, frame, -1, -ret, NULL, NULL, NULL);
+out:
+        STACK_UNWIND_STRICT(zerofill, frame, op_ret, op_errno, NULL, NULL, NULL);
         return 0;
-
 }
 
 static int32_t
@@ -1354,6 +1365,7 @@ posix_mknod (call_frame_t *frame, xlator_t *this,
         VALIDATE_OR_GOTO (priv, out);
         GFID_NULL_CHECK_AND_GOTO (frame, this, loc, xdata, op_ret, op_errno,
                                   out);
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         MAKE_ENTRY_HANDLE (real_path, par_path, this, loc, NULL);
 
@@ -1574,6 +1586,7 @@ posix_mkdir (call_frame_t *frame, xlator_t *this,
         VALIDATE_OR_GOTO (priv, out);
         GFID_NULL_CHECK_AND_GOTO (frame, this, loc, xdata, op_ret, op_errno,
                                   out);
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         MAKE_ENTRY_HANDLE (real_path, par_path, this, loc, NULL);
         if (!real_path || !par_path) {
@@ -2400,6 +2413,7 @@ posix_symlink (call_frame_t *frame, xlator_t *this,
         VALIDATE_OR_GOTO (priv, out);
         GFID_NULL_CHECK_AND_GOTO (frame, this, loc, xdata, op_ret, op_errno,
                                   out);
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         MAKE_ENTRY_HANDLE (real_path, par_path, this, loc, &stbuf);
 
@@ -2558,6 +2572,7 @@ posix_rename (call_frame_t *frame, xlator_t *this,
 
         priv = this->private;
         VALIDATE_OR_GOTO (priv, out);
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         SET_FS_ID (frame->root->uid, frame->root->gid);
         MAKE_ENTRY_HANDLE (real_oldpath, par_oldpath, this, oldloc, NULL);
@@ -2840,6 +2855,7 @@ posix_link (call_frame_t *frame, xlator_t *this,
 
         priv = this->private;
         VALIDATE_OR_GOTO (priv, out);
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         SET_FS_ID (frame->root->uid, frame->root->gid);
         MAKE_INODE_HANDLE (real_oldpath, this, oldloc, &stbuf);
@@ -3049,6 +3065,7 @@ posix_create (call_frame_t *frame, xlator_t *this,
         VALIDATE_OR_GOTO (priv, out);
         GFID_NULL_CHECK_AND_GOTO (frame, this, loc, xdata, op_ret, op_errno,
                                   out);
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         MAKE_ENTRY_HANDLE (real_path, par_path, this, loc, &stbuf);
 
@@ -3235,6 +3252,9 @@ posix_open (call_frame_t *frame, xlator_t *this,
 
         priv = this->private;
         VALIDATE_OR_GOTO (priv, out);
+
+        if (flags & O_CREAT)
+                DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         MAKE_INODE_HANDLE (real_path, this, loc, &stbuf);
         if (!real_path) {
@@ -3559,6 +3579,7 @@ posix_writev (call_frame_t *frame, xlator_t *this, fd_t *fd,
         priv = this->private;
 
         VALIDATE_OR_GOTO (priv, out);
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         ret = posix_fd_ctx_get (fd, this, &pfd, &op_errno);
         if (ret < 0) {
@@ -3698,6 +3719,7 @@ posix_statfs (call_frame_t *frame, xlator_t *this,
         struct statvfs         buf       = {0, };
         struct posix_private * priv      = NULL;
         int                    shared_by = 1;
+        int                    percent   = 0;
 
         VALIDATE_OR_GOTO (frame, out);
         VALIDATE_OR_GOTO (this, out);
@@ -3721,6 +3743,9 @@ posix_statfs (call_frame_t *frame, xlator_t *this,
                         "statvfs failed on %s", real_path);
                 goto out;
         }
+
+        percent = priv->disk_threshhold;
+        buf.f_bfree = (buf.f_bfree - ((buf.f_blocks * percent) / 100));
 
         shared_by = priv->shared_brick_count;
         if (shared_by > 1) {
@@ -3879,6 +3904,7 @@ posix_fsync (call_frame_t *frame, xlator_t *this,
 #endif
 
 	priv = this->private;
+
 	if (priv->batch_fsync_mode && xdata && dict_get (xdata, "batch-fsync")) {
 		posix_batch_fsync (frame, this, fd, datasync, xdata);
 		return 0;
@@ -3983,6 +4009,7 @@ posix_setxattr (call_frame_t *frame, xlator_t *this,
         ssize_t       acl_size                = 0;
         dict_t       *xattr                   = NULL;
         posix_xattr_filler_t filler = {0,};
+        struct  posix_private *priv           = NULL;
 
         DECLARE_OLD_FS_ID_VAR;
         SET_FS_ID (frame->root->uid, frame->root->gid);
@@ -3991,6 +4018,9 @@ posix_setxattr (call_frame_t *frame, xlator_t *this,
         VALIDATE_OR_GOTO (this, out);
         VALIDATE_OR_GOTO (loc, out);
         VALIDATE_OR_GOTO (dict, out);
+
+        priv = this->private;
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         MAKE_INODE_HANDLE (real_path, this, loc, NULL);
         if (!real_path) {
@@ -5346,6 +5376,7 @@ posix_fsetxattr (call_frame_t *frame, xlator_t *this,
         struct  iatt       stbuf          = {0,};
         dict_t            *xattr          = NULL;
         posix_xattr_filler_t filler       = {0,};
+        struct  posix_private *priv       = NULL;
 
         DECLARE_OLD_FS_ID_VAR;
         SET_FS_ID (frame->root->uid, frame->root->gid);
@@ -5354,6 +5385,9 @@ posix_fsetxattr (call_frame_t *frame, xlator_t *this,
         VALIDATE_OR_GOTO (this, out);
         VALIDATE_OR_GOTO (fd, out);
         VALIDATE_OR_GOTO (dict, out);
+
+        priv = this->private;
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
 
         ret = posix_fd_ctx_get (fd, this, &pfd, &op_errno);
         if (ret < 0) {
@@ -6018,10 +6052,16 @@ do_xattrop (call_frame_t *frame, xlator_t *this, loc_t *loc, fd_t *fd,
         dict_t               *xattr_rsp = NULL;
         dict_t               *xdata_rsp = NULL;
         struct iatt           stbuf = {0};
+        struct  posix_private *priv     = NULL;
+
 
         VALIDATE_OR_GOTO (frame, out);
         VALIDATE_OR_GOTO (xattr, out);
         VALIDATE_OR_GOTO (this, out);
+
+        priv = this->private;
+        DISK_SPACE_CHECK_AND_GOTO (frame, priv, op_ret, op_errno, out);
+
 
         if (fd) {
                 op_ret = posix_fd_ctx_get (fd, this, &pfd, &op_errno);
@@ -6119,7 +6159,6 @@ posix_fxattrop (call_frame_t *frame, xlator_t *this,
         do_xattrop (frame, this, NULL, fd, optype, xattr, xdata);
         return 0;
 }
-
 
 int
 posix_access (call_frame_t *frame, xlator_t *this,
@@ -6944,6 +6983,11 @@ notify (xlator_t *this,
                         pthread_cancel (priv->health_check);
                         priv->health_check = 0;
                 }
+                if (priv->disk_space_check) {
+                        priv->disk_space_check_active = _gf_false;
+                        pthread_cancel (priv->disk_space_check);
+                        priv->disk_space_check = 0;
+                }
                 if (priv->janitor) {
                         (void) gf_thread_cleanup_xint (priv->janitor);
                         priv->janitor = 0;
@@ -7139,6 +7183,11 @@ reconfigure (xlator_t *this, dict_t *options)
                         "glusterd uuid is NULL, pathinfo xattr would"
                         " fallback to <hostname>:<export>");
         }
+
+        GF_OPTION_RECONF ("reserve", priv->disk_threshhold,
+                          options, uint32, out);
+        if (priv->disk_threshhold)
+                posix_spawn_disk_space_check_thread (this);
 
         GF_OPTION_RECONF ("health-check-interval", priv->health_check_interval,
                           options, uint32, out);
@@ -7738,6 +7787,13 @@ init (xlator_t *this)
                                 " fallback to <hostname>:<export>");
         }
 
+        _private->disk_space_check_active = _gf_false;
+        _private->disk_space_full          = 0;
+        GF_OPTION_INIT ("reserve",
+                        _private->disk_threshhold, uint32, out);
+        if (_private->disk_threshhold)
+                posix_spawn_disk_space_check_thread (this);
+
         _private->health_check_active = _gf_false;
         GF_OPTION_INIT ("health-check-interval",
                         _private->health_check_interval, uint32, out);
@@ -7939,6 +7995,16 @@ struct volume_options options[] = {
           .validate = GF_OPT_VALIDATE_MIN,
           .description = "Interval in seconds for a filesystem health check, "
                          "set to 0 to disable"
+        },
+        {
+          .key = {"reserve"},
+          .type = GF_OPTION_TYPE_INT,
+          .min = 0,
+          .default_value = "1",
+          .validate = GF_OPT_VALIDATE_MIN,
+          .description = "Value in percentage in integer form required "
+           "to set reserve disk, "
+           "set to 0 to disable"
         },
 	{ .key = {"batch-fsync-mode"},
 	  .type = GF_OPTION_TYPE_STR,
