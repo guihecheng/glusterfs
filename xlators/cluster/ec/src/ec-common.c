@@ -21,6 +21,10 @@
 #include "ec.h"
 #include "ec-messages.h"
 
+#define EC_XATTROP_ALL_WAITING_FLAGS (EC_FLAG_WAITING_XATTROP |\
+                                   EC_FLAG_WAITING_DATA_DIRTY |\
+                                   EC_FLAG_WAITING_METADATA_DIRTY)
+
 uint32_t
 ec_select_first_by_read_policy (ec_t *ec, ec_fop_data_t *fop)
 {
@@ -882,11 +886,11 @@ void ec_lock_prepare_fd(ec_fop_data_t *fop, fd_t *fd, uint32_t flags)
 }
 
 gf_boolean_t
-ec_config_check (ec_fop_data_t *fop, ec_config_t *config)
+ec_config_check (xlator_t *xl, ec_config_t *config)
 {
     ec_t *ec;
 
-    ec = fop->xl->private;
+    ec = xl->private;
     if ((config->version != EC_CONFIG_VERSION) ||
         (config->algorithm != EC_CONFIG_ALGORITHM) ||
         (config->gf_word_size != EC_GF_BITS) ||
@@ -911,11 +915,11 @@ ec_config_check (ec_fop_data_t *fop, ec_config_t *config)
             !ec_is_power_of_2(config->gf_word_size) ||
             ((config->chunk_size * 8) % (config->gf_word_size * data_bricks)
                                                                        != 0)) {
-            gf_msg (fop->xl->name, GF_LOG_ERROR, EINVAL,
+            gf_msg (xl->name, GF_LOG_ERROR, EINVAL,
                     EC_MSG_INVALID_CONFIG,
                     "Invalid or corrupted config");
         } else {
-            gf_msg (fop->xl->name, GF_LOG_ERROR, EINVAL,
+            gf_msg (xl->name, GF_LOG_ERROR, EINVAL,
                     EC_MSG_INVALID_CONFIG,
                     "Unsupported config "
                     "(V=%u, A=%u, W=%u, "
@@ -962,24 +966,28 @@ ec_prepare_update_cbk (call_frame_t *frame, void *cookie,
 {
     struct list_head list;
     ec_fop_data_t *fop = cookie, *parent, *tmp;
-    ec_lock_link_t *link = fop->data;
+    ec_lock_link_t *parent_link = fop->data;
+    ec_lock_link_t *link = NULL;
     ec_lock_t *lock = NULL;
     ec_inode_t *ctx;
     gf_boolean_t release = _gf_false;
+    uint64_t waiting_flags = 0;
+    uint64_t dirty[EC_VERSION_SIZE] = {0, 0};
 
-    lock = link->lock;
-    parent = link->fop;
+    lock = parent_link->lock;
+    parent = parent_link->fop;
     ctx = lock->ctx;
 
     INIT_LIST_HEAD(&list);
+    waiting_flags = parent_link->waiting_flags & EC_XATTROP_ALL_WAITING_FLAGS;
 
     LOCK(&lock->loc.inode->lock);
 
     list_for_each_entry(link, &lock->owners, owner_list) {
-        if ((link->fop->flags & EC_FLAG_WAITING_XATTROP) != 0) {
-            link->fop->flags ^= EC_FLAG_WAITING_XATTROP;
-
-            list_add_tail(&link->fop->cbk_list, &list);
+        if ((link->waiting_flags & waiting_flags) != 0) {
+            link->waiting_flags ^= (link->waiting_flags & waiting_flags);
+            if ((link->waiting_flags & EC_XATTROP_ALL_WAITING_FLAGS) == 0)
+                    list_add_tail(&link->fop->cbk_list, &list);
         }
     }
 
@@ -991,8 +999,7 @@ ec_prepare_update_cbk (call_frame_t *frame, void *cookie,
         goto unlock;
     }
 
-    if (parent->flags & EC_FLAG_QUERY_METADATA) {
-            parent->flags ^= EC_FLAG_QUERY_METADATA;
+    if (waiting_flags & EC_FLAG_WAITING_XATTROP) {
             op_errno = -ec_dict_del_array(dict, EC_XATTR_VERSION,
                                           ctx->pre_version,
                                           EC_VERSION_SIZE);
@@ -1036,7 +1043,7 @@ ec_prepare_update_cbk (call_frame_t *frame, void *cookie,
                         goto unlock;
                     }
                 } else {
-                    if (!ec_config_check(parent, &ctx->config)) {
+                    if (!ec_config_check(parent->xl, &ctx->config)) {
                         gf_msg (this->name, GF_LOG_ERROR, EINVAL,
                                 EC_MSG_CONFIG_XATTR_INVALID,
                                 "Invalid config xattr");
@@ -1051,12 +1058,22 @@ ec_prepare_update_cbk (call_frame_t *frame, void *cookie,
             ctx->have_info = _gf_true;
     }
 
-    ec_set_dirty_flag (fop->data, ctx, ctx->dirty);
+    ec_set_dirty_flag (fop->data, ctx, dirty);
+    if (dirty[EC_METADATA_TXN] &&
+        (waiting_flags & EC_FLAG_WAITING_METADATA_DIRTY)) {
+            GF_ASSERT (!ctx->dirty[EC_METADATA_TXN]);
+            ctx->dirty[EC_METADATA_TXN] = 1;
+    }
+
+    if (dirty[EC_DATA_TXN] &&
+        (waiting_flags & EC_FLAG_WAITING_DATA_DIRTY)) {
+            GF_ASSERT (!ctx->dirty[EC_DATA_TXN]);
+            ctx->dirty[EC_DATA_TXN] = 1;
+    }
     op_errno = 0;
 unlock:
-    lock->getting_xattr = _gf_false;
 
-    UNLOCK(&lock->loc.inode->lock);
+    lock->waiting_flags ^= waiting_flags;
 
     if (op_errno == 0) {
         /* If the fop fails on any of the good bricks, it is important to mark
@@ -1066,32 +1083,23 @@ unlock:
                 release = _gf_true;
         }
 
-        /* lock->release is a critical field that is checked and modified most
-         * of the time inside a locked region. This use here is safe because we
-         * are in a modifying fop and we currently don't allow two modifying
-         * fops to be processed concurrently, so no one else could be checking
-         * or modifying it.*/
-        if (link->update[0] && !link->dirty[0]) {
+        if (parent_link->update[0] && !parent_link->dirty[0]) {
                 lock->release |= release;
         }
 
-        if (link->update[1] && !link->dirty[1]) {
+        if (parent_link->update[1] && !parent_link->dirty[1]) {
                 lock->release |= release;
         }
 
         /* We don't allow the main fop to be executed on bricks that have not
          * succeeded the initial xattrop. */
-        parent->mask &= fop->good;
         ec_lock_update_good (lock, fop);
 
         /*As of now only data healing marks bricks as healing*/
         lock->healing |= fop->healing;
-        if (ec_is_data_fop (parent->id)) {
-            parent->healing |= fop->healing;
-        }
-    } else {
-        ec_fop_set_error(parent, op_errno);
     }
+
+    UNLOCK(&lock->loc.inode->lock);
 
     while (!list_empty(&list)) {
         tmp = list_entry(list.next, ec_fop_data_t, cbk_list);
@@ -1104,14 +1112,48 @@ unlock:
             if (ec_is_data_fop (tmp->id)) {
                 tmp->healing |= fop->healing;
             }
-        } else {
-            ec_fop_set_error(tmp, op_errno);
         }
 
-        ec_resume(tmp, 0);
+        ec_resume(tmp, op_errno);
     }
 
     return 0;
+}
+
+static uint64_t
+ec_set_xattrop_flags_and_params (ec_lock_t *lock, ec_lock_link_t *link,
+                                 uint64_t *dirty)
+{
+        uint64_t        oldflags = 0;
+        uint64_t        newflags = 0;
+        ec_inode_t *ctx     = lock->ctx;
+
+        oldflags = lock->waiting_flags & EC_XATTROP_ALL_WAITING_FLAGS;
+
+        if (lock->query && !ctx->have_info) {
+                lock->waiting_flags |= EC_FLAG_WAITING_XATTROP;
+                link->waiting_flags |= EC_FLAG_WAITING_XATTROP;
+        }
+
+        if (dirty[EC_DATA_TXN]) {
+                if (oldflags & EC_FLAG_WAITING_DATA_DIRTY) {
+                        dirty[EC_DATA_TXN] = 0;
+                } else {
+                        lock->waiting_flags |= EC_FLAG_WAITING_DATA_DIRTY;
+                }
+                link->waiting_flags |= EC_FLAG_WAITING_DATA_DIRTY;
+        }
+
+        if (dirty[EC_METADATA_TXN]) {
+                if (oldflags & EC_FLAG_WAITING_METADATA_DIRTY) {
+                        dirty[EC_METADATA_TXN] = 0;
+                } else {
+                        lock->waiting_flags |= EC_FLAG_WAITING_METADATA_DIRTY;
+                }
+                link->waiting_flags |= EC_FLAG_WAITING_METADATA_DIRTY;
+        }
+        newflags = lock->waiting_flags & EC_XATTROP_ALL_WAITING_FLAGS;
+        return oldflags ^ newflags;
 }
 
 void ec_get_size_version(ec_lock_link_t *link)
@@ -1124,7 +1166,6 @@ void ec_get_size_version(ec_lock_link_t *link)
     dict_t *xdata = NULL;
     ec_t   *ec = NULL;
     int32_t error = 0;
-    gf_boolean_t getting_xattr;
     gf_boolean_t set_dirty = _gf_false;
     uint64_t allzero[EC_VERSION_SIZE] = {0, 0};
     uint64_t dirty[EC_VERSION_SIZE] = {0, 0};
@@ -1132,6 +1173,7 @@ void ec_get_size_version(ec_lock_link_t *link)
     ctx = lock->ctx;
     fop = link->fop;
     ec  = fop->xl->private;
+    uint64_t changed_flags = 0;
 
     if (ec->optimistic_changelog &&
         !(ec->node_mask & ~link->lock->good_mask) && !ec_is_data_fop (fop->id))
@@ -1159,19 +1201,20 @@ void ec_get_size_version(ec_lock_link_t *link)
 
     LOCK(&lock->loc.inode->lock);
 
-    getting_xattr = lock->getting_xattr;
-    lock->getting_xattr = _gf_true;
-    if (getting_xattr) {
-        fop->flags |= EC_FLAG_WAITING_XATTROP;
-
-        ec_sleep(fop);
+    changed_flags = ec_set_xattrop_flags_and_params (lock, link, dirty);
+    if (link->waiting_flags) {
+            /* This fop needs to wait until all its flags are cleared which
+             * potentially can be cleared by other xattrops that are already
+             * wound*/
+            ec_sleep(fop);
+    } else {
+            GF_ASSERT (!changed_flags);
     }
 
     UNLOCK(&lock->loc.inode->lock);
 
-    if (getting_xattr) {
+    if (!changed_flags)
         goto out;
-    }
 
     dict = dict_new();
     if (dict == NULL) {
@@ -1179,17 +1222,7 @@ void ec_get_size_version(ec_lock_link_t *link)
         goto out;
     }
 
-    if (lock->loc.inode->ia_type == IA_IFREG ||
-        lock->loc.inode->ia_type == IA_INVAL) {
-            xdata = dict_new();
-            if (xdata == NULL || dict_set_int32 (xdata, GF_GET_SIZE, 1)) {
-                error = -ENOMEM;
-                goto out;
-            }
-    }
-
-    if (lock->query && !ctx->have_info) {
-            fop->flags |= EC_FLAG_QUERY_METADATA;
+    if (changed_flags & EC_FLAG_WAITING_XATTROP) {
             /* Once we know that an xattrop will be needed,
              * we try to get all available information in a
              * single call. */
@@ -1208,9 +1241,17 @@ void ec_get_size_version(ec_lock_link_t *link)
                 if (error != 0) {
                     goto out;
                 }
+
+                xdata = dict_new();
+                if (xdata == NULL || dict_set_int32 (xdata, GF_GET_SIZE, 1)) {
+                    error = -ENOMEM;
+                    goto out;
+                }
+
             }
     }
-    if (set_dirty) {
+
+    if (memcmp (allzero, dirty, sizeof (allzero))) {
             error = ec_dict_set_array(dict, EC_XATTR_DIRTY, dirty,
                                       EC_VERSION_SIZE);
             if (error != 0) {
@@ -1943,7 +1984,7 @@ int32_t ec_update_size_version_done(call_frame_t * frame, void * cookie,
             ctx->have_size = _gf_true;
         }
         if ((ec_dict_del_config(xdata, EC_XATTR_CONFIG, &ctx->config) == 0) &&
-            ec_config_check(fop->parent, &ctx->config)) {
+            ec_config_check(fop->xl, &ctx->config)) {
             ctx->have_config = _gf_true;
         }
 
