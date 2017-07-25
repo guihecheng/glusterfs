@@ -26,15 +26,15 @@ TEST glusterfs --volfile-id=/$V0 --volfile-server=$H0 $M1
 TEST touch $M0/file1
 
 ## 9. Setxattr from mount-0
-TEST "setfattr -n user.DOSATTRIB -v "abc" $M0/file1"
+TEST "setfattr -n user.DosStream.abc -v "abc" $M0/file1"
 ## 10. Getxattr from mount-1, this should return the correct value as it is a fresh getxattr
-TEST "getfattr -n user.DOSATTRIB $M1/file1 | grep -q abc"
+TEST "getfattr -n user.DosStream.abc $M1/file1 | grep -q abc"
 
 ## 11. Now modify the same xattr from mount-0 again
-TEST "setfattr -n user.DOSATTRIB -v "xyz" $M0/file1"
+TEST "setfattr -n user.DosStream.abc -v "xyz" $M0/file1"
 ## 12. Since the xattr is already cached in mount-1 it returns the old xattr
        #value, until the timeout (600)
-TEST "getfattr -n user.DOSATTRIB $M1/file1 | grep -q abc"
+TEST "getfattr -n user.DosStream.abc $M1/file1 | grep -q abc"
 
 ## 13. Unmount to clean all the cache
 EXPECT_WITHIN $UMOUNT_TIMEOUT "Y" force_umount $M0
@@ -54,14 +54,14 @@ TEST glusterfs --volfile-id=/$V0 --volfile-server=$H0 $M1
 
 ## 23. Repeat the tests 11-14, but this time since cache invalidation is on,
        #the getxattr will reflect the new value
-TEST "setfattr -n user.DOSATTRIB -v "abc" $M0/file1"
-TEST "getfattr -n user.DOSATTRIB $M1/file1 | grep -q abc"
-TEST "setfattr -n user.DOSATTRIB -v "xyz" $M0/file1"
+TEST "setfattr -n user.DosStream.abc -v "abc" $M0/file1"
+TEST "getfattr -n user.DosStream.abc $M1/file1 | grep -q abc"
+TEST "setfattr -n user.DosStream.abc -v "xyz" $M0/file1"
 sleep 2; #There can be a very very small window where the next getxattr
          #reaches md-cache, before the cache-invalidation caused by previous
          #setxattr, reaches md-cache. Hence sleeping for 2 sec.
          #Also it should not be > 600.
-TEST "getfattr -n user.DOSATTRIB $M1/file1 | grep -q xyz"
+TEST "getfattr -n user.DosStream.abc $M1/file1 | grep -q xyz"
 
 TEST $CLI volume set $V0 cache-samba-metadata off
 EXPECT 'off' volinfo_field $V0 'performance.cache-samba-metadata'
