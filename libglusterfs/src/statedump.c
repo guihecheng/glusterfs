@@ -377,11 +377,11 @@ gf_proc_dump_mem_info_to_dict (dict_t *dict)
 void
 gf_proc_dump_mempool_info (glusterfs_ctx_t *ctx)
 {
-#if defined(OLD_MEM_POOLS)
         struct mem_pool *pool = NULL;
 
         gf_proc_dump_add_section ("mempool");
 
+#if defined(OLD_MEM_POOLS)
         list_for_each_entry (pool, &ctx->mempool_list, global_list) {
                 gf_proc_dump_write ("-----", "-----");
                 gf_proc_dump_write ("pool-name", "%s", pool->name);
@@ -396,6 +396,20 @@ gf_proc_dump_mempool_info (glusterfs_ctx_t *ctx)
                 gf_proc_dump_write ("cur-stdalloc", "%d", pool->curr_stdalloc);
                 gf_proc_dump_write ("max-stdalloc", "%d", pool->max_stdalloc);
         }
+#else
+        LOCK (&ctx->lock);
+        {
+                list_for_each_entry (pool, &ctx->mempool_list, owner) {
+                        gf_proc_dump_write ("-----", "-----");
+                        gf_proc_dump_write ("pool-name", "%s", pool->name);
+                        gf_proc_dump_write ("sizeof-type", "%lu", pool->sizeof_type);
+                        gf_proc_dump_write ("padded-sizeof", "%d", 1 << pool->pool->power_of_two);
+                        gf_proc_dump_write ("shared-pool", "%p", pool->pool);
+                }
+        }
+        UNLOCK (&ctx->lock);
+
+        /* TODO: details of (struct mem_pool_shared) pool->pool */
 #endif
 }
 
