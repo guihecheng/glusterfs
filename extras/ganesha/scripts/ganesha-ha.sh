@@ -985,7 +985,9 @@ main()
         exit 0
     fi
 
-    semanage boolean -m gluster_use_execmem --on
+    if (selinuxenabled) ;then
+     semanage boolean -m gluster_use_execmem --on
+    fi
 
     HA_CONFDIR=${1%/}; shift
     local ha_conf=${HA_CONFDIR}/ganesha-ha.conf
@@ -1133,8 +1135,9 @@ $HA_CONFDIR/ganesha-ha.conf
 
     esac
 
-    semanage boolean -m gluster_use_execmem --off
-
+    if (selinuxenabled) ;then
+     semanage boolean -m gluster_use_execmem --off
+    fi
 }
 
 main $*
