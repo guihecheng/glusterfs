@@ -39,7 +39,7 @@ from changelogagent import agent, Changelog
 from gsyncdstatus import set_monitor_status, GeorepStatus, human_time_utc
 from libcxattr import Xattr
 import struct
-from syncdutils import get_master_and_slave_data_from_args, lf
+from syncdutils import get_master_and_slave_data_from_args, lf, Popen
 
 ParseError = XET.ParseError if hasattr(XET, 'ParseError') else SyntaxError
 
@@ -778,7 +778,7 @@ def main_i():
     else:
         gconf.label = 'slave'
     startup(go_daemon=go_daemon, log_file=log_file, label=gconf.label)
-    resource.Popen.init_errhandler()
+    Popen.init_errhandler()
 
     if be_agent:
         os.setsid()
