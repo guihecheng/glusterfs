@@ -1553,6 +1553,8 @@ exit 0
      %{_datadir}/glusterfs/scripts/stop-all-gluster-processes.sh
 %if ( 0%{?_with_systemd:1} )
      %{_libexecdir}/glusterfs/mount-shared-storage.sh
+     %{_datadir}/glusterfs/scripts/control-cpu-load.sh
+     %{_datadir}/glusterfs/scripts/control-mem.sh
 %endif
 
 # Incrementalapi
@@ -2178,6 +2180,9 @@ fi
 %endif
 
 %changelog
+* Fri Dec 01 2017 Mohit Agrawal <moagrawa@redhat.com>
+- Added control-cpu-load.sh and control-mem.sh scripts to glusterfs-server section(#1484446)
+
 * Mon Nov 13 2017 Jiffin Tony Thottan <jthottan@redhat.com>
 - Adding ganesha bits back in gluster repository #1499784
 
