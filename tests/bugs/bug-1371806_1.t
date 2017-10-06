@@ -46,4 +46,3 @@ EXPECT "abc" get_getfattr ./tmp{1..10}
 
 cd -
 cleanup
-exit
