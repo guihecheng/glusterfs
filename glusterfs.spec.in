@@ -963,27 +963,6 @@ fi
     %firewalld_reload
 %endif
 
-pidof -c -o %PPID -x glusterd &> /dev/null
-if [ $? -eq 0 ]; then
-    kill -9 `pgrep -f gsyncd.py` &> /dev/null
-
-    killall --wait glusterd &> /dev/null
-    glusterd --xlator-option *.upgrade=on -N
-
-    #Cleaning leftover glusterd socket file which is created by glusterd in
-    #rpm_script_t context.
-    rm -f %{_rundir}/glusterd.socket
-
-    # glusterd _was_ running, we killed it, it exited after *.upgrade=on,
-    # so start it again
-    %_init_start glusterd
-else
-    glusterd --xlator-option *.upgrade=on -N
-
-    #Cleaning leftover glusterd socket file which is created by glusterd in
-    #rpm_script_t context.
-    rm -f %{_rundir}/glusterd.socket
-fi
 %endif
 
 ##-----------------------------------------------------------------------------
@@ -2166,6 +2145,35 @@ os.remove(tmpname)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
+
+%posttrans server
+pidof -c -o %PPID -x glusterd &> /dev/null
+if [ $? -eq 0 ]; then
+    kill -9 `pgrep -f gsyncd.py` &> /dev/null
+
+    killall --wait -SIGTERM glusterd &> /dev/null
+
+    if [ "$?" != "0" ]; then
+        echo "killall failed while killing glusterd"
+    fi
+
+    glusterd --xlator-option *.upgrade=on -N
+
+    #Cleaning leftover glusterd socket file which is created by glusterd in
+    #rpm_script_t context.
+    rm -rf /var/run/glusterd.socket
+
+    # glusterd _was_ running, we killed it, it exited after *.upgrade=on,
+    # so start it again
+    %_init_start glusterd
+else
+    glusterd --xlator-option *.upgrade=on -N
+
+    #Cleaning leftover glusterd socket file which is created by glusterd in
+    #rpm_script_t context.
+    rm -rf /var/run/glusterd.socket
+fi
+
 %endif
 
 # Events
@@ -2190,8 +2198,14 @@ end
 %endif
 
 %changelog
+* Tue Oct 10 2017 Milind Changire <mchangir@redhat.com>
+- DOWNSTREAM ONLY patch - launch glusterd in upgrade mode after all new bits have been installed
+
 * Tue Aug 22 2017 Kaleb S. KEITHLEY <kkeithle@redhat.com>
 - libibverbs-devel, librdmacm-devel -> rdma-core-devel #1483996
+
+* Fri Aug 04 2017 Kaleb S. KEITHLEY <kkeithle@rehat.com>
+- /var/lib/glusterd/options made config(noreplace) to avoid losing shared state info
 
 * Thu Jul 20 2017 Aravinda VK <avishwan@redhat.com>
 - Added new tool/binary to set the gfid2path xattr on files
