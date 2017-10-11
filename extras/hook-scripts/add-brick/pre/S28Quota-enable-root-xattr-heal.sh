@@ -29,7 +29,7 @@ VERSION=
 ENABLED_NAME="S28Quota-root-xattr-heal.sh"
 DISABLED_NAME="disabled-quota-root-xattr-heal.sh"
 
-enable ()
+activate ()
 {
         ln -sf $DISABLED_STATE $1;
 }
@@ -37,7 +37,7 @@ enable ()
 ##------------------------------------------
 ## Parse the arguments
 ##------------------------------------------
-ARGS=$(getopt -l $OPTSPEC  -name $PROGNAME $@)
+ARGS=$(getopt -l $OPTSPEC  -name $PROGNAME "$@")
 eval set -- "$ARGS"
 
 while true;
@@ -92,9 +92,9 @@ FLAG=`cat $GLUSTERD_WORKDIR/vols/$VOL_NAME/info | grep "^status=" \
       | awk -F'=' '{print $NF}'`;
 if [ "$FLAG" != "1" ]
 then
-        enable $ENABLED_STATE_START;
+        activate $ENABLED_STATE_START;
         exit $?
 fi
 
-enable $ENABLED_STATE_ADD_BRICK;
+activate $ENABLED_STATE_ADD_BRICK;
 exit $?
