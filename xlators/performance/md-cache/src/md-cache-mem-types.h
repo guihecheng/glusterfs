@@ -19,6 +19,7 @@ enum gf_mdc_mem_types_ {
 	gf_mdc_mt_md_cache_t,
 	gf_mdc_mt_mdc_conf_t,
         gf_mdc_mt_mdc_ipc,
+        gf_mdc_mt_mdc_dentry_t,
         gf_mdc_mt_end
 };
 #endif

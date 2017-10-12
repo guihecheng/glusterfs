@@ -692,6 +692,9 @@ nfs3_fill_entry3 (gf_dirent_t *entry, struct nfs3_fh *dfh)
         nfs3_funge_root_dotdot_dirent (entry, dfh);
         ent->fileid = entry->d_ino;
         ent->cookie = entry->d_off;
+
+        gf_msg_debug (GF_NFS3, 0, "Entry: %s Cookie(d_off): %lu", entry->d_name, ent->cookie);
+
         ent->name = GF_CALLOC ((strlen (entry->d_name) + 1), sizeof (char),
                                gf_nfs_mt_char);
         if (!ent->name) {
@@ -769,6 +772,9 @@ nfs3_fill_entryp3 (gf_dirent_t *entry, struct nfs3_fh *dirfh, uint64_t devid)
         ent->cookie = entry->d_off;
         ent->name = GF_CALLOC ((strlen (entry->d_name) + 1), sizeof (char),
                                gf_nfs_mt_char);
+
+        gf_msg_debug (GF_NFS3, 0, "Entry: %s Cookie(d_off): %lu", entry->d_name, ent->cookie);
+
         if (!ent->name) {
                 GF_FREE (ent);
                 ent = NULL;

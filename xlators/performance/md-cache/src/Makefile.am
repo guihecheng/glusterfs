@@ -10,7 +10,7 @@ noinst_HEADERS = md-cache-mem-types.h md-cache-messages.h
 
 AM_CPPFLAGS = $(GF_CPPFLAGS) -I$(top_srcdir)/libglusterfs/src \
 	-I$(top_srcdir)/rpc/xdr/src -I$(top_builddir)/rpc/xdr/src \
-	-I$(CONTRIBDIR)/rbtree
+	-I$(CONTRIBDIR)/rbtree -I$(CONTRIBDIR)/xxhash
 
 AM_CFLAGS = -Wall $(GF_CFLAGS)
 

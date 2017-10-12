@@ -25,6 +25,7 @@
 #include "md-cache-messages.h"
 #include "statedump.h"
 #include "atomic.h"
+#include "xxhash.h"
 
 /* TODO:
    - cache symlink() link names and nuke symlink-cache
@@ -96,26 +97,38 @@ typedef struct mdc_local mdc_local_t;
         } while (0)
 
 
+struct mdc_dentry {
+        struct list_head list;
+        uuid_t           gfid;
+	uint64_t         d_ino;
+	uint64_t         d_off;
+	uint32_t         d_len;
+	char             d_name[];
+};
+
 struct md_cache {
-        ia_prot_t     md_prot;
-        uint32_t      md_nlink;
-        uint32_t      md_uid;
-        uint32_t      md_gid;
-        uint32_t      md_atime;
-        uint32_t      md_atime_nsec;
-        uint32_t      md_mtime;
-        uint32_t      md_mtime_nsec;
-        uint32_t      md_ctime;
-        uint32_t      md_ctime_nsec;
-        uint64_t      md_rdev;
-        uint64_t      md_size;
-        uint64_t      md_blocks;
-        dict_t       *xattr;
-        char         *linkname;
-	time_t        ia_time;
-	time_t        xa_time;
-        gf_boolean_t  need_lookup;
-        gf_lock_t     lock;
+        ia_prot_t          md_prot;
+        uint32_t           md_nlink;
+        uint32_t           md_uid;
+        uint32_t           md_gid;
+        uint32_t           md_atime;
+        uint32_t           md_atime_nsec;
+        uint32_t           md_mtime;
+        uint32_t           md_mtime_nsec;
+        uint32_t           md_ctime;
+        uint32_t           md_ctime_nsec;
+        uint64_t           md_rdev;
+        uint64_t           md_size;
+        uint64_t           md_blocks;
+        dict_t            *xattr;
+        char              *linkname;
+	time_t             ia_time;
+	time_t             xa_time;
+        gf_boolean_t       need_lookup;
+        struct list_head   dentry_list;
+        gf_boolean_t       fullfilled;
+        gf_boolean_t       trusted;
+        gf_lock_t          lock;
 };
 
 
@@ -277,6 +290,7 @@ mdc_inode_prep (xlator_t *this, inode_t *inode)
                         goto unlock;
                 }
 
+                INIT_LIST_HEAD (&mdc->dentry_list);
                 LOCK_INIT (&mdc->lock);
 
                 ret = __mdc_inode_ctx_set (this, inode, mdc);
@@ -951,6 +965,166 @@ mdc_xattr_satisfied (xlator_t *this, dict_t *req, dict_t *rsp)
         return pair.ret;
 }
 
+#define mdc_dentry_size(name) (sizeof (struct mdc_dentry) + strlen (name) + 1)
+
+static struct mdc_dentry *
+mdc_dentry_for_name (const char *name, uuid_t gfid)
+{
+        struct mdc_dentry *dentry = NULL;
+
+        dentry = GF_CALLOC (mdc_dentry_size (name), 1,
+                            gf_mdc_mt_mdc_dentry_t);
+        if (!dentry)
+                return NULL;
+
+        INIT_LIST_HEAD (&dentry->list);
+        strcpy (dentry->d_name, name);
+        gf_uuid_copy (dentry->gfid, gfid);
+
+        dentry->d_ino = gfid_to_ino (gfid);
+        dentry->d_len = strlen (name);
+        dentry->d_off = 0;
+
+        return dentry;
+}
+
+static void
+mdc_dentry_to_dirent(struct mdc_dentry *dentry, gf_dirent_t *dirent)
+{
+        dirent->d_ino = dentry->d_ino;
+        dirent->d_off = dentry->d_off;
+}
+
+static uint64_t
+mdc_dentry_cookie_hash(const void *data, size_t len)
+{
+        uint64_t seed = 233;
+        return gf_xxh64_wrapper_raw(data, len, seed);
+}
+
+static int
+dentry_orderfn (struct list_head *pos1, struct list_head *pos2)
+{
+        struct mdc_dentry *dentry1 = NULL;
+        struct mdc_dentry *dentry2 = NULL;
+
+        dentry1 = list_entry (pos1, struct mdc_dentry, list);
+        dentry2 = list_entry (pos2, struct mdc_dentry, list);
+
+        if  (dentry1->d_off > dentry2->d_off)
+                return 1;
+        return -1;
+}
+
+static struct mdc_dentry*
+mdc_dentry_insert(struct md_cache *mdc, const char *name, uuid_t gfid)
+{
+        struct mdc_dentry *dentry;
+
+        dentry = mdc_dentry_for_name(name, gfid);
+        dentry->d_off = mdc_dentry_cookie_hash(dentry->d_name,
+                                               dentry->d_len);
+
+        LOCK (&mdc->lock);
+        {
+                list_add_order (&dentry->list, &mdc->dentry_list, dentry_orderfn);
+        }
+        UNLOCK (&mdc->lock);
+
+        return dentry;
+}
+
+static int
+mdc_dentry_remove(struct md_cache *mdc, const char *name, uuid_t gfid)
+{
+        struct mdc_dentry *dentry = NULL, *tmp = NULL;
+
+        LOCK (&mdc->lock);
+        {
+                list_for_each_entry_safe (dentry, tmp, &mdc->dentry_list, list) {
+                        if (dentry->d_ino == gfid_to_ino (gfid) &&
+                            !strcmp(dentry->d_name, name)) {
+                                list_del(&dentry->list);
+                                break;
+                        }
+                }
+        }
+        UNLOCK (&mdc->lock);
+        return 0;
+}
+
+static int
+mdc_dentry_create(xlator_t *this, inode_t *parent, inode_t *inode,
+                  const char *name)
+{
+        int              ret = -1;
+        struct md_cache *mdc = NULL;
+
+        if (!inode) {
+                goto out;
+        }
+
+        if (mdc_inode_ctx_get (this, parent, &mdc) != 0) {
+                goto out;
+        }
+
+        mdc_dentry_insert(mdc, name, inode->gfid);
+
+        ret = 0;
+out:
+        return ret;
+}
+
+static int
+mdc_dentry_unlink(xlator_t *this, inode_t *parent, inode_t *inode,
+                  const char *name)
+{
+        int              ret = -1;
+        struct md_cache *mdc = NULL;
+
+        if (!inode) {
+                goto out;
+        }
+
+        if (mdc_inode_ctx_get (this, parent, &mdc) != 0) {
+                goto out;
+        }
+
+        ret = mdc_dentry_remove(mdc, name, inode->gfid);
+out:
+        return ret;
+}
+
+static int
+mdc_dentry_rename(xlator_t *this, inode_t *old_parent, inode_t *new_parent,
+                  inode_t *old_inode, inode_t *new_inode,
+                  const char *old_name, const char *new_name)
+{
+        int              ret = -1;
+        struct md_cache *old_mdc = NULL;
+        struct md_cache *new_mdc = NULL;
+
+        if (!old_inode || !new_inode) {
+                goto out;
+        }
+
+        if (mdc_inode_ctx_get (this, old_parent, &old_mdc) != 0) {
+                goto out;
+        }
+
+        ret = mdc_dentry_remove(old_mdc, old_name, old_inode->gfid);
+
+        if (mdc_inode_ctx_get (this, new_parent, &new_mdc) != 0) {
+                goto out;
+        }
+
+        mdc_dentry_insert(new_mdc, new_name, new_inode->gfid);
+
+        ret = 0;
+out:
+        return ret;
+}
+
 static void
 mdc_cache_statfs (xlator_t *this, struct statvfs *buf)
 {
@@ -1439,6 +1613,11 @@ mdc_mkdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 mdc_inode_iatt_set (this, local->loc.inode, buf);
                 mdc_inode_xatt_set (this, local->loc.inode, local->xattr);
         }
+
+        if (local->loc.parent) {
+                mdc_dentry_create (this, local->loc.parent, local->loc.inode,
+                                   local->loc.name);
+        }
 out:
         MDC_STACK_UNWIND (mkdir, frame, op_ret, op_errno, inode, buf,
                           preparent, postparent, xdata);
@@ -1487,6 +1666,11 @@ mdc_unlink_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 mdc_inode_iatt_set (this, local->loc.inode, NULL);
         }
 
+        if (local->loc.parent) {
+                mdc_dentry_unlink(this, local->loc.parent, local->loc.inode,
+                                  local->loc.name);
+        }
+
 out:
         MDC_STACK_UNWIND (unlink, frame, op_ret, op_errno,
                           preparent, postparent, xdata);
@@ -1528,6 +1712,8 @@ mdc_rmdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 
         if (local->loc.parent) {
                 mdc_inode_iatt_set (this, local->loc.parent, postparent);
+                mdc_dentry_unlink(this, local->loc.parent, local->loc.inode,
+                                  local->loc.name);
         }
 
 out:
@@ -1635,6 +1821,13 @@ mdc_rename_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
         if (local->loc2.parent) {
                 mdc_inode_iatt_set (this, local->loc2.parent, postnewparent);
         }
+
+        if (local->loc.parent && local->loc2.parent) {
+                gf_uuid_copy (local->loc2.inode->gfid, buf->ia_gfid); // FIXME: temp
+                mdc_dentry_rename (this, local->loc.parent, local->loc2.parent,
+                                   local->loc.inode, local->loc2.inode,
+                                   local->loc.name, local->loc2.name);
+        }
 out:
         MDC_STACK_UNWIND (rename, frame, op_ret, op_errno, buf,
                           preoldparent, postoldparent, prenewparent,
@@ -1707,7 +1900,6 @@ mdc_link (call_frame_t *frame, xlator_t *this,
         return 0;
 }
 
-
 int
 mdc_create_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 int32_t op_ret, int32_t op_errno, fd_t *fd, inode_t *inode,
@@ -1731,6 +1923,12 @@ mdc_create_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
         if (local->loc.inode) {
                 mdc_inode_iatt_set (this, inode, buf);
                 mdc_inode_xatt_set (this, local->loc.inode, local->xattr);
+        }
+
+        if (local->loc.parent) {
+                gf_uuid_copy (inode->gfid, buf->ia_gfid); // FIXME: temp
+                mdc_dentry_create (this, local->loc.parent, local->loc.inode,
+                                   local->loc.name);
         }
 out:
         MDC_STACK_UNWIND (create, frame, op_ret, op_errno, fd, inode, buf,
@@ -2396,25 +2594,170 @@ mdc_opendir(call_frame_t *frame, xlator_t *this, loc_t *loc,
         return 0;
 }
 
+static void
+mdc_readdirp_fill_stat(struct md_cache *mdc,
+                       struct mdc_dentry *dentry, gf_dirent_t *dirent)
+{
+        struct iatt *iatt    = &dirent->d_stat;
+
+        LOCK (&mdc->lock);
+        {
+                mdc_to_iatt (mdc, iatt);
+
+                gf_uuid_copy (iatt->ia_gfid, dentry->gfid);
+                iatt->ia_ino    = gfid_to_ino (dentry->gfid);
+                iatt->ia_dev    = 42;
+                iatt->ia_type   = dirent->d_stat.ia_type;
+
+                /* xattr not needed ? */
+        }
+        UNLOCK (&mdc->lock);
+}
+
+static int
+mdc_readdir_helper(xlator_t *this, struct md_cache *parent_mdc,
+                   inode_t *parent, off_t offset, size_t size,
+                   size_t *filled, gf_dirent_t *entries, gf_boolean_t readdirp)
+{
+        struct mdc_dentry *dentry = NULL;
+        struct md_cache *mdc      = NULL;
+        int ret                   = 0;
+
+        LOCK (&parent_mdc->lock);
+
+        if (list_empty (&parent_mdc->dentry_list) ||
+            !parent_mdc->fullfilled) {
+                ret = 1;
+                goto unlock;
+        }
+
+        if (parent_mdc->fullfilled && !parent_mdc->trusted && offset != 0) {
+                ret = 1;
+                goto unlock;
+        } else {
+                parent_mdc->trusted = _gf_true;
+        }
+
+        list_for_each_entry (dentry, &parent_mdc->dentry_list, list) {
+                if (dentry->d_off <= offset)
+                        continue;
+
+                gf_dirent_t *dirent = gf_dirent_for_name (dentry->d_name);
+
+                mdc_dentry_to_dirent(dentry, dirent);
+
+                if (readdirp) {
+                        inode_t *inode = inode_find(parent->table, dentry->gfid);
+                        if (!inode) {
+                                gf_msg_trace ("md-cache", 0, "inode_find failed for (%s %s)",
+                                              dentry->d_name, uuid_utoa (dentry->gfid));
+                        } else {
+                                if (mdc_inode_ctx_get (this, inode, &mdc) != 0) {
+                                        gf_msg_trace ("md-cache", 0, "mdc_inode_ctx_get failed (%s)",
+                                                      uuid_utoa (inode->gfid));
+                                } else {
+                                        mdc_readdirp_fill_stat(mdc, dentry, dirent);
+                                }
+
+                        }
+                }
+
+                list_add_tail(&dirent->list, &entries->list);
+                (*filled) += gf_dirent_size(dentry->d_name);
+
+                if (*filled >= size)
+                        break;
+        }
+
+        if (*filled == 0)
+                ret = 1;
+
+unlock:
+        UNLOCK (&parent_mdc->lock);
+
+        return ret;
+}
+
+static struct mdc_dentry*
+mdc_dentry_update(struct md_cache *mdc, gf_dirent_t *dirent)
+{
+        struct mdc_dentry *dentry = NULL;
+
+        LOCK (&mdc->lock);
+        list_for_each_entry (dentry, &mdc->dentry_list, list) {
+                if (!strcmp(dentry->d_name, dirent->d_name)) {
+                        UNLOCK (&mdc->lock);
+                        return dentry;
+                }
+        }
+        UNLOCK (&mdc->lock);
+
+        return mdc_dentry_insert(mdc, dirent->d_name, dirent->d_stat.ia_gfid);
+}
 
 int
 mdc_readdirp_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 		  int op_ret, int op_errno, gf_dirent_t *entries, dict_t *xdata)
 {
-        gf_dirent_t *entry      = NULL;
+        gf_dirent_t *entry         = NULL;
+        mdc_local_t *local         = NULL;
+        struct md_cache *mdc       = NULL;
+        inode_table_t *itable      = NULL;
+        gf_boolean_t update_parent = _gf_true;
 
-	if (op_ret <= 0)
-		goto unwind;
+        local = frame->local;
+        if (!local) {
+                update_parent = _gf_false;
+        }
+
+	if (op_ret <= 0) {
+                goto unwind;
+        }
+
+        if (local) {
+                if (mdc_inode_ctx_get (this, local->fd->inode, &mdc) != 0) {
+                        update_parent = _gf_false;
+                }
+        }
+
+        itable = local->fd->inode->table;
 
         list_for_each_entry (entry, &entries->list, list) {
-                if (!entry->inode)
-			continue;
-                mdc_inode_iatt_set (this, entry->inode, &entry->d_stat);
-                mdc_inode_xatt_set (this, entry->inode, entry->dict);
+                inode_t *inode;
+
+                if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+                        continue;
+
+                if (!entry->inode) {
+                        inode = inode_find (itable, entry->d_stat.ia_gfid);
+                        if (!inode) {
+                                inode = inode_new (itable);
+                                gf_uuid_copy (inode->gfid, entry->d_stat.ia_gfid);
+                                inode->ia_type = entry->d_stat.ia_type;
+                                inode_link (inode, local->fd->inode, entry->d_name, &entry->d_stat);
+                        }
+                } else {
+                        inode = entry->inode;
+                }
+
+                mdc_inode_xatt_set (this, inode, entry->dict);
+                mdc_inode_iatt_set (this, inode, &entry->d_stat);
+
+                if (!update_parent) {
+                        continue;
+                }
+
+                mdc_dentry_update(mdc, entry);
+        }
+
+        if (mdc && op_errno == ENOENT) {
+                LOCK (&mdc->lock);
+                mdc->fullfilled = _gf_true;
+                UNLOCK (&mdc->lock);
         }
 
 unwind:
-	STACK_UNWIND_STRICT (readdirp, frame, op_ret, op_errno, entries, xdata);
+	MDC_STACK_UNWIND (readdirp, frame, op_ret, op_errno, entries, xdata);
 	return 0;
 }
 
@@ -2423,16 +2766,46 @@ int
 mdc_readdirp (call_frame_t *frame, xlator_t *this, fd_t *fd,
 	      size_t size, off_t offset, dict_t *xdata)
 {
-	dict_t *xattr_alloc = NULL;
+	dict_t *xattr_alloc  = NULL;
+        mdc_local_t *local   = NULL;
+        struct md_cache *mdc = NULL;
+        gf_dirent_t entries;
+        size_t filled        = 0;
+        int op_errno         = 0;
+
+        INIT_LIST_HEAD (&entries.list);
+
+        local = mdc_local_get (frame);
+	local->fd = fd_ref(fd);
 
 	if (!xdata)
 		xdata = xattr_alloc = dict_new ();
 	if (xdata)
 		mdc_load_reqs (this, xdata);
 
+        if (mdc_inode_ctx_get (this, fd->inode, &mdc) != 0) {
+                goto uncached;
+        }
+
+        if (mdc_readdir_helper (this, mdc, fd->inode, offset, size,
+                                &filled, &entries, _gf_true)) {
+                goto uncached;
+        }
+
+        if (filled < size)
+                op_errno = ENOENT;
+
+        MDC_STACK_UNWIND (readdirp, frame, 0, op_errno, &entries, xdata);
+
+        gf_dirent_free (&entries);
+        goto out;
+
+uncached:
 	STACK_WIND (frame, mdc_readdirp_cbk,
 		    FIRST_CHILD (this), FIRST_CHILD (this)->fops->readdirp,
 		    fd, size, offset, xdata);
+
+out:
 	if (xattr_alloc)
 		dict_unref (xattr_alloc);
 	return 0;
@@ -2442,7 +2815,38 @@ int
 mdc_readdir_cbk(call_frame_t *frame, void *cookie, xlator_t *this, int op_ret,
 		int op_errno, gf_dirent_t *entries, dict_t *xdata)
 {
-	STACK_UNWIND_STRICT (readdir, frame, op_ret, op_errno, entries, xdata);
+        gf_dirent_t *entry      = NULL;
+        mdc_local_t  *local = NULL;
+        struct md_cache *mdc = NULL;
+
+        local = frame->local;
+        if (!local)
+                goto unwind;
+
+	if (op_ret <= 0)
+		goto unwind;
+
+        if (!local->fd)
+                goto unwind;
+
+        if (mdc_inode_ctx_get (this, local->fd->inode, &mdc) != 0);
+                goto unwind;
+
+        list_for_each_entry (entry, &entries->list, list) {
+                if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+                        continue;
+
+                mdc_dentry_update(mdc, entry);
+        }
+
+        if (op_errno == ENOENT) {
+                LOCK (&mdc->lock);
+                mdc->fullfilled = _gf_true;
+                UNLOCK (&mdc->lock);
+        }
+
+unwind:
+	MDC_STACK_UNWIND (readdir, frame, op_ret, op_errno, entries, xdata);
 	return 0;
 }
 
@@ -2450,10 +2854,35 @@ int
 mdc_readdir (call_frame_t *frame, xlator_t *this, fd_t *fd,
 	     size_t size, off_t offset, dict_t *xdata)
 {
-        int need_unref = 0;
+        int need_unref        = 0;
 	struct mdc_conf *conf = this->private;
+        mdc_local_t *local    = NULL;
+        struct md_cache *mdc  = NULL;
+        gf_dirent_t entries;
+        gf_boolean_t uncached = _gf_false;
+        size_t filled         = 0;
+        int op_errno          = 0;
+
+        local = mdc_local_get (frame);
+	local->fd = fd_ref(fd);
+
+        if (mdc_inode_ctx_get (this, fd->inode, &mdc) != 0) {
+                uncached = _gf_true;
+        }
 
 	if (!conf->force_readdirp) {
+                if (!uncached) {
+                        if (mdc_readdir_helper(this, mdc, fd->inode, offset, size,
+                                               &filled, &entries, _gf_false)) {
+                                goto uncached_readdir;
+                        }
+                        if (filled < size)
+                                op_errno = ENOENT;
+                        MDC_STACK_UNWIND (readdir, frame, 0, op_errno, &entries, xdata);
+                        gf_dirent_free (&entries);
+                        return 0;
+                }
+uncached_readdir:
 		STACK_WIND(frame, mdc_readdir_cbk, FIRST_CHILD(this),
 			   FIRST_CHILD(this)->fops->readdir, fd, size, offset,
 			   xdata);
@@ -2468,10 +2897,24 @@ mdc_readdir (call_frame_t *frame, xlator_t *this, fd_t *fd,
         if (xdata)
 		mdc_load_reqs (this, xdata);
 
+        if (!uncached) {
+                if (mdc_readdir_helper(this, mdc, fd->inode, offset, size,
+                                       &filled, &entries, _gf_true)) {
+                        goto uncached_readdirp;
+                }
+                if (filled < size)
+                        op_errno = ENOENT;
+                MDC_STACK_UNWIND (readdirp, frame, 0, op_errno, &entries, xdata);
+                gf_dirent_free (&entries);
+                goto out;
+        }
+
+uncached_readdirp:
 	STACK_WIND(frame, mdc_readdirp_cbk, FIRST_CHILD(this),
 		   FIRST_CHILD(this)->fops->readdirp, fd, size, offset,
 		   xdata);
 
+out:
         if (need_unref && xdata)
                 dict_unref (xdata);
 

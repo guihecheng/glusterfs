@@ -73,6 +73,13 @@ char *vol_type_str[] = {"Distribute",
 typedef int32_t (*rw_op_t)(int32_t fd, char *buf, int32_t size);
 typedef int32_t (*rwv_op_t)(int32_t fd, const struct iovec *buf, int32_t size);
 
+uint64_t
+gf_xxh64_wrapper_raw(const unsigned char *data, size_t len,
+                     unsigned long long seed)
+{
+        return GF_XXH64(data, len, seed);
+}
+
 void
 gf_xxh64_wrapper(const unsigned char *data, size_t len, unsigned long long seed,
                  char *xxh64)

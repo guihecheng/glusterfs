@@ -712,6 +712,7 @@ gf_uuid_unparse
 gf_valid_pid
 gf_vasprintf
 gf_volfile_reconfigure
+gf_xxh64_wrapper_raw
 gf_xxh64_wrapper
 gf_zero_fill_stat
 gid_cache_add
