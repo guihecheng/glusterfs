@@ -1126,6 +1126,12 @@ glusterd_op_stage_set_volume (dict_t *dict, char **op_errstr)
                 if (ret)
                         goto out;
 
+                if ((strcmp (key, "ganesha.enable") == 0) &&
+                    (strcmp (value, "off") == 0)) {
+                        ret = ganesha_manage_export (dict, "off", op_errstr);
+                        if (ret)
+                                goto out;
+                }
                 ret = glusterd_check_quota_cmd (key, value, errstr, sizeof (errstr));
                 if (ret)
                         goto out;
@@ -1640,6 +1646,21 @@ glusterd_op_stage_reset_volume (dict_t *dict, char **op_errstr)
                 gf_msg (this->name, GF_LOG_ERROR, 0,
                         GD_MSG_DICT_GET_FAILED, "Unable to get option key");
                 goto out;
+        }
+
+        /* *
+         * If key ganesha.enable is set, then volume should be unexported from
+         * ganesha server. Also it is a volume-level option, perform only when
+         * volume name not equal to "all"(in other words if volinfo != NULL)
+         */
+        if (volinfo && (!strcmp (key, "all") || !strcmp(key, "ganesha.enable"))) {
+                if (glusterd_check_ganesha_export (volinfo)) {
+                        ret = ganesha_manage_export (dict, "off", op_errstr);
+                        if (ret)
+                                gf_msg (this->name, GF_LOG_WARNING, 0,
+                                        GD_MSG_NFS_GNS_RESET_FAIL,
+                                        "Could not reset ganesha.enable key");
+                }
         }
 
        if (strcmp(key, "all")) {
@@ -2364,6 +2385,16 @@ glusterd_op_reset_volume (dict_t *dict, char **op_rspstr)
                 }
         }
 
+        if (!strcmp(key, "ganesha.enable") || !strcmp (key, "all")) {
+                if (glusterd_check_ganesha_export (volinfo)) {
+                        ret = manage_export_config (volname, "off", op_rspstr);
+                        if (ret)
+                                gf_msg (this->name, GF_LOG_WARNING, 0,
+                                        GD_MSG_NFS_GNS_RESET_FAIL,
+                                        "Could not reset ganesha.enable key");
+                }
+         }
+
 out:
         GF_FREE (key_fixed);
         if (quorum_action)
@@ -2960,6 +2991,9 @@ glusterd_op_set_volume (dict_t *dict, char **errstr)
                         }
                 }
 
+                ret =  glusterd_check_ganesha_cmd (key, value, errstr, dict);
+                if (ret == -1)
+                        goto out;
                 if (!is_key_glusterd_hooks_friendly (key)) {
                         ret = glusterd_check_option_exists (key, &key_fixed);
                         GF_ASSERT (ret);
@@ -4568,6 +4602,12 @@ glusterd_op_build_payload (dict_t **req, char **op_errstr, dict_t *op_ctx)
                         }
                         break;
 
+                case GD_OP_GANESHA:
+                        {
+                                dict_copy (dict, req_dict);
+                        }
+                        break;
+
                 default:
                         break;
         }
@@ -6062,6 +6102,10 @@ glusterd_op_stage_validate (glusterd_op_t op, dict_t *dict, char **op_errstr,
                         ret = glusterd_op_stage_set_volume (dict, op_errstr);
                         break;
 
+                case GD_OP_GANESHA:
+                        ret = glusterd_op_stage_set_ganesha (dict, op_errstr);
+                        break;
+
                 case GD_OP_RESET_VOLUME:
                         ret = glusterd_op_stage_reset_volume (dict, op_errstr);
                         break;
@@ -6194,6 +6238,9 @@ glusterd_op_commit_perform (glusterd_op_t op, dict_t *dict, char **op_errstr,
 
                 case GD_OP_SET_VOLUME:
                         ret = glusterd_op_set_volume (dict, op_errstr);
+                        break;
+                case GD_OP_GANESHA:
+                        ret = glusterd_op_set_ganesha (dict, op_errstr);
                         break;
 
 
