@@ -262,7 +262,6 @@ Obsoletes:        hekafs
 Obsoletes:        %{name}-common < %{version}-%{release}
 Obsoletes:        %{name}-core < %{version}-%{release}
 Obsoletes:        %{name}-ufo
-Obsoletes:        %{name}-ganesha
 Provides:         %{name}-common = %{version}-%{release}
 Provides:         %{name}-core = %{version}-%{release}
 
@@ -1275,6 +1274,9 @@ exit 0
 
 %if ( 0%{?_build_server} )
 %files ganesha
+%{_sysconfdir}/ganesha/*
+%{_libexecdir}/ganesha/*
+%{_sharedstatedir}/glusterd/hooks/1/start/post/S31ganesha-start.sh
 %endif
 
 %if ( 0%{?_build_server} )
@@ -2121,6 +2123,9 @@ fi
 
 %changelog
 * Mon Nov 13 2017 Jiffin Tony Thottan <jthottan@redhat.com>
+- Adding ganesha bits back in gluster repository #1499784
+
+* Mon Nov 13 2017 Jiffin Tony Thottan <jthottan@redhat.com>
 - DOWNSTREAM ONLY - revert of 83abcb(gnfs in an optional subpackage)
 
 * Tue Oct 10 2017 Milind Changire <mchangir@redhat.com>
@@ -2177,9 +2182,6 @@ fi
 
 * Thu Feb 16 2017 Niels de Vos <ndevos@redhat.com>
 - Obsolete and Provide python-gluster for upgrading from glusterfs < 3.10
-
-* Tue Feb 7 2017 Kaleb S. KEITHLEY <kkeithle@redhat.com>
-- remove ganesha (#1418417)
 
 * Wed Feb 1 2017 Poornima G <pgurusid@redhat.com>
 - Install /var/lib/glusterd/groups/metadata-cache by default
