@@ -635,6 +635,8 @@ reconfigure(xlator_t *this, dict_t *options)
                          size_uint64, err);
         GF_OPTION_RECONF("rda-cache-limit", priv->rda_cache_limit, options,
                          size_uint64, err);
+        GF_OPTION_RECONF("parallel-readdir", priv->parallel_readdir, options,
+                         bool, err);
 
 	return 0;
 err:
@@ -677,6 +679,8 @@ init(xlator_t *this)
 	GF_OPTION_INIT("rda-high-wmark", priv->rda_high_wmark, size_uint64,
                        err);
         GF_OPTION_INIT("rda-cache-limit", priv->rda_cache_limit, size_uint64,
+                       err);
+        GF_OPTION_INIT("parallel-readdir", priv->parallel_readdir, bool,
                        err);
 
 	return 0;
@@ -744,6 +748,15 @@ struct volume_options options[] = {
                          "consumption by readdir-ahead is capped by this "
                          "value, irrespective of the number/size of "
                          "directories cached",
+        },
+        { .key = {"parallel-readdir"},
+          .type = GF_OPTION_TYPE_BOOL,
+          .default_value = "off",
+          .description = "If this option is enabled, the readdir operation "
+                         "is performed in parallel on all the bricks, thus "
+                         "improving the performance of readdir. Note that "
+                         "the performance improvement is higher in large "
+                         "clusters"
         },
         { .key = {NULL} },
 };
