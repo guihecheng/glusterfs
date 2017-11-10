@@ -2612,7 +2612,8 @@ glusterd_op_set_all_volume_options (xlator_t *this, dict_t *dict,
                                               NULL);
                                 if (ret)
                                         goto out;
-                                ret = glusterd_update_volumes_dict (volinfo);
+                                ret = glusterd_update_volumes_dict
+                                                (volinfo, &start_nfs_svc);
                                 if (ret)
                                         goto out;
                                 if (!volinfo->is_snap_volume) {
@@ -2622,14 +2623,6 @@ glusterd_op_set_all_volume_options (xlator_t *this, dict_t *dict,
                                         if (ret)
                                                 goto out;
                                 }
-
-                                if (volinfo->type == GF_CLUSTER_TYPE_TIER) {
-                                        svc = &(volinfo->tierd.svc);
-                                        ret = svc->reconfigure (volinfo);
-                                        if (ret)
-                                                goto out;
-                                }
-
                                 ret = glusterd_create_volfiles_and_notify_services (volinfo);
                                 if (ret) {
                                         gf_msg (this->name, GF_LOG_ERROR, 0,
@@ -2651,27 +2644,22 @@ glusterd_op_set_all_volume_options (xlator_t *this, dict_t *dict,
                                         }
                                 }
                         }
+                        if (start_nfs_svc) {
+                                ret = conf->nfs_svc.manager (&(conf->nfs_svc),
+                                                             NULL,
+                                                             PROC_START_NO_WAIT);
+                                if (ret) {
+                                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                                GD_MSG_SVC_START_FAIL,
+                                                 "unable to start nfs service");
+                                        goto out;
+                                }
+                        }
                         ret = glusterd_store_global_info (this);
                         if (ret) {
                                 gf_msg (this->name, GF_LOG_ERROR, 0,
                                         GD_MSG_OP_VERS_STORE_FAIL,
                                         "Failed to store op-version.");
-                        }
-                }
-                cds_list_for_each_entry (volinfo, &conf->volumes, vol_list) {
-                        ret = glusterd_update_volumes_dict (volinfo,
-                                                            &start_nfs_svc);
-                        if (ret)
-                                goto out;
-                }
-                if (start_nfs_svc) {
-                        ret = conf->nfs_svc.manager (&(conf->nfs_svc), NULL,
-                                                     PROC_START_NO_WAIT);
-                        if (ret) {
-                                gf_msg (this->name, GF_LOG_ERROR, 0,
-                                        GD_MSG_SVC_START_FAIL,
-                                         "unable to start nfs service");
-                                goto out;
                         }
                 }
                 /* No need to save cluster.op-version in conf->opts
