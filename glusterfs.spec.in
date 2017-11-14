@@ -822,9 +822,6 @@ install -D -p -m 0644 extras/glusterfs-logrotate \
 # ganesha ghosts
 mkdir -p %{buildroot}%{_sysconfdir}/ganesha
 touch %{buildroot}%{_sysconfdir}/ganesha/ganesha-ha.conf
-mkdir -p %{buildroot}%{_localstatedir}/run/gluster/shared_storage/nfs-ganesha/exports
-touch %{buildroot}%{_localstatedir}/run/gluster/shared_storage/nfs-ganesha/ganesha.conf
-touch %{buildroot}%{_localstatedir}/run/gluster/shared_storage/nfs-ganesha/ganesha-ha.conf
 
 %if ( 0%{!?_without_georeplication:1} )
 mkdir -p %{buildroot}%{_sharedstatedir}/glusterd/geo-replication
@@ -888,10 +885,12 @@ modprobe fuse
 exit 0
 %endif
 
+%if ( 0%{?_build_server} )
 %if ( 0%{?fedora} && 0%{?fedora} > 25 )
 %post ganesha
 semanage boolean -m ganesha_use_fusefs --on
 exit 0
+%endif
 %endif
 
 %if ( 0%{?_build_server} )
@@ -1016,10 +1015,12 @@ fi
 %postun api
 /sbin/ldconfig
 
+%if ( 0%{?_build_server} )
 %if ( 0%{?fedora} && 0%{?fedora} > 25 )
 %postun ganesha
 semanage boolean -m ganesha_use_fusefs --off
 exit 0
+%endif
 %endif
 
 %postun libs
@@ -1037,19 +1038,23 @@ exit 0
 ##-----------------------------------------------------------------------------
 ## All %%trigger should be placed here and keep them sorted
 ##
+%if ( 0%{?_build_server} )
 %if ( 0%{?fedora} && 0%{?fedora} > 25 )
 %trigger ganesha -- selinux-policy-targeted
 semanage boolean -m ganesha_use_fusefs --on
 exit 0
 %endif
+%endif
 
 ##-----------------------------------------------------------------------------
 ## All %%triggerun should be placed here and keep them sorted
 ##
+%if ( 0%{?_build_server} )
 %if ( 0%{?fedora} && 0%{?fedora} > 25 )
 %triggerun ganesha -- selinux-policy-targeted
 semanage boolean -m ganesha_use_fusefs --off
 exit 0
+%endif
 %endif
 
 ##-----------------------------------------------------------------------------
@@ -1074,6 +1079,11 @@ exit 0
 %if ( ! 0%{?_build_server} )
 # exclude ganesha files
 %exclude %{_prefix}/lib/ocf/*
+%exclude %{_libexecdir}/ganesha/*
+%exclude %{_prefix}/lib/ocf/resource.d/heartbeat/*
+%exclude %{_sysconfdir}/ganesha/ganesha-ha.conf.sample
+%exclude %{_sysconfdir}/ganesha/ganesha-ha.conf
+
 # exclude incrementalapi
 %exclude %{_libexecdir}/glusterfs/*
 %exclude %{_sbindir}/gfind_missing_files
@@ -1323,10 +1333,6 @@ exit 0
 %{_sharedstatedir}/glusterd/hooks/1/start/post/S31ganesha-start.sh
 %{_sysconfdir}/ganesha/ganesha-ha.conf.sample
 %ghost %config(noreplace) %{_sysconfdir}/ganesha/ganesha-ha.conf
-%ghost %dir %{_localstatedir}/run/gluster/shared_storage/nfs-ganesha
-%ghost %dir %{_localstatedir}/run/gluster/shared_storage/nfs-ganesha/exports
-%ghost %config(noreplace) %{_localstatedir}/run/gluster/shared_storage/nfs-ganesha/ganesha.conf
-%ghost %config(noreplace) %{_localstatedir}/run/gluster/shared_storage/nfs-ganesha/ganesha-ha.conf
 %endif
 
 %if ( 0%{?_build_server} )
