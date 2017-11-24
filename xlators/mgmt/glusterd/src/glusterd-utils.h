@@ -629,6 +629,9 @@ int
 glusterd_is_tierd_enabled (glusterd_volinfo_t *volinfo);
 
 int
+glusterd_is_tierd_supposed_to_be_enabled (glusterd_volinfo_t *volinfo);
+
+int
 glusterd_is_volume_quota_enabled (glusterd_volinfo_t *volinfo);
 
 int

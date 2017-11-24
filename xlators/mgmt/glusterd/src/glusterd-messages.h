@@ -4976,6 +4976,14 @@
  */
 #define GD_MSG_CHANGELOG_GET_FAIL (GLUSTERD_COMP_BASE + 614)
 
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_MANAGER_FUNCTION_FAILED  (GLUSTERD_COMP_BASE + 614)
+
 /*------------*/
 
 #define glfs_msg_end_x GLFS_MSGID_END, "Invalid: End of messages"
