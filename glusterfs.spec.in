@@ -1875,48 +1875,6 @@ end
 
 
 
-%pretrans ganesha -p <lua>
-if not posix.access("/bin/bash", "x") then
-    -- initial installation, no shell, no running glusterfsd
-    return 0
-end
-
--- TODO: move this completely to a lua script
--- For now, we write a temporary bash script and execute that.
-
-script = [[#!/bin/sh
-pidof -c -o %PPID -x glusterfsd &>/dev/null
-
-if [ $? -eq 0 ]; then
-   pushd . > /dev/null 2>&1
-   for volume in /var/lib/glusterd/vols/*; do cd $volume;
-       vol_type=`grep '^type=' info | awk -F'=' '{print $2}'`
-       volume_started=`grep '^status=' info | awk -F'=' '{print $2}'`
-       if [ $vol_type -eq 0 ] && [ $volume_started -eq 1 ] ; then
-          exit 1;
-       fi
-   done
-
-   popd > /dev/null 2>&1
-   exit 1;
-fi
-]]
-
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-tmpname = os.tmpname()
-tmpfile = io.open(tmpname, "w")
-tmpfile:write(script)
-tmpfile:close()
-ok, how, val = os.execute("/bin/bash " .. tmpname)
-os.remove(tmpname)
-if not (ok == 0) then
-   error("Detected running glusterfs processes", ok)
-end
-
-
-
 %if ( 0%{!?_without_georeplication:1} )
 %pretrans geo-replication -p <lua>
 if not posix.access("/bin/bash", "x") then
@@ -2183,6 +2141,9 @@ fi
 %endif
 
 %changelog
+* Wed Jan 17 2018 Milind Changire <mchangir@redhat.com>
+- DOWNSTREAM ONLY - Removed pretrans script for glusterfs-ganesha - (#1410719)
+
 * Wed Jan 17 2018 Mohit Agrawal <moagrawa@redhat.com>
 - Exclude control-cpu-load.sh and control-mem.sh for RHEL_7 client builds only (#1534530)
 
