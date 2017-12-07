@@ -1256,6 +1256,9 @@ out:
         if (rsp.hndsk.hndsk_val)
                 GF_FREE (rsp.hndsk.hndsk_val);
 
+        if (args_dict)
+                dict_unref (args_dict);
+
         return ret;
 }
 
