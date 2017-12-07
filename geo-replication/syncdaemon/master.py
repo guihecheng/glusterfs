@@ -1527,6 +1527,10 @@ class GMasterXsyncMixin(GMasterChangelogMixin):
                 pass
             else:
                 raise
+        # Purge stale unprocessed xsync changelogs
+        for f in os.listdir(self.tempdir):
+            if f.startswith("XSYNC-CHANGELOG"):
+                os.remove(os.path.join(self.tempdir, f))
 
     def crawl(self):
         """
