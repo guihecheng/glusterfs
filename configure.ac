@@ -281,6 +281,10 @@ AC_CONFIG_FILES([Makefile
                 tools/glusterfind/glusterfind
                 tools/glusterfind/Makefile
                 tools/glusterfind/src/Makefile
+                tools/gluster_usergroup_adm/src/ugadm.conf
+                tools/gluster_usergroup_adm/gluster_usergroup_adm
+                tools/gluster_usergroup_adm/Makefile
+                tools/gluster_usergroup_adm/src/Makefile
                 tools/setgfid2path/Makefile
                 tools/setgfid2path/src/Makefile])
 

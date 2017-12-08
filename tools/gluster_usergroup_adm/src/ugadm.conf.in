@@ -1,0 +1,5 @@
+[vars]
+working_dir=@GLUSTERFSD_MISCDIR@/gluster_usergroup_adm/
+log_file=/var/log/glusterfs/gluster_usergroup_adm/adm.log
+db_file=@GLUSTERFSD_MISCDIR@/gluster_usergroup_adm/ugstore.db
+cmd_agent=@GLUSTERFS_LIBEXECDIR@/gluster_usergroup_adm/samba-ctl.py

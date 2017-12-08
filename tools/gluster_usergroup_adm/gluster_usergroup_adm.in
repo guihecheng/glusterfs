@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+sys.path.insert(1, '@GLUSTERFS_LIBEXECDIR@/')
+
+from gluster_usergroup_adm.main import main
+
+if __name__ == '__main__':
+        main()
