@@ -23,7 +23,7 @@ from threading import Condition, Lock
 from datetime import datetime
 from gconf import gconf
 from syncdutils import Thread, GsyncdError, boolify, escape_space_newline
-from syncdutils import unescape_space_newline, gauxpfx, md5hex, selfkill
+from syncdutils import unescape_space_newline, gauxpfx, escape1, selfkill
 from syncdutils import lstat, errno_wrap, FreeObject, lf, matching_disk_gfid
 from syncdutils import NoStimeAvailable, PartialHistoryAvailable
 
@@ -771,7 +771,7 @@ class GMasterChangelogMixin(GMasterCommon):
         selfkill()
 
     def setup_working_dir(self):
-        workdir = os.path.join(gconf.working_dir, md5hex(gconf.local_path))
+        workdir = os.path.join(gconf.working_dir, escape1(gconf.local_path))
         logging.debug('changelog working dir %s' % workdir)
         return workdir
 

@@ -60,11 +60,7 @@ try:
 except ImportError:
     import urllib
 
-try:
-    from hashlib import md5 as md5
-except ImportError:
-    # py 2.4
-    from md5 import new as md5
+from hashlib import sha256 as sha256
 
 # auxiliary gfid based access prefix
 _CL_AUX_GFID_PFX = ".gfid/"
@@ -97,6 +93,8 @@ def escape(s):
        to turn whatever data to creatable representation"""
     return urllib.quote_plus(s)
 
+def escape1(s):
+    return s.replace("/", "-").strip("-")
 
 def unescape(s):
     """inverse of .escape"""
@@ -175,13 +173,21 @@ def setup_ssh_ctl(ctld, remote_addr, resource_url):
     gconf.ssh_ctl_dir = ctld
     content = "SLAVE_HOST=%s\nSLAVE_RESOURCE_URL=%s" % (remote_addr,
                                                         resource_url)
-    content_md5 = md5hex(content)
+    content_sha256 = sha256hex(content)
+    """
+    The length of ctl_path for ssh connection should not be > 108.
+    ssh fails with ctl_path too long if it is so. But when rsync
+    is piped to ssh, it is not taking > 90. Hence using first 32
+    bytes of hash. Hash collision doesn't matter as only one sock
+    file is created per directory.
+    """
+    content_sha256 = content_sha256[:32]
     fname = os.path.join(gconf.ssh_ctl_dir,
-                         "%s.mft" % content_md5)
+                         "%s.mft" % content_sha256)
 
     create_manifest(fname, content)
     ssh_ctl_path = os.path.join(gconf.ssh_ctl_dir,
-                                "%s.sock" % content_md5)
+                                "%s.sock" % content_sha256)
     gconf.ssh_ctl_args = ["-oControlMaster=auto", "-S", ssh_ctl_path]
 
 
@@ -536,8 +542,8 @@ def gauxpfx():
     return _CL_AUX_GFID_PFX
 
 
-def md5hex(s):
-    return md5(s).hexdigest()
+def sha256hex(s):
+    return sha256(s).hexdigest()
 
 
 def selfkill(sig=SIGTERM):
