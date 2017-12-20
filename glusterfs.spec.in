@@ -193,7 +193,6 @@ Release:          0.1%{?prereltag:.%{prereltag}}%{?dist}
 Name:             @PACKAGE_NAME@
 Version:          @PACKAGE_VERSION@
 Release:          @PACKAGE_RELEASE@%{?dist}
-ExclusiveArch:    x86_64 aarch64
 %endif
 License:          GPLv2 or LGPLv3+
 Group:            System Environment/Base
@@ -2180,6 +2179,9 @@ fi
 %endif
 
 %changelog
+* Wed Dec 20 2017 Milind Changire <mchangir@redhat.com>
+- Remove ExclusiveArch directive to help building on non-x86_64 arches (#1527772)
+
 * Fri Dec 01 2017 Mohit Agrawal <moagrawa@redhat.com>
 - Added control-cpu-load.sh and control-mem.sh scripts to glusterfs-server section(#1484446)
 
