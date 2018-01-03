@@ -14,7 +14,6 @@
 #include "dht-common.h"
 #include "dht-messages.h"
 #include "dht-lock.h"
-#include "glusterfs-acl.h"
 
 #define DHT_SET_LAYOUT_RANGE(layout,i,srt,chunk,path)    do {           \
                 layout->list[i].start = srt;                            \

@@ -20,6 +20,7 @@
 #include "refcount.h"
 #include "timer.h"
 #include "protocol-common.h"
+#include "glusterfs-acl.h"
 
 #ifndef _DHT_H
 #define _DHT_H
@@ -146,6 +147,7 @@ struct dht_rebalance_ {
         dht_defrag_cbk_fn_t  target_op_fn;
         dict_t              *xdata;
         dict_t              *xattr;
+        dict_t              *dict;
         int32_t              set;
         struct gf_flock      flock;
         int                  lock_cmd;
@@ -1416,4 +1418,12 @@ dht_file_removexattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 int
 dht_file_setxattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                        int op_ret, int op_errno, dict_t *xdata);
+
+/* Abstract out the DHT-IATT-IN-DICT */
+
+
+int dht_request_iatt_in_xdata (xlator_t *this, dict_t *xattr_req);
+
+int dht_read_iatt_from_xdata (xlator_t *this, dict_t *xdata,
+                              struct iatt *stbuf);
 #endif/* _DHT_H */
