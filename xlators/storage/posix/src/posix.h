@@ -240,6 +240,8 @@ typedef struct {
         int          fdnum;
         int          flags;
         int32_t     op_errno;
+        char        *list;
+        size_t       list_size;
 } posix_xattr_filler_t;
 
 typedef struct {
