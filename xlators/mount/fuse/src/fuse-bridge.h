@@ -52,7 +52,7 @@
 
 typedef struct fuse_in_header fuse_in_header_t;
 typedef void (fuse_handler_t) (xlator_t *this, fuse_in_header_t *finh,
-                               void *msg);
+                               void *msg, struct iobuf *iobuf);
 
 struct fuse_private {
         int                  fd;
@@ -62,7 +62,8 @@ struct fuse_private {
         char                *mount_point;
         struct iobuf        *iobuf;
 
-        pthread_t            fuse_thread;
+        pthread_t            *fuse_thread;
+        uint32_t              reader_thread_count;
         char                 fuse_thread_started;
 
         uint32_t             direct_io_mode;
@@ -140,6 +141,9 @@ struct fuse_private {
 
         /* whether to run the unmount daemon */
         gf_boolean_t auto_unmount;
+        gf_boolean_t         mount_finished;
+        gf_boolean_t         handle_graph_switch;
+        pthread_cond_t       migrate_cond;
 };
 typedef struct fuse_private fuse_private_t;
 
@@ -391,6 +395,7 @@ typedef struct {
         int32_t        fd_no;
 
         gf_seek_what_t whence;
+        struct iobuf *iobuf;
 } fuse_state_t;
 
 typedef struct {

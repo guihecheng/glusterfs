@@ -446,6 +446,7 @@ struct _cmd_args {
         char           *subdir_mount;
 
         char              *event_history;
+        uint32_t           reader_thread_count;
 };
 typedef struct _cmd_args cmd_args_t;
 
