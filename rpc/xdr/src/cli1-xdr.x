@@ -105,6 +105,17 @@ enum gf_quota_type {
         GF_QUOTA_OPTION_TYPE_MAX
 };
 
+enum gf_worm_type {
+        GF_WORM_OPTION_TYPE_NONE = 0,
+        GF_WORM_OPTION_TYPE_ENABLE,
+        GF_WORM_OPTION_TYPE_DISABLE,
+        GF_WORM_OPTION_TYPE_SET,
+        GF_WORM_OPTION_TYPE_GET,
+        GF_WORM_OPTION_TYPE_CLEAR,
+        GF_WORM_OPTION_TYPE_LIST,
+        GF_WORM_OPTION_TYPE_MAX
+};
+
 enum gf1_cli_friends_list {
         GF_CLI_LIST_PEERS = 1,
         GF_CLI_LIST_POOL_NODES = 2

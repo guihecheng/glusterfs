@@ -25,6 +25,7 @@ extern rpc_clnt_prog_t *cli_rpc_prog;
 extern struct cli_cmd volume_cmds[];
 extern struct cli_cmd bitrot_cmds[];
 extern struct cli_cmd quota_cmds[];
+extern struct cli_cmd worm_cmds[];
 extern struct cli_cmd tier_cmds[];
 extern struct cli_cmd cli_probe_cmds[];
 extern struct cli_cmd cli_log_cmds[];
@@ -62,6 +63,7 @@ cli_cmd_display_help (struct cli_state *state, struct cli_cmd_word *in_word,
 {
         struct cli_cmd        *cmd[] = {cli_misc_cmds, cli_probe_cmds,
                                         volume_cmds, bitrot_cmds, quota_cmds,
+                                        worm_cmds,
 #if !defined(__NetBSD__)
                                         tier_cmds,
 #endif

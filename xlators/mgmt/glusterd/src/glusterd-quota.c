@@ -1562,6 +1562,7 @@ glusterd_op_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
         gf_boolean_t            start_crawl  = _gf_false;
         glusterd_conf_t        *priv         = NULL;
         xlator_t               *this         = NULL;
+        char                    mountdir[PATH_MAX] = {0,};
 
         GF_ASSERT (dict);
         GF_ASSERT (op_errstr);
@@ -1727,7 +1728,8 @@ out:
                 /* During a list operation we need the aux mount to be
                  * accessible until the listing is done at the cli
                  */
-                glusterd_remove_auxiliary_mount (volinfo->volname);
+                GLUSTERD_GET_QUOTA_LIMIT_MOUNT_PATH (mountdir, volname, "/");
+                glusterd_remove_auxiliary_mount (volname, mountdir);
         }
 
         return ret;

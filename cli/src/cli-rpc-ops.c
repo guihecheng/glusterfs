@@ -44,6 +44,7 @@
 #include "cli-quotad-client.h"
 #include "run.h"
 #include "quota-common-utils.h"
+#include "worm-common-utils.h"
 #include "events.h"
 
 enum gf_task_types {
@@ -3703,21 +3704,19 @@ out:
         return ret;
 }
 
-int
-gluster_remove_auxiliary_mount (char *volname)
+static int
+gluster_remove_auxiliary_mount (char *volname, char *mountdir)
 {
         int       ret                = -1;
-        char      mountdir[PATH_MAX] = {0,};
         xlator_t  *this               = NULL;
 
         this = THIS;
         GF_ASSERT (this);
 
-        GLUSTERD_GET_QUOTA_LIST_MOUNT_PATH (mountdir, volname, "/");
         ret = gf_umount_lazy (this->name, mountdir, 1);
         if (ret) {
                 gf_log("cli", GF_LOG_ERROR, "umount on %s failed, "
-                        "reason : %s", mountdir, strerror (errno));
+                       "reason : %s", mountdir, strerror (errno));
         }
 
         return ret;
@@ -3888,6 +3887,83 @@ print_quota_list_from_quotad (call_frame_t *frame, dict_t *rsp_dict)
 
         ret = print_quota_list_output (local, path, default_sl, &limits,
                                        &used_space, type, _gf_true);
+out:
+        return ret;
+}
+
+static int
+print_worm_list_output (cli_local_t *local, char *path, int64_t start,
+                        int64_t dura, gf_boolean_t worm_set)
+{
+        int             ret          = -1;
+
+        GF_ASSERT (local);
+        GF_ASSERT (path);
+
+        if (global_state->mode & GLUSTER_MODE_XML) {
+                ret = cli_worm_list_xml_output (local, path, start,
+                                                dura, worm_set);
+                if (ret) {
+                        gf_log ("cli", GF_LOG_ERROR, "Failed to "
+                                "output in xml format for worm "
+                                "command");
+                }
+                goto out;
+        }
+
+        ret = 0;
+
+        if (worm_set) {
+                cli_out ("%-20s %-20"PRId64" %-20"PRId64"",
+                         path, start, dura);
+        } else {
+                print_worm_list_empty (path);
+        }
+
+out:
+        return ret;
+}
+
+int
+gf_cli_print_worm_list_from_dict (cli_local_t *local, char *volname,
+                                  dict_t *dict, int op_ret, int op_errno,
+                                  char *op_errstr)
+{
+        int             ret                     = -1;
+        char           *path                    = NULL;
+        int64_t         start                   = -1;
+        int64_t         dura                    = -1;
+
+        if (!dict)
+                goto out;
+
+        if (global_state->mode & GLUSTER_MODE_XML) {
+                ret = cli_xml_output_vol_worm_list_begin
+                        (local, op_ret, op_errno, op_errstr);
+                if (ret) {
+                        gf_log ("cli", GF_LOG_ERROR,
+                                "Error outputting xml begin");
+                        goto out;
+                }
+        } else {
+                print_worm_list_header ();
+        }
+
+        ret = dict_get_str (dict, "path", &path);
+        if (ret)
+                gf_log ("cli", GF_LOG_TRACE, "Failed to get worm path");
+
+        ret = dict_get_int64 (dict, "start", &start);
+        if (ret)
+                gf_log ("cli", GF_LOG_TRACE, "Failed to get worm start");
+
+        ret = dict_get_int64 (dict, "dura", &dura);
+        if (ret)
+                gf_log ("cli", GF_LOG_TRACE, "Failed to get worm dura");
+
+        ret = print_worm_list_output (local, path, start, dura,
+                                      start == -1 ? _gf_false : _gf_true);
+
 out:
         return ret;
 }
@@ -4139,6 +4215,7 @@ gf_cli_quota_cbk (struct rpc_req *req, struct iovec *iov,
         cli_local_t       *local       = NULL;
         char              *default_sl_dup  = NULL;
         int32_t            entry_count      = 0;
+        char               mountdir[PATH_MAX] = {0,};
 
         GF_ASSERT (myframe);
 
@@ -4266,9 +4343,148 @@ out:
 
         if ((type == GF_QUOTA_OPTION_TYPE_LIST)
             || (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS)) {
-                gluster_remove_auxiliary_mount (volname);
+                GLUSTERD_GET_QUOTA_LIST_MOUNT_PATH (mountdir, volname, "/");
+                gluster_remove_auxiliary_mount (volname, mountdir);
         }
 
+        cli_cmd_broadcast_response (ret);
+        if (dict)
+                dict_unref (dict);
+
+        free (rsp.dict.dict_val);
+
+        return ret;
+}
+
+void
+gf_cli_worm_print (cli_local_t *local, char *volname, dict_t *dict,
+                   int op_ret, int op_errno, char *op_errstr)
+{
+        GF_VALIDATE_OR_GOTO ("cli", volname, out);
+
+        if (!connected)
+                goto out;
+
+        gf_cli_print_worm_list_from_dict (local, volname, dict,
+                                          op_ret, op_errno, op_errstr);
+
+out:
+        return;
+}
+
+int
+gf_cli_worm_cbk (struct rpc_req *req, struct iovec *iov,
+                 int count, void *myframe)
+{
+        gf_cli_rsp         rsp                = {0,};
+        int                ret                = -1;
+        dict_t            *dict               = NULL;
+        char              *volname            = NULL;
+        int32_t            type               = 0;
+        call_frame_t      *frame              = NULL;
+        cli_local_t       *local              = NULL;
+//        int32_t            entry_count        = 0;
+
+        GF_ASSERT (myframe);
+
+        if (-1 == req->rpc_status) {
+                goto out;
+        }
+
+        frame = myframe;
+
+        GF_ASSERT (frame->local);
+
+        local = frame->local;
+
+        ret = xdr_to_generic (*iov, &rsp, (xdrproc_t)xdr_gf_cli_rsp);
+        if (ret < 0) {
+                gf_log (frame->this->name, GF_LOG_ERROR,
+                        "Failed to decode xdr response");
+                goto out;
+        }
+
+        if (rsp.op_ret) {
+                ret = -1;
+                if (global_state->mode & GLUSTER_MODE_XML)
+                        goto xml_output;
+
+                if (strcmp (rsp.op_errstr, "")) {
+                        cli_err ("worm command failed : %s", rsp.op_errstr);
+                        if (rsp.op_ret == -ENOENT)
+                                cli_err ("please enter the path relative to "
+                                         "the volume");
+                } else {
+                        cli_err ("worm command : failed");
+                }
+
+                goto out;
+        }
+
+        if (rsp.dict.dict_len) {
+                /* Unserialize the dictionary */
+                dict  = dict_new ();
+
+                ret = dict_unserialize (rsp.dict.dict_val,
+                                        rsp.dict.dict_len,
+                                        &dict);
+                if (ret < 0) {
+                        gf_log ("cli", GF_LOG_ERROR,
+                                "failed to "
+                                "unserialize req-buffer to dictionary");
+                        goto out;
+                }
+        }
+
+        gf_log ("cli", GF_LOG_DEBUG, "Received resp to worm command");
+
+        ret = dict_get_str (dict, "volname", &volname);
+        if (ret)
+                gf_log (frame->this->name, GF_LOG_ERROR,
+                        "failed to get volname");
+
+        ret = dict_get_int32 (dict, "type", &type);
+        if (ret)
+                gf_log (frame->this->name, GF_LOG_TRACE,
+                        "failed to get type");
+
+//        ret = dict_get_int32 (dict, "count", &entry_count);
+//        if (ret)
+//                gf_log (frame->this->name, GF_LOG_TRACE, "failed to get count");
+//
+//
+        if (type == GF_WORM_OPTION_TYPE_GET) {
+                gf_cli_worm_print (local, volname, dict,
+                                   rsp.op_ret,
+                                   rsp.op_errno, rsp.op_errstr);
+
+                if (global_state->mode & GLUSTER_MODE_XML) {
+                        ret = cli_xml_output_vol_worm_list_end (local);
+                        if (ret < 0) {
+                                ret = -1;
+                                gf_log ("cli", GF_LOG_ERROR, "Error in printing"
+                                       " xml output");
+                        }
+                        goto out;
+                }
+        }
+
+xml_output:
+
+        if (global_state->mode & GLUSTER_MODE_XML) {
+                ret = cli_xml_output_str ("volWorm", NULL, rsp.op_ret,
+                                          rsp.op_errno, rsp.op_errstr);
+                if (ret)
+                        gf_log ("cli", GF_LOG_ERROR,
+                                "Error outputting to xml");
+                goto out;
+        }
+
+        if (!rsp.op_ret && type != GF_WORM_OPTION_TYPE_GET)
+                cli_out ("volume worm : success");
+
+        ret = rsp.op_ret;
+out:
         cli_cmd_broadcast_response (ret);
         if (dict)
                 dict_unref (dict);
@@ -5430,6 +5646,31 @@ gf_cli_quota (call_frame_t *frame, xlator_t *this,
         ret = cli_to_glusterd (&req, frame, gf_cli_quota_cbk,
                                (xdrproc_t) xdr_gf_cli_req, dict,
                                GLUSTER_CLI_QUOTA, this, cli_rpc_prog, NULL);
+
+out:
+        GF_FREE (req.dict.dict_val);
+
+        return ret;
+}
+
+int32_t
+gf_cli_worm (call_frame_t *frame, xlator_t *this,
+             void *data)
+{
+        gf_cli_req          req = {{0,}};
+        int                 ret = 0;
+        dict_t             *dict = NULL;
+
+        if (!frame || !this ||  !data) {
+                ret = -1;
+                goto out;
+        }
+
+        dict = data;
+
+        ret = cli_to_glusterd (&req, frame, gf_cli_worm_cbk,
+                               (xdrproc_t) xdr_gf_cli_req, dict,
+                               GLUSTER_CLI_WORM, this, cli_rpc_prog, NULL);
 
 out:
         GF_FREE (req.dict.dict_val);
@@ -12285,7 +12526,8 @@ struct rpc_clnt_procedure gluster_cli_actors[GLUSTER_CLI_MAXVALUE] = {
         [GLUSTER_CLI_GET_STATE]        = {"GET_STATE", gf_cli_get_state},
         [GLUSTER_CLI_RESET_BRICK]      = {"RESET_BRICK", gf_cli_reset_brick},
         [GLUSTER_CLI_REMOVE_TIER_BRICK] = {"DETACH_TIER", gf_cli_remove_tier_brick},
-        [GLUSTER_CLI_ADD_TIER_BRICK]   = {"ADD_TIER_BRICK", gf_cli_add_tier_brick}
+        [GLUSTER_CLI_ADD_TIER_BRICK]   = {"ADD_TIER_BRICK", gf_cli_add_tier_brick},
+        [GLUSTER_CLI_WORM]             = {"WORM", gf_cli_worm}
 };
 
 struct rpc_clnt_program cli_prog = {

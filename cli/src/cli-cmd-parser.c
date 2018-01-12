@@ -1409,6 +1409,202 @@ out:
         return ret;
 }
 
+int32_t
+cli_cmd_worm_parse (const char **words, int wordcount, dict_t **options)
+{
+        dict_t          *dict    = NULL;
+        char            *volname = NULL;
+        int              ret     = -1;
+        gf_worm_type     type    = GF_WORM_OPTION_TYPE_NONE;
+        char            *opwords[] = { "enable", "disable", "set", "get",
+                                       "clear", "list", NULL };
+        char            *w       = NULL;
+        int64_t          start   = 0;
+        int64_t          dura    = 0;
+        char            *end_ptr = NULL;
+
+        GF_ASSERT (words);
+        GF_ASSERT (options);
+
+        dict = dict_new ();
+        if (!dict) {
+                gf_log ("cli", GF_LOG_ERROR, "dict_new failed");
+                goto out;
+        }
+
+        if (wordcount < 4) {
+
+                if ((wordcount == 3) && !(strcmp (words[2], "help"))) {
+                        ret = 1;
+                }
+                goto out;
+        }
+
+        volname = (char *)words[2];
+        if (!volname) {
+                ret = -1;
+                goto out;
+        }
+
+        /* Validate the volume name here itself */
+        if (cli_validate_volname (volname) < 0)
+                goto out;
+
+        ret = dict_set_str (dict, "volname", volname);
+        if (ret < 0)
+                goto out;
+
+        w = str_getunamb (words[3], opwords);
+        if (!w) {
+                cli_out ("Invalid worm option : %s", words[3]);
+                ret = - 1;
+                goto out;
+        }
+
+        if (strcmp (w, "enable") == 0) {
+                if (wordcount == 4) {
+                        type = GF_WORM_OPTION_TYPE_ENABLE;
+                        ret = 0;
+                        goto set_type;
+                } else {
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        if (strcmp (w, "disable") == 0) {
+                if (wordcount == 4) {
+                        type = GF_WORM_OPTION_TYPE_DISABLE;
+                        ret = 0;
+                        goto set_type;
+                } else {
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        if (strcmp (w, "set") == 0) {
+                if (wordcount != 7) {
+                        ret = -1;
+                        goto out;
+                }
+
+                type = GF_WORM_OPTION_TYPE_SET;
+
+                if (words[4][0] != '/') {
+                        cli_err ("Please enter absolute path");
+                        ret = -1;
+                        goto out;
+                }
+                ret = dict_set_str (dict, "path", (char *) words[4]);
+                if (ret)
+                        goto out;
+
+                if (!words[5]) {
+                        cli_err ("Please enter the start period to be set");
+                        ret = -1;
+                        goto out;
+                }
+
+                errno = 0;
+                start = strtol (words[5], &end_ptr, 10);
+                if (errno == ERANGE || errno == EINVAL || start <= 0
+                                    || strcmp (end_ptr, "") != 0) {
+                        ret = -1;
+                        cli_err ("Please enter an integer value in "
+                                 "the range 1 - %"PRId64, INT64_MAX);
+                        goto out;
+                }
+
+                ret  = dict_set_str (dict, "start", (char *) words[5]);
+                if (ret < 0)
+                        goto out;
+
+                if (!words[6]) {
+                        cli_err ("Please enter the duration period to be set");
+                        ret = -1;
+                        goto out;
+                }
+
+                errno = 0;
+                dura = strtol (words[6], &end_ptr, 10);
+                if (errno == ERANGE || errno == EINVAL || dura <= 0
+                                    || strcmp (end_ptr, "") != 0) {
+                        ret = -1;
+                        cli_err ("Please enter an integer value in "
+                                 "the range 1 - %"PRId64, INT64_MAX);
+                        goto out;
+                }
+
+                ret  = dict_set_str (dict, "dura", (char *) words[6]);
+                if (ret < 0)
+                        goto out;
+
+                goto set_type;
+        }
+
+        if (strcmp (w, "get") == 0) {
+                if (wordcount != 5) {
+                        ret = -1;
+                        goto out;
+                }
+
+                type = GF_WORM_OPTION_TYPE_GET;
+
+                if (words[4][0] != '/') {
+                        cli_err ("Please enter absolute path");
+                        ret = -1;
+                        goto out;
+                }
+
+                ret = dict_set_str (dict, "path", (char *) words[4]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        }
+
+        if (strcmp (w, "clear") == 0) {
+                if (wordcount != 5) {
+                        ret = -1;
+                        goto out;
+                }
+
+                type = GF_WORM_OPTION_TYPE_CLEAR;
+
+                if (words[4][0] != '/') {
+                        cli_err ("Please enter absolute path");
+                        ret = -1;
+                        goto out;
+                }
+
+                ret = dict_set_str (dict, "path", (char *) words[4]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        }
+
+        if (strcmp (w, "list") == 0) {
+                type = GF_WORM_OPTION_TYPE_LIST;
+                goto set_type;
+        } else {
+                GF_ASSERT (!"opword mismatch");
+        }
+
+set_type:
+        ret = dict_set_int32 (dict, "type", type);
+        if (ret < 0)
+                goto out;
+
+        *options = dict;
+out:
+        if (ret < 0) {
+                if (dict)
+                        dict_unref (dict);
+        }
+
+        return ret;
+}
+
 static gf_boolean_t
 cli_is_key_spl (char *key)
 {

@@ -195,6 +195,14 @@ keys = (
     #brick/inodes events
     "EVENT_DHT_DISK_USAGE",
     "EVENT_DHT_INODES_USAGE",
+
+    #worm events
+    "EVENT_WORM_ENABLE",
+    "EVENT_WORM_DISABLE",
+    "EVENT_WORM_SET",
+    "EVENT_WORM_GET",
+    "EVENT_WORM_CLEAR",
+    "EVENT_WORM_LIST",
 )
 
 LAST_EVENT = "EVENT_LAST"

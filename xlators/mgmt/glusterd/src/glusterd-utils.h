@@ -543,6 +543,10 @@ glusterd_check_if_quota_trans_enabled (glusterd_volinfo_t *volinfo);
 
 int
 glusterd_volume_quota_copy_to_op_ctx_dict (dict_t *aggr, dict_t *rsp);
+
+int
+glusterd_volume_worm_copy_to_op_ctx_dict (dict_t *aggr, dict_t *rsp);
+
 int
 _profile_volume_add_brick_rsp (dict_t *this, char *key, data_t *value,
                              void *data);
@@ -642,6 +646,9 @@ int
 glusterd_is_volume_inode_quota_enabled (glusterd_volinfo_t *volinfo);
 
 int
+glusterd_is_volume_worm_enabled (glusterd_volinfo_t *volinfo);
+
+int
 glusterd_is_bitrot_enabled (glusterd_volinfo_t *volinfo);
 
 gf_boolean_t
@@ -650,8 +657,11 @@ glusterd_all_volumes_with_quota_stopped ();
 void
 glusterd_clean_up_quota_store (glusterd_volinfo_t *volinfo);
 
+void
+glusterd_clean_up_worm_store (glusterd_volinfo_t *volinfo);
+
 int
-glusterd_remove_auxiliary_mount (char *volname);
+glusterd_remove_auxiliary_mount (char *volname, char *mountdir);
 
 gf_boolean_t
 glusterd_status_has_tasks (int cmd);

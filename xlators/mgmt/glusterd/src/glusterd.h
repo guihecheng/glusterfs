@@ -131,6 +131,7 @@ typedef enum glusterd_op_ {
         GD_OP_DETACH_NOT_STARTED,
         GD_OP_REMOVE_TIER_BRICK,
         GD_OP_ADD_TIER_BRICK,
+        GD_OP_WORM,
         GD_OP_MAX,
 } glusterd_op_t;
 
@@ -435,6 +436,7 @@ struct glusterd_volinfo_ {
         gf_store_handle_t        *shandle;
         gf_store_handle_t        *node_state_shandle;
         gf_store_handle_t        *quota_conf_shandle;
+        gf_store_handle_t        *worm_conf_shandle;
 
         /* Defrag/rebalance related */
         glusterd_rebalance_t      rebal;
@@ -576,6 +578,7 @@ typedef enum {
 #define GLUSTERD_DEFAULT_PORT    GF_DEFAULT_BASE_PORT
 #define GLUSTERD_INFO_FILE      "glusterd.info"
 #define GLUSTERD_VOLUME_QUOTA_CONFIG "quota.conf"
+#define GLUSTERD_VOLUME_WORM_CONFIG "worm.conf"
 #define GLUSTERD_VOLUME_DIR_PREFIX "vols"
 #define GLUSTERD_PEER_DIR_PREFIX "peers"
 #define GLUSTERD_VOLUME_INFO_FILE "info"
@@ -679,6 +682,11 @@ do {                                                                       \
                   DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_list%s", volname, path);\
         } while (0)
 
+#define GLUSTERD_GET_WORM_MOUNT_PATH(abspath, volname, path) do {         \
+        snprintf (abspath, sizeof (abspath)-1,                                \
+                 DEFAULT_VAR_RUN_DIRECTORY"/%s_worm%s", volname, path);   \
+        } while (0)
+
 #define GLUSTERD_GET_TMP_PATH(abspath, path) do {                       \
         snprintf (abspath, sizeof (abspath)-1,                          \
                   DEFAULT_VAR_RUN_DIRECTORY"/tmp%s", path);             \
@@ -721,6 +729,17 @@ do {                                                                       \
                                   _volpath);                                  \
                 else                                                          \
                         snprintf (piddir, PATH_MAX, "%s/run/quota/disable",   \
+                                  _volpath);                                  \
+        } while (0)
+
+#define GLUSTERD_GET_WORM_CRAWL_PIDDIR(piddir, volinfo, type) do {            \
+                char _volpath[PATH_MAX]  = {0,};                              \
+                GLUSTERD_GET_VOLUME_DIR (_volpath, volinfo, priv);            \
+                if (type == GF_WORM_OPTION_TYPE_ENABLE)                       \
+                        snprintf (piddir, PATH_MAX, "%s/run/worm/enable",     \
+                                  _volpath);                                  \
+                else                                                          \
+                        snprintf (piddir, PATH_MAX, "%s/run/worm/disable",    \
                                   _volpath);                                  \
         } while (0)
 
@@ -778,6 +797,11 @@ do {                                                                       \
                           volname);                                       \
         }
 
+#define GLUSTERFS_GET_WORM_MOUNT_PIDFILE(pidfile, volname) {              \
+                snprintf (pidfile, PATH_MAX-1,                            \
+                          DEFAULT_VAR_RUN_DIRECTORY"/%s_worm.pid",        \
+                          volname);                                       \
+        }
 
 #define GLUSTERD_GET_UUID_NOHYPHEN(ret_string, uuid) do {               \
                 char *snap_volname_ptr = ret_string;                    \
@@ -1050,6 +1074,9 @@ int
 glusterd_handle_quota (rpcsvc_request_t *req);
 
 int
+glusterd_handle_worm (rpcsvc_request_t *req);
+
+int
 glusterd_handle_bitrot (rpcsvc_request_t *req);
 
 int
@@ -1153,10 +1180,13 @@ int glusterd_op_sys_exec (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 int glusterd_op_stage_gsync_create (dict_t *dict, char **op_errstr);
 int glusterd_op_gsync_create (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 int glusterd_op_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
+int glusterd_op_worm (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 
 int glusterd_op_bitrot (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 
 int glusterd_op_stage_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
+
+int glusterd_op_stage_worm (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 
 int glusterd_op_stage_bitrot (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 

@@ -38,6 +38,7 @@
 #include "rpc-clnt.h"
 #include "common-utils.h"
 #include "quota-common-utils.h"
+#include "worm-common-utils.h"
 
 #include <sys/resource.h>
 #include <inttypes.h>
@@ -1252,6 +1253,21 @@ glusterd_store_quota_conf_path_set (glusterd_volinfo_t *volinfo,
 }
 
 static void
+glusterd_store_worm_conf_path_set (glusterd_volinfo_t *volinfo,
+                                   char *worm_conf_path, size_t len)
+{
+        char    voldirpath[PATH_MAX] = {0,};
+        GF_ASSERT (volinfo);
+        GF_ASSERT (worm_conf_path);
+        GF_ASSERT (len <= PATH_MAX);
+
+        glusterd_store_voldirpath_set (volinfo, voldirpath,
+                                       sizeof (voldirpath));
+        snprintf (worm_conf_path, len, "%s/%s", voldirpath,
+                  GLUSTERD_VOLUME_WORM_CONFIG);
+}
+
+static void
 glusterd_store_missed_snaps_list_path_set (char *missed_snaps_list,
                                            size_t len)
 {
@@ -1324,6 +1340,23 @@ glusterd_store_create_quota_conf_sh_on_absence (glusterd_volinfo_t *volinfo)
         ret =
           gf_store_handle_create_on_absence (&volinfo->quota_conf_shandle,
                                              quota_conf_path);
+
+        return ret;
+}
+
+int32_t
+glusterd_store_create_worm_conf_sh_on_absence (glusterd_volinfo_t *volinfo)
+{
+        char            worm_conf_path[PATH_MAX] = {0};
+        int32_t         ret                       = 0;
+
+        GF_ASSERT (volinfo);
+
+        glusterd_store_worm_conf_path_set (volinfo, worm_conf_path,
+                                           sizeof (worm_conf_path));
+        ret =
+          gf_store_handle_create_on_absence (&volinfo->worm_conf_shandle,
+                                             worm_conf_path);
 
         return ret;
 }
@@ -4890,6 +4923,41 @@ out:
 }
 
 int32_t
+glusterd_worm_conf_write_header (int fd)
+{
+        int                 header_len    = 0;
+        int                 ret           = -1;
+        xlator_t           *this          = NULL;
+        glusterd_conf_t    *conf          = NULL;
+
+        this = THIS;
+        GF_VALIDATE_OR_GOTO ("worm", this, out);
+
+        conf = this->private;
+        GF_VALIDATE_OR_GOTO (this->name, conf, out);
+
+
+        header_len = strlen (WORM_CONF_HEADER);
+        ret = gf_nwrite (fd, WORM_CONF_HEADER, header_len);
+
+        if (ret != header_len) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = 0;
+
+out:
+        if (ret < 0)
+                gf_msg_callingfn ("worm", GF_LOG_ERROR, 0,
+                                  GD_MSG_WORM_CONF_WRITE_FAIL,
+                                  "failed to write "
+                                  "header to a worm conf");
+
+        return ret;
+}
+
+int32_t
 glusterd_quota_conf_write_gfid (int fd, void *buf, char type)
 {
         int                 ret        = -1;
@@ -4925,6 +4993,37 @@ out:
                                   GD_MSG_QUOTA_CONF_WRITE_FAIL,
                                   "failed to write "
                                   "gfid %s to a quota conf", uuid_utoa (buf));
+
+        return ret;
+}
+
+int32_t
+glusterd_worm_conf_write_gfid (int fd, void *buf)
+{
+        int                 ret        = -1;
+        xlator_t           *this       = NULL;
+        glusterd_conf_t    *conf       = NULL;
+
+        this = THIS;
+        GF_VALIDATE_OR_GOTO ("worm", this, out);
+
+        conf = this->private;
+        GF_VALIDATE_OR_GOTO (this->name, conf, out);
+
+        ret = gf_nwrite (fd, buf, 16);
+        if (ret != 16) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = 0;
+
+out:
+        if (ret < 0)
+                gf_msg_callingfn ("worm", GF_LOG_ERROR, 0,
+                                  GD_MSG_WORM_CONF_WRITE_FAIL,
+                                  "failed to write "
+                                  "gfid %s to a worm conf", uuid_utoa (buf));
 
         return ret;
 }

@@ -838,3 +838,16 @@ print_quota_list_empty (char *path, int type)
                          "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A");
 }
 
+void
+print_worm_list_header ()
+{
+        cli_out ("Path                Start"
+                 "               Duration ");
+        cli_out ("-----------------------------------------------------");
+}
+
+void
+print_worm_list_empty (char *path)
+{
+        cli_out ("%-20s %20s %20s", path, "N/A", "N/A");
+}

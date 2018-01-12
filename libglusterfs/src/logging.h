@@ -94,6 +94,7 @@ typedef enum {
 
 #define DEFAULT_LOG_FILE_DIRECTORY          DATADIR "/log/glusterfs"
 #define DEFAULT_QUOTA_CRAWL_LOG_DIRECTORY   DATADIR "/log/glusterfs/quota_crawl"
+#define DEFAULT_WORM_CRAWL_LOG_DIRECTORY    DATADIR "/log/glusterfs/worm_crawl"
 #define DEFAULT_LOG_LEVEL                   GF_LOG_INFO
 
 typedef struct gf_log_handle_ {

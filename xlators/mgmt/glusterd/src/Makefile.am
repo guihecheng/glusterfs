@@ -11,7 +11,7 @@ glusterd_la_SOURCES = glusterd.c glusterd-handler.c glusterd-sm.c \
 	glusterd-op-sm.c glusterd-utils.c glusterd-rpc-ops.c \
 	glusterd-store.c glusterd-handshake.c glusterd-pmap.c \
 	glusterd-volgen.c glusterd-rebalance.c \
-	glusterd-quota.c glusterd-bitrot.c glusterd-geo-rep.c \
+	glusterd-quota.c glusterd-worm.c glusterd-bitrot.c glusterd-geo-rep.c \
 	glusterd-replace-brick.c glusterd-log-ops.c glusterd-tier.c \
 	glusterd-volume-ops.c glusterd-brick-ops.c glusterd-mountbroker.c \
 	glusterd-syncop.c glusterd-hooks.c glusterd-volume-set.c \
@@ -38,7 +38,7 @@ noinst_HEADERS = glusterd.h glusterd-utils.h glusterd-op-sm.h \
 	glusterd-sm.h glusterd-store.h glusterd-mem-types.h \
 	glusterd-pmap.h glusterd-volgen.h glusterd-mountbroker.h \
 	glusterd-syncop.h glusterd-hooks.h glusterd-locks.h glusterd-quota.h \
-	glusterd-mgmt.h glusterd-messages.h glusterd-peer-utils.h \
+	glusterd-worm.h glusterd-mgmt.h glusterd-messages.h glusterd-peer-utils.h \
 	glusterd-statedump.h glusterd-snapshot-utils.h glusterd-geo-rep.h \
 	glusterd-conn-mgmt.h glusterd-conn-helper.h glusterd-proc-mgmt.h \
 	glusterd-svc-mgmt.h glusterd-shd-svc.h glusterd-nfs-svc.h \

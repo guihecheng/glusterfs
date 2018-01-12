@@ -677,6 +677,7 @@ gf_string2bytesize_uint64
 gf_string2double
 gf_string2int
 gf_string2int32
+gf_string2int64
 gf_string2percent
 gf_string2time
 gf_string2uint
@@ -862,6 +863,12 @@ quota_dict_get_inode_meta
 quota_dict_get_meta
 quota_dict_set_meta
 quota_meta_is_null
+worm_conf_read_gfid
+worm_conf_read_version
+worm_conf_skip_header
+worm_dict_get_meta
+worm_dict_set_meta
+worm_meta_is_null
 rb_create
 rb_delete
 rb_destroy

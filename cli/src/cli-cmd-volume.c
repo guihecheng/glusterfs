@@ -47,6 +47,10 @@ cli_cmd_quota_help_cbk (struct cli_state *state, struct cli_cmd_word *in_word,
                         const char **words, int wordcount);
 
 int
+cli_cmd_worm_help_cbk (struct cli_state *state, struct cli_cmd_word *in_word,
+                       const char **words, int wordcount);
+
+int
 cli_cmd_tier_help_cbk (struct cli_state *state, struct cli_cmd_word *in_word,
                        const char **words, int wordcount);
 
@@ -2003,6 +2007,98 @@ out:
 }
 
 int
+cli_cmd_worm_cbk (struct cli_state *state, struct cli_cmd_word *word,
+                  const char **words, int wordcount)
+{
+
+        int                      ret       = 0;
+        int                      parse_err = 0;
+        int32_t                  type      = 0;
+        rpc_clnt_procedure_t    *proc      = NULL;
+        call_frame_t            *frame     = NULL;
+        dict_t                  *options   = NULL;
+        cli_local_t             *local     = NULL;
+        int                      sent      = 0;
+        char                    *volname   = NULL;
+
+        ret = cli_cmd_worm_parse (words, wordcount, &options);
+
+        if (ret == 1) {
+                cli_cmd_worm_help_cbk (state, word, words, wordcount);
+                ret = 0;
+                goto out;
+        }
+        if (ret < 0) {
+                cli_usage_out (word->pattern);
+                parse_err = 1;
+                goto out;
+        }
+
+        ret = dict_get_int32 (options, "type", &type);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get opcode");
+                goto out;
+        }
+
+        ret = dict_get_str (options, "volname", &volname);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get volume name");
+                goto out;
+        }
+
+        frame = create_frame (THIS, THIS->ctx->pool);
+        if (!frame) {
+                ret = -1;
+                goto out;
+        }
+
+        CLI_LOCAL_INIT (local, words, frame, options);
+        proc = &cli_rpc_prog->proctable[GLUSTER_CLI_WORM];
+
+        if (proc->fn)
+                ret = proc->fn (frame, THIS, options);
+
+out:
+        if (ret) {
+                cli_cmd_sent_status_get (&sent);
+                if (sent == 0 && parse_err == 0)
+                        cli_out ("Worm command failed. Please check the cli "
+                                 "logs for more details");
+        }
+
+        /* Events for Worm */
+         if (ret == 0) {
+                switch (type) {
+                case GF_WORM_OPTION_TYPE_ENABLE:
+                        gf_event (EVENT_WORM_ENABLE, "volume=%s", volname);
+                        break;
+                case GF_WORM_OPTION_TYPE_DISABLE:
+                        gf_event (EVENT_WORM_DISABLE, "volume=%s", volname);
+                        break;
+                case GF_WORM_OPTION_TYPE_SET:
+                        gf_event (EVENT_WORM_SET, "volume=%s;"
+                                  "path=%s;start=%s;dura=%s", volname,
+                                  words[4], words[5], words[6]);
+                        break;
+                case GF_WORM_OPTION_TYPE_GET:
+                        gf_event (EVENT_WORM_GET, "volume=%s;"
+                                  "path=%s", volname, words[4]);
+                        break;
+                case GF_WORM_OPTION_TYPE_CLEAR:
+                        gf_event (EVENT_WORM_CLEAR, "volume=%s;"
+                                  "path=%s", volname, words[4]);
+                        break;
+                case GF_WORM_OPTION_TYPE_LIST:
+                        gf_event (EVENT_WORM_LIST, "volume=%s", volname);
+                        break;
+                }
+        }
+
+        CLI_STACK_DESTROY (frame);
+        return ret;
+}
+
+int
 cli_cmd_volume_remove_brick_cbk (struct cli_state *state,
                                  struct cli_cmd_word *word, const char **words,
                                  int wordcount)
@@ -3291,6 +3387,53 @@ struct cli_cmd quota_cmds[] = {
         { NULL, NULL, NULL }
 };
 
+struct cli_cmd worm_cmds[] = {
+
+        /* WORM commands */
+        {"volume worm help",
+         cli_cmd_worm_help_cbk,
+         "display help for volume worm commands"
+        },
+
+        {"volume worm <VOLNAME> {enable|disable} ",
+         cli_cmd_worm_cbk,
+         "Enable/disable worm for <VOLNAME>"
+        },
+
+        {"volume worm <VOLNAME> {set <path> <start> <duration>}",
+         cli_cmd_worm_cbk,
+         "Set worm start (after creation) and duration for <path> in <VOLNAME>"
+        },
+
+        {"volume worm <VOLNAME> {get <path>}",
+         cli_cmd_worm_cbk,
+         "Show worm start and duration for <path> in <VOLNAME>"
+        },
+
+        {"volume worm <VOLNAME> {clear <path>}",
+         cli_cmd_worm_cbk,
+         "Clear worm configuration for <path> in <VOLNAME>"
+        },
+
+//        {"volume worm <VOLNAME> {list}",
+//         cli_cmd_worm_cbk,
+//         "List worm directories in <VOLNAME>"
+//        },
+
+        { "volume worm <VOLNAME> {enable|disable|set <path> <start> <duration>|"
+          "get <path>|clear <path>|list}\n"
+          "volume worm <VOLNAME> {enable|disable}\n"
+          "volume worm <VOLNAME> {set <path> <start> <duration>}\n"
+          "volume worm <VOLNAME> {get <path>}\n"
+          "volume worm <VOLNAME> {clear <path>}\n",
+//          "volume worm <VOLNAME> {list}",
+          cli_cmd_worm_cbk,
+          NULL
+        },
+
+        { NULL, NULL, NULL }
+};
+
 struct cli_cmd tier_cmds[] = {
 
         { "volume tier help",
@@ -3517,6 +3660,33 @@ cli_cmd_quota_help_cbk (struct cli_state *state, struct cli_cmd_word *in_word,
 }
 
 int
+cli_cmd_worm_help_cbk (struct cli_state *state, struct cli_cmd_word *in_word,
+                       const char **words, int wordcount)
+{
+        struct cli_cmd        *cmd     = NULL;
+        struct cli_cmd        *worm_cmd = NULL;
+        int                   count    = 0;
+
+        cmd = GF_CALLOC (1, sizeof (worm_cmds), cli_mt_cli_cmd);
+        memcpy (cmd, worm_cmds, sizeof (worm_cmds));
+        count = (sizeof (worm_cmds) / sizeof (struct cli_cmd));
+        cli_cmd_sort (cmd, count);
+
+        cli_out ("\ngluster worm commands");
+        cli_out ("=======================\n");
+
+        for (worm_cmd = cmd; worm_cmd->pattern; worm_cmd++)
+                if ((_gf_false == worm_cmd->disable) && (worm_cmd->desc))
+                        cli_out ("%s - %s", worm_cmd->pattern,
+                                 worm_cmd->desc);
+
+        cli_out ("\n");
+        GF_FREE (cmd);
+
+        return 0;
+}
+
+int
 cli_cmd_bitrot_help_cbk (struct cli_state *state, struct cli_cmd_word *in_word,
                          const char **words, int wordcount)
 {
@@ -3613,6 +3783,12 @@ cli_cmd_volume_register (struct cli_state *state)
         }
 
         for (cmd = quota_cmds; cmd->pattern; cmd++) {
+                ret = cli_cmd_register (&state->tree, cmd);
+                if (ret)
+                        goto out;
+        }
+
+        for (cmd = worm_cmds; cmd->pattern; cmd++) {
                 ret = cli_cmd_register (&state->tree, cmd);
                 if (ret)
                         goto out;

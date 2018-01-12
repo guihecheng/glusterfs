@@ -198,6 +198,10 @@
 #define VIRTUAL_QUOTA_XATTR_CLEANUP_KEY "glusterfs.quota-xattr-cleanup"
 #define QUOTA_READ_ONLY_KEY "trusted.glusterfs.quota.read-only"
 
+/* worm xattrs */
+#define WORM_START_AND_DURA_KEY "trusted.glusterfs.worm.start-and-dura"
+#define VIRTUAL_WORM_XATTR_CLEANUP_KEY "glusterfs.worm-xattr-cleanup"
+
 /* afr related */
 #define AFR_XATTR_PREFIX "trusted.afr"
 

@@ -205,4 +205,13 @@ int32_t
 glusterd_recreate_vol_brick_mounts (xlator_t  *this,
                                     glusterd_volinfo_t *volinfo);
 
+int32_t
+glusterd_store_create_worm_conf_sh_on_absence (glusterd_volinfo_t *volinfo);
+
+int32_t
+glusterd_worm_conf_write_header (int fd);
+
+int32_t
+glusterd_worm_conf_write_gfid (int fd, void *buf);
+
 #endif

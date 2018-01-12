@@ -250,6 +250,9 @@ int32_t
 cli_cmd_inode_quota_parse (const char **words, int wordcount, dict_t **opt);
 
 int32_t
+cli_cmd_worm_parse (const char **words, int wordcount, dict_t **opt);
+
+int32_t
 cli_cmd_bitrot_parse (const char **words, int wordcount, dict_t **opt);
 
 int32_t
@@ -416,6 +419,20 @@ cli_quota_object_xml_output (cli_local_t *local, char *path, char *sl_str,
                              char *sl, char *hl, gf_boolean_t limit_set);
 
 int
+cli_xml_output_vol_worm_list_begin (cli_local_t *local, int op_ret,
+                                    int op_errno, char *op_errstr);
+int
+cli_xml_output_vol_worm_list_end (cli_local_t *local);
+
+int
+cli_worm_list_xml_error (cli_local_t *local, char *path,
+                         char *errstr);
+
+int
+cli_worm_list_xml_output (cli_local_t *local, char *path, int64_t start,
+                          int64_t dura, gf_boolean_t worm_set);
+
+int
 cli_xml_output_peer_status (dict_t *dict, int op_ret, int op_errno,
                             char *op_errstr);
 
@@ -489,6 +506,12 @@ print_quota_list_header (int type);
 
 void
 print_quota_list_empty (char *path, int type);
+
+void
+print_worm_list_header ();
+
+void
+print_worm_list_empty (char *path);
 
 int
 gf_gsync_status_t_comparator (const void *p, const void *q);

@@ -3296,6 +3296,54 @@ out:
 #endif
 }
 
+int
+cli_xml_output_vol_worm_list_end (cli_local_t *local)
+{
+#if (HAVE_LIB_XML)
+        int     ret = -1;
+
+        ret = xmlTextWriterEndElement (local->writer);
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+        ret = cli_end_xml_output (local->writer, local->doc);
+
+out:
+        return ret;
+#else
+        return 0;
+#endif
+}
+
+int
+cli_xml_output_vol_worm_list_begin (cli_local_t *local, int op_ret,
+                                    int op_errno, char *op_errstr)
+{
+#if (HAVE_LIB_XML)
+        int                     ret = -1;
+
+        ret = cli_begin_xml_output (&(local->writer), &(local->doc));
+        if (ret)
+                goto out;
+
+        ret = cli_xml_output_common (local->writer, op_ret, op_errno,
+                                     op_errstr);
+        if (ret)
+                goto out;
+
+        /* <volWorm> */
+        ret = xmlTextWriterStartElement (local->writer, (xmlChar *)"volWorm");
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+
+out:
+        gf_log ("cli", GF_LOG_DEBUG, "Returning %d", ret);
+        return ret;
+#else
+        return 0;
+#endif
+}
+
+
 #if (HAVE_LIB_XML)
 static int
 cli_xml_output_peer_hostnames (xmlTextWriterPtr writer, dict_t *dict,
@@ -6515,6 +6563,72 @@ cli_quota_object_xml_output (cli_local_t *local, char *path, char *sl_str,
                                                "%s", hl);
         XML_RET_CHECK_AND_GOTO (ret, out);
 
+
+        ret = xmlTextWriterEndElement (local->writer);
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+out:
+        return ret;
+#else
+        return 0;
+#endif /* HAVE_LIB_XML */
+}
+
+int
+cli_worm_list_xml_error (cli_local_t *local, char *path, char *errstr)
+{
+#if (HAVE_LIB_XML)
+        int     ret     =       -1;
+
+        ret = xmlTextWriterStartElement (local->writer, (xmlChar *)"worm");
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+        ret = xmlTextWriterWriteFormatElement (local->writer,
+                                              (xmlChar *)"path",
+                                               "%s", path);
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+        ret = xmlTextWriterWriteFormatElement (local->writer,
+                                              (xmlChar *)"errstr",
+                                               "%s", errstr);
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+        ret = xmlTextWriterEndElement (local->writer);
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+out:
+        return ret;
+#else
+        return 0;
+#endif
+}
+
+int
+cli_worm_list_xml_output (cli_local_t *local, char *path, int64_t start,
+                          int64_t dura, gf_boolean_t worm_set)
+{
+#if (HAVE_LIB_XML)
+        int     ret             = -1;
+
+        ret = xmlTextWriterStartElement (local->writer, (xmlChar *)"worm");
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+        ret = xmlTextWriterWriteFormatElement (local->writer,
+                                               (xmlChar *)"path",
+                                               "%s", path);
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+        ret = xmlTextWriterWriteFormatElement (local->writer,
+                                               (xmlChar *)"start",
+                                               !worm_set ? "N/A" :
+                                               "%"PRId64, start);
+        XML_RET_CHECK_AND_GOTO (ret, out);
+
+        ret = xmlTextWriterWriteFormatElement (local->writer,
+                                               (xmlChar *)"duration",
+                                               !worm_set ? "N/A" :
+                                               "%"PRId64, dura);
+        XML_RET_CHECK_AND_GOTO (ret, out);
 
         ret = xmlTextWriterEndElement (local->writer);
         XML_RET_CHECK_AND_GOTO (ret, out);

@@ -125,6 +125,7 @@ const char *gd_op_list[GD_OP_MAX + 1] = {
         [GD_OP_GSYNC_CREATE]            = "Geo-replication Create",
         [GD_OP_SNAP]                    = "Snapshot",
         [GD_OP_RESET_BRICK]             = "Reset Brick",
+        [GD_OP_WORM]                    = "Worm",
         [GD_OP_MAX_OPVERSION]           = "Maximum supported op-version",
         [GD_OP_MAX]                     = "Invalid op"
 };

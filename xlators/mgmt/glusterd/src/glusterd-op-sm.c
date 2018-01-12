@@ -37,6 +37,7 @@
 #include "glusterd-messages.h"
 #include "glusterd-utils.h"
 #include "glusterd-quota.h"
+#include "glusterd-worm.h"
 #include "syscall.h"
 #include "cli1-xdr.h"
 #include "common-utils.h"
@@ -4537,6 +4538,7 @@ glusterd_op_build_payload (dict_t **req, char **op_errstr, dict_t *op_ctx)
                 case GD_OP_RESET_VOLUME:
                 case GD_OP_LOG_ROTATE:
                 case GD_OP_QUOTA:
+                case GD_OP_WORM:
                 case GD_OP_PROFILE_VOLUME:
                 case GD_OP_HEAL_VOLUME:
                 case GD_OP_STATEDUMP_VOLUME:
@@ -6099,6 +6101,11 @@ glusterd_op_stage_validate (glusterd_op_t op, dict_t *dict, char **op_errstr,
                                                        rsp_dict);
                         break;
 
+                case GD_OP_WORM:
+                        ret = glusterd_op_stage_worm (dict, op_errstr,
+                                                      rsp_dict);
+                        break;
+
                 case GD_OP_STATUS_VOLUME:
                         ret = glusterd_op_stage_status_volume (dict, op_errstr);
                         break;
@@ -6235,6 +6242,10 @@ glusterd_op_commit_perform (glusterd_op_t op, dict_t *dict, char **op_errstr,
 
                 case GD_OP_QUOTA:
                         ret = glusterd_op_quota (dict, op_errstr, rsp_dict);
+                        break;
+
+                case GD_OP_WORM:
+                        ret = glusterd_op_worm (dict, op_errstr, rsp_dict);
                         break;
 
                 case GD_OP_STATUS_VOLUME:
@@ -8399,6 +8410,7 @@ glusterd_op_free_ctx (glusterd_op_t op, void *ctx)
                 case GD_OP_RESET_VOLUME:
                 case GD_OP_GSYNC_SET:
                 case GD_OP_QUOTA:
+                case GD_OP_WORM:
                 case GD_OP_PROFILE_VOLUME:
                 case GD_OP_STATUS_VOLUME:
                 case GD_OP_REBALANCE:

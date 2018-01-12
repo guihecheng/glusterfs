@@ -6525,6 +6525,7 @@ rpcsvc_actor_t gd_svc_cli_actors[GLUSTER_CLI_MAXVALUE] = {
         [GLUSTER_CLI_TIER]               = {"TIER",               GLUSTER_CLI_TIER,             glusterd_handle_tier,                  NULL, 0, DRC_NA},
         [GLUSTER_CLI_REMOVE_TIER_BRICK]  = {"REMOVE_TIER_BRICK",  GLUSTER_CLI_REMOVE_TIER_BRICK,             glusterd_handle_tier,                  NULL, 0, DRC_NA},
         [GLUSTER_CLI_ADD_TIER_BRICK]     = {"ADD_TIER_BRICK",     GLUSTER_CLI_ADD_TIER_BRICK,      glusterd_handle_add_tier_brick,           NULL, 0, DRC_NA},
+        [GLUSTER_CLI_WORM]               = { "WORM",              GLUSTER_CLI_WORM,             glusterd_handle_worm,                  NULL, 0, DRC_NA},
 };
 
 struct rpcsvc_program gd_svc_cli_prog = {

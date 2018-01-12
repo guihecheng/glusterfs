@@ -11313,6 +11313,100 @@ out:
 }
 
 int
+glusterd_volume_worm_copy_to_op_ctx_dict (dict_t *dict, dict_t *rsp_dict)
+{
+        int        ret            = -1;
+        int        i              = 0;
+        int        count          = 0;
+        int        rsp_dict_count = 0;
+        char      *uuid_str       = NULL;
+        char      *uuid_str_dup   = NULL;
+        char       key[256]       = {0,};
+        xlator_t  *this           = NULL;
+        int        type           = GF_WORM_OPTION_TYPE_NONE;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        ret = dict_get_int32 (dict, "type", &type);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED,
+                        "Failed to get worm opcode");
+                goto out;
+        }
+
+        if ((type != GF_WORM_OPTION_TYPE_SET) &&
+            (type != GF_WORM_OPTION_TYPE_CLEAR)) {
+                dict_copy (rsp_dict, dict);
+                ret = 0;
+                goto out;
+        }
+
+        ret = dict_get_int32 (rsp_dict, "count", &rsp_dict_count);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED,
+                        "Failed to get the count of "
+                        "gfids from the rsp dict");
+                goto out;
+        }
+
+        ret = dict_get_int32 (dict, "count", &count);
+        if (ret)
+                /* The key "count" is absent in op_ctx when this function is
+                 * called after self-staging on the originator. This must not
+                 * be treated as error.
+                 */
+                gf_msg_debug (this->name, 0, "Failed to get count of gfids"
+                        " from req dict. This could be because count is not yet"
+                        " copied from rsp_dict into op_ctx");
+
+        for (i = 0; i < rsp_dict_count; i++) {
+                snprintf (key, sizeof(key)-1, "gfid%d", i);
+
+                ret = dict_get_str (rsp_dict, key, &uuid_str);
+                if (ret) {
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_DICT_GET_FAILED,
+                                "Failed to get gfid "
+                                "from rsp dict");
+                        goto out;
+                }
+
+                snprintf (key, sizeof (key)-1, "gfid%d", i + count);
+
+                uuid_str_dup = gf_strdup (uuid_str);
+                if (!uuid_str_dup) {
+                        ret = -1;
+                        goto out;
+                }
+
+                ret = dict_set_dynstr (dict, key, uuid_str_dup);
+                if (ret) {
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_DICT_SET_FAILED,
+                                "Failed to set gfid "
+                                "from rsp dict into req dict");
+                        GF_FREE (uuid_str_dup);
+                        goto out;
+                }
+        }
+
+        ret = dict_set_int32 (dict, "count", rsp_dict_count + count);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_SET_FAILED,
+                        "Failed to set aggregated "
+                        "count in req dict");
+                goto out;
+        }
+
+out:
+        return ret;
+}
+
+int
 glusterd_profile_volume_brick_rsp (void *pending_entry,
                                    dict_t *rsp_dict, dict_t *op_ctx,
                                    char **op_errstr, gd_node_type type)
@@ -12350,6 +12444,12 @@ glusterd_is_volume_inode_quota_enabled (glusterd_volinfo_t *volinfo)
 }
 
 int
+glusterd_is_volume_worm_enabled (glusterd_volinfo_t *volinfo)
+{
+        return (glusterd_volinfo_get_boolean (volinfo, VKEY_FEATURES_WORM));
+}
+
+int
 glusterd_is_tierd_supposed_to_be_enabled (glusterd_volinfo_t *volinfo)
 {
         if ((volinfo->type != GF_CLUSTER_TYPE_TIER) ||
@@ -12378,7 +12478,7 @@ glusterd_validate_and_set_gfid (dict_t *op_ctx, dict_t *req_dict,
         int        ret           = -1;
         int        count         = 0;
         int        i             = 0;
-        int        op_code       = GF_QUOTA_OPTION_TYPE_NONE;
+        int        op_code       = 0;
         uuid_t     uuid1         = {0};
         uuid_t     uuid2         = {0,};
         char      *path          = NULL;
@@ -12395,14 +12495,16 @@ glusterd_validate_and_set_gfid (dict_t *op_ctx, dict_t *req_dict,
         if (ret) {
                 gf_msg (this->name, GF_LOG_ERROR, 0,
                         GD_MSG_DICT_GET_FAILED,
-                        "Failed to get quota opcode");
+                        "Failed to get opcode");
                 goto out;
         }
 
         if ((op_code != GF_QUOTA_OPTION_TYPE_LIMIT_USAGE) &&
             (op_code != GF_QUOTA_OPTION_TYPE_LIMIT_OBJECTS) &&
             (op_code != GF_QUOTA_OPTION_TYPE_REMOVE) &&
-            (op_code != GF_QUOTA_OPTION_TYPE_REMOVE_OBJECTS)) {
+            (op_code != GF_QUOTA_OPTION_TYPE_REMOVE_OBJECTS) &&
+            (op_code != GF_WORM_OPTION_TYPE_SET) &&
+            (op_code != GF_WORM_OPTION_TYPE_CLEAR)) {
                 ret = 0;
                 goto out;
         }
@@ -12537,17 +12639,39 @@ glusterd_clean_up_quota_store (glusterd_volinfo_t *volinfo)
 
 }
 
+void
+glusterd_clean_up_worm_store (glusterd_volinfo_t *volinfo)
+{
+        char      voldir[PATH_MAX]         = {0,};
+        char      worm_confpath[PATH_MAX]  = {0,};
+        xlator_t  *this                    = NULL;
+        glusterd_conf_t *conf              = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+        conf = this->private;
+        GF_ASSERT (conf);
+
+        GLUSTERD_GET_VOLUME_DIR (voldir, volinfo, conf);
+
+        snprintf (worm_confpath, sizeof (worm_confpath), "%s/%s", voldir,
+                  GLUSTERD_VOLUME_WORM_CONFIG);
+
+        sys_unlink (worm_confpath);
+
+        gf_store_handle_destroy (volinfo->quota_conf_shandle);
+        volinfo->quota_conf_shandle = NULL;
+}
+
 int
-glusterd_remove_auxiliary_mount (char *volname)
+glusterd_remove_auxiliary_mount (char *volname, char *mountdir)
 {
         int       ret                = -1;
-        char      mountdir[PATH_MAX] = {0,};
         xlator_t *this               = NULL;
 
         this = THIS;
         GF_ASSERT (this);
 
-        GLUSTERD_GET_QUOTA_LIMIT_MOUNT_PATH (mountdir, volname, "/");
         ret = gf_umount_lazy (this->name, mountdir, 1);
         if (ret) {
                 gf_msg (this->name, GF_LOG_ERROR, errno,

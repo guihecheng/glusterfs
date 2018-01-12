@@ -294,6 +294,12 @@ glusterd_syncop_aggr_rsp_dict (glusterd_op_t op, dict_t *aggr, dict_t *rsp)
                         goto out;
                 break;
 
+        case GD_OP_WORM:
+                ret = glusterd_volume_worm_copy_to_op_ctx_dict (aggr, rsp);
+                if (ret)
+                        goto out;
+                break;
+
         case GD_OP_SYS_EXEC:
                 ret = glusterd_sys_exec_output_rsp_dict (aggr, rsp);
                 if (ret)
@@ -1068,7 +1074,7 @@ _gd_syncop_commit_op_cbk (struct rpc_req *req, struct iovec *iov,
         call_frame_t           *frame             = NULL;
         int                     op_ret            = -1;
         int                     op_errno          = -1;
-        int                     type              = GF_QUOTA_OPTION_TYPE_NONE;
+        int                     type              = 0;
         uuid_t                 *peerid            = NULL;
 
         this  = THIS;
@@ -1123,7 +1129,7 @@ _gd_syncop_commit_op_cbk (struct rpc_req *req, struct iovec *iov,
         }
 
         gf_uuid_copy (args->uuid, rsp.uuid);
-        if (rsp.op == GD_OP_QUOTA) {
+        if (rsp.op == GD_OP_QUOTA || rsp.op == GD_OP_WORM) {
                 ret = dict_get_int32 (args->dict, "type", &type);
                 if (ret) {
                         gf_msg (this->name, GF_LOG_ERROR, 0,
@@ -1133,7 +1139,8 @@ _gd_syncop_commit_op_cbk (struct rpc_req *req, struct iovec *iov,
                 }
         }
 
-        if ((rsp.op != GD_OP_QUOTA) || (type == GF_QUOTA_OPTION_TYPE_LIST)) {
+        if ((rsp.op != GD_OP_QUOTA) || (type == GF_QUOTA_OPTION_TYPE_LIST) ||
+                                       (type == GF_WORM_OPTION_TYPE_GET)) {
                 pthread_mutex_lock (&args->lock_dict);
                 {
                         ret = glusterd_syncop_aggr_rsp_dict (rsp.op, args->dict,
@@ -1332,7 +1339,7 @@ gd_stage_op_phase (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
 
         if ((op == GD_OP_REPLACE_BRICK || op == GD_OP_QUOTA ||
              op == GD_OP_CREATE_VOLUME || op == GD_OP_ADD_BRICK ||
-             op == GD_OP_START_VOLUME)) {
+             op == GD_OP_START_VOLUME  || op == GD_OP_WORM)) {
                 ret = glusterd_syncop_aggr_rsp_dict (op, aggr_dict, rsp_dict);
                 if (ret) {
                         gf_msg (this->name, GF_LOG_ERROR, 0,
@@ -1399,7 +1406,7 @@ stage_done:
         ret = args.op_ret;
 
 out:
-        if ((ret == 0) && (op == GD_OP_QUOTA)) {
+        if ((ret == 0) && ((op == GD_OP_QUOTA) || (op == GD_OP_WORM))) {
                 ret = glusterd_validate_and_set_gfid (op_ctx, req_dict,
                                                       op_errstr);
                 if (ret)
@@ -1446,7 +1453,7 @@ gd_commit_op_phase (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
                 goto commit_done;
         }
 
-        if (op == GD_OP_QUOTA) {
+        if (op == GD_OP_QUOTA || op == GD_OP_WORM) {
                 ret = dict_get_int32 (op_ctx, "type", &type);
                 if (ret) {
                         gf_msg (this->name, GF_LOG_ERROR, 0,
@@ -1458,7 +1465,9 @@ gd_commit_op_phase (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
 
         if (((op == GD_OP_QUOTA) && ((type == GF_QUOTA_OPTION_TYPE_LIST) ||
              (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS))) ||
-            ((op != GD_OP_SYNC_VOLUME) && (op != GD_OP_QUOTA))) {
+             (op == GD_OP_WORM && type == GF_WORM_OPTION_TYPE_GET) ||
+            ((op != GD_OP_SYNC_VOLUME) && (op != GD_OP_QUOTA) &&
+             (op != GD_OP_WORM))) {
 
                 ret =  glusterd_syncop_aggr_rsp_dict (op, op_ctx,
                                                       rsp_dict);
