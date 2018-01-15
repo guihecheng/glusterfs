@@ -1219,6 +1219,8 @@ exit 0
 %exclude %{_libdir}/pkgconfig/libgfdb.pc
 %exclude %{_sbindir}/gluster-setgfid2path
 %exclude %{_mandir}/man8/gluster-setgfid2path.8*
+%exclude %{_datadir}/glusterfs/scripts/control-cpu-load.sh
+%exclude %{_datadir}/glusterfs/scripts/control-mem.sh
 %endif
 
 %files api
@@ -2179,6 +2181,9 @@ fi
 %endif
 
 %changelog
+* Tue Jan 16 2018 Mohit Agrawal <moagrawa@redhat.com>
+- Exclude control-cpu-load.sh and control-mem.sh from client builds
+
 * Wed Dec 20 2017 Milind Changire <mchangir@redhat.com>
 - Remove ExclusiveArch directive to help building on non-x86_64 arches (#1527772)
 
