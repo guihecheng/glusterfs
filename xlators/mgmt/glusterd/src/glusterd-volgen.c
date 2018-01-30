@@ -2361,6 +2361,37 @@ out:
 }
 
 static int
+brick_graph_add_dir_worm (volgen_graph_t *graph, glusterd_volinfo_t *volinfo,
+                          dict_t *set_dict, glusterd_brickinfo_t *brickinfo)
+{
+        int             ret = -1;
+        xlator_t        *xl = NULL;
+
+        if (!graph || !volinfo || !set_dict)
+                goto out;
+
+        if (dict_get_str_boolean (set_dict, "features.dir-worm", 0) &&
+            (dict_get_str_boolean (set_dict, "features.read-only", 0) ||
+             dict_get_str_boolean (set_dict, "features.worm", 0) ||
+             dict_get_str_boolean (set_dict, "features.worm-file-level", 0))) {
+                gf_msg (THIS->name, GF_LOG_ERROR, 0,
+                        GD_MSG_INCOMPATIBLE_VALUE,
+                        "dir-worm and read-only, worm cannot be set together");
+                ret = -1;
+                goto out;
+        }
+
+        xl = volgen_graph_add (graph, "features/dir-worm", volinfo->volname);
+        if (!xl)
+                return -1;
+
+        ret = 0;
+
+out:
+        return ret;
+}
+
+static int
 brick_graph_add_cdc (volgen_graph_t *graph, glusterd_volinfo_t *volinfo,
                       dict_t *set_dict, glusterd_brickinfo_t *brickinfo)
 {
@@ -2685,6 +2716,7 @@ static volgen_brick_xlator_t server_graph_table[] = {
         {brick_graph_add_pump, NULL},
         {brick_graph_add_ro, NULL},
         {brick_graph_add_worm, NULL},
+        {brick_graph_add_dir_worm, NULL},
         {brick_graph_add_locks, "locks"},
         {brick_graph_add_acl, "acl"},
         {brick_graph_add_bitrot_stub, "bitrot-stub"},

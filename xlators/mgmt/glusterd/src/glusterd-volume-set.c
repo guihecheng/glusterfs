@@ -2876,6 +2876,15 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .value       = "off",
           .validate_fn = validate_boolean,
           .op_version  = GD_OP_VERSION_3_8_4,
+          .flags       = VOLOPT_FLAG_CLIENT_OPT | VOLOPT_FLAG_XLATOR_OPT
+        },
+        { .key         = "features.dir-worm-files-deletable",
+          .voltype     = "features/dir-worm",
+          .option      = "dir-worm-files-deletable",
+          .value       = "on",
+          .validate_fn = validate_boolean,
+          .op_version  = GD_OP_VERSION_3_8_4,
+          .flags       = VOLOPT_FLAG_CLIENT_OPT | VOLOPT_FLAG_XLATOR_OPT
         },
         { .key         = "storage.linux-aio",
           .voltype     = "storage/posix",

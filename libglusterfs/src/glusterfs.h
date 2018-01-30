@@ -200,6 +200,8 @@
 
 /* worm xattrs */
 #define WORM_START_AND_DURA_KEY "trusted.glusterfs.worm.start-and-dura"
+#define WORM_TICK_START_KEY "trusted.glusterfs.worm.tick-start"
+#define WORM_RETEN_STATE_KEY "trusted.glusterfs.worm.reten_state"
 #define VIRTUAL_WORM_XATTR_CLEANUP_KEY "glusterfs.worm-xattr-cleanup"
 
 /* afr related */

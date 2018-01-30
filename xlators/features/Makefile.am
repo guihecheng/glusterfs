@@ -1,4 +1,4 @@
-SUBDIRS = locks quota read-only quiesce marker index barrier \
+SUBDIRS = locks quota read-only quiesce marker index barrier dir-worm \
           arbiter compress changelog changetimerecorder \
           gfid-access $(GLUPY_SUBDIR) upcall snapview-client snapview-server \
           trash shard bit-rot leases selinux sdfs namespace

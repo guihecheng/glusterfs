@@ -148,6 +148,8 @@ AC_CONFIG_FILES([Makefile
                 xlators/features/sdfs/src/Makefile
                 xlators/features/read-only/Makefile
                 xlators/features/read-only/src/Makefile
+                xlators/features/dir-worm/Makefile
+                xlators/features/dir-worm/src/Makefile
                 xlators/features/compress/Makefile
                 xlators/features/compress/src/Makefile
                 xlators/features/namespace/Makefile
