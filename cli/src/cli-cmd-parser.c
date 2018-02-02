@@ -1740,24 +1740,6 @@ cli_cmd_volume_set_parse (struct cli_state *state, const char **words,
                                 goto out;
                         }
                 }
-
-                if ((strcmp (key, "cluster.brick-multiplex") == 0)) {
-                        question = "Brick-multiplexing is supported only for "
-                                   "container workloads (CNS/CRS). Also it is "
-                                   "advised to make sure that either all "
-                                   "volumes are in stopped state or no bricks "
-                                   "are running before this option is modified."
-                                   "Do you still want to continue?";
-
-                        answer = cli_cmd_get_confirmation (state, question);
-                        if (GF_ANSWER_NO == answer) {
-                                gf_log ("cli", GF_LOG_ERROR, "Operation "
-                                        "cancelled, exiting");
-                                *op_errstr = gf_strdup ("Aborted by user.");
-                                ret = -1;
-                                goto out;
-                        }
-                }
         }
 
         ret = dict_set_int32 (dict, "count", wordcount-3);
