@@ -7248,7 +7248,8 @@ dht_mknod_lock (call_frame_t *frame, xlator_t *subvol)
                 goto err;
 
         lk_array[0] = dht_lock_new (frame->this, subvol, &local->loc, F_RDLCK,
-                                    DHT_LAYOUT_HEAL_DOMAIN, NULL);
+                                    DHT_LAYOUT_HEAL_DOMAIN, NULL,
+                                    IGNORE_ENOENT_ESTALE);
 
         if (lk_array[0] == NULL)
                 goto err;
@@ -7256,8 +7257,7 @@ dht_mknod_lock (call_frame_t *frame, xlator_t *subvol)
         local->lock[0].layout.parent_layout.locks = lk_array;
         local->lock[0].layout.parent_layout.lk_count = count;
 
-        ret = dht_blocking_inodelk (frame, lk_array, count,
-                                    IGNORE_ENOENT_ESTALE, dht_mknod_lock_cbk);
+        ret = dht_blocking_inodelk (frame, lk_array, count, dht_mknod_lock_cbk);
 
         if (ret < 0) {
                 local->lock[0].layout.parent_layout.locks = NULL;
@@ -8392,7 +8392,8 @@ dht_create_lock (call_frame_t *frame, xlator_t *subvol)
                 goto err;
 
         lk_array[0] = dht_lock_new (frame->this, subvol, &local->loc, F_RDLCK,
-                                    DHT_LAYOUT_HEAL_DOMAIN, NULL);
+                                    DHT_LAYOUT_HEAL_DOMAIN, NULL,
+                                    IGNORE_ENOENT_ESTALE);
 
         if (lk_array[0] == NULL)
                 goto err;
@@ -8401,7 +8402,7 @@ dht_create_lock (call_frame_t *frame, xlator_t *subvol)
         local->lock[0].layout.parent_layout.lk_count = count;
 
         ret = dht_blocking_inodelk (frame, lk_array, count,
-                                    IGNORE_ENOENT_ESTALE, dht_create_lock_cbk);
+                                    dht_create_lock_cbk);
 
         if (ret < 0) {
                 local->lock[0].layout.parent_layout.locks = NULL;
