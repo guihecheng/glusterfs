@@ -1043,7 +1043,9 @@ glusterd_volume_exclude_options_write (int fd, glusterd_volinfo_t *volinfo)
                                            buf);
                 if (ret)
                         goto out;
+        }
 
+        if (conf->op_version >= GD_OP_VERSION_3_13_1) {
                 snprintf (buf, sizeof (buf), "%d", volinfo->is_tier_enabled);
                 ret = gf_store_save_value (fd, GF_TIER_ENABLED, buf);
                 if (ret)
