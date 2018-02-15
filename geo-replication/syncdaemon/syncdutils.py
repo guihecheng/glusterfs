@@ -23,7 +23,6 @@ from errno import EINTR, ENOENT, EPERM, ESTALE, EBUSY, errorcode
 from signal import signal, SIGTERM
 import select as oselect
 from os import waitpid as owaitpid
-import subprocess
 
 from conf import GLUSTERFS_LIBEXECDIR, UUID_FILE
 sys.path.insert(1, GLUSTERFS_LIBEXECDIR)
@@ -209,7 +208,6 @@ def grabpidfile(fname=None, setpid=True):
 
 final_lock = Lock()
 
-mntpt_list = []
 def finalize(*a, **kw):
     """all those messy final steps we go trough upon termination
 
@@ -256,12 +254,16 @@ def finalize(*a, **kw):
                 pass
 
     """ Unmount if not done """
-    for mnt in mntpt_list:
-        p0 = subprocess.Popen (["umount", "-l", mnt], stderr=subprocess.PIPE)
+    if gconf.mount_point:
+        if gconf.mountbroker:
+            umount_cmd = gconf.mbr_umount_cmd + [gconf.mount_point, 'lazy']
+        else:
+            umount_cmd = ['umount', '-l', gconf.mount_point]
+        p0 = subprocess.Popen(umount_cmd, stderr=subprocess.PIPE)
         _, errdata = p0.communicate()
         if p0.returncode == 0:
             try:
-                os.rmdir(mnt)
+                os.rmdir(gconf.mount_point)
             except OSError:
                 pass
         else:

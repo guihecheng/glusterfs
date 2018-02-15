@@ -453,6 +453,7 @@ BuildRequires:    python-ctypes
 %endif
 Requires:         python2-gluster = %{version}-%{release}
 Requires:         rsync
+Requires:         util-linux
 
 %description geo-replication
 GlusterFS is a distributed file-system capable of scaling to several
@@ -2147,6 +2148,9 @@ fi
 %endif
 
 %changelog
+* Thu Feb 22 2018 Kotresh HR <khiremat@redhat.com>
+- Added util-linux as dependency to georeplication rpm (#1544382)
+
 * Wed Jan 17 2018 Milind Changire <mchangir@redhat.com>
 - DOWNSTREAM ONLY - Removed pretrans script for glusterfs-ganesha - (#1410719)
 

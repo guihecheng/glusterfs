@@ -43,7 +43,7 @@ from syncdutils import CHANGELOG_AGENT_CLIENT_VERSION
 from syncdutils import GX_GFID_CANONICAL_LEN
 from gsyncdstatus import GeorepStatus
 from syncdutils import get_master_and_slave_data_from_args
-from syncdutils import mntpt_list, lf
+from syncdutils import lf
 from syncdutils import Xattr, matching_disk_gfid, get_gfid_from_mnt
 
 UrlRX = re.compile('\A(\w+)://([^ *?[]*)\Z')
@@ -1047,8 +1047,8 @@ class SlaveRemote(object):
             extra_opts += ['--local-node', ln]
         if boolify(gconf.use_rsync_xattrs):
             extra_opts.append('--use-rsync-xattrs')
-        if boolify(gconf.access_mount):
-            extra_opts.append('--access-mount')
+        if boolify(gconf.slave_access_mount):
+            extra_opts.append('--slave-access-mount')
         po = Popen(rargs + gconf.remote_gsyncd.split() + extra_opts +
                    ['-N', '--listen', '--timeout', str(gconf.timeout),
                     slave],
@@ -1333,6 +1333,7 @@ class GLUSTER(AbstractUrl, SlaveLocal, SlaveRemote):
         def __init__(self, params):
             self.params = params
             self.mntpt = None
+            self.umount_cmd = []
 
         @classmethod
         def get_glusterprog(cls):
@@ -1424,13 +1425,15 @@ class GLUSTER(AbstractUrl, SlaveLocal, SlaveRemote):
                         assert(mntdata[-1] == '\0')
                         mntpt = mntdata[:-1]
                         assert(mntpt)
-                        if mounted and not boolify(gconf.access_mount):
+                        if mounted and gconf.label == 'slave' \
+                           and not boolify(gconf.slave_access_mount):
                             po = self.umount_l(mntpt)
                             po.terminate_geterr(fail_on_err=False)
                             if po.returncode != 0:
                                 po.errlog()
                                 rv = po.returncode
-                        if not boolify(gconf.access_mount):
+                        if gconf.label == 'slave' \
+                           and not boolify(gconf.slave_access_mount):
                             self.cleanup_mntpt(mntpt)
                 except:
                     logging.exception('mount cleanup failure:')
@@ -1451,7 +1454,7 @@ class GLUSTER(AbstractUrl, SlaveLocal, SlaveRemote):
 
         def make_mount_argv(self):
             self.mntpt = tempfile.mkdtemp(prefix='gsyncd-aux-mount-')
-            mntpt_list.append(self.mntpt)
+            gconf.mount_point = self.mntpt
             return [self.get_glusterprog()] + \
                 ['--' + p for p in self.params] + [self.mntpt]
 
@@ -1483,6 +1486,11 @@ class GLUSTER(AbstractUrl, SlaveLocal, SlaveRemote):
 
         def handle_mounter(self, po):
             self.mntpt = po.stdout.readline()[:-1]
+            gconf.mount_point = self.mntpt
+            gconf.mountbroker = True
+            self.umount_cmd = self.make_cli_argv() + ['umount']
+            gconf.mbr_umount_cmd = self.umount_cmd
+
             po.stdout.close()
             sup(self, po)
             if po.returncode != 0:

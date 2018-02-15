@@ -28,5 +28,8 @@ class GConf(object):
     active_earlier = False
     passive_earlier = False
     mgmt_lock_fd = None
+    mountbroker = False
+    mount_point = None
+    mbr_umount_cmd = []
 
 gconf = GConf()

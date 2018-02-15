@@ -276,6 +276,7 @@ def main_i():
     op.add_option('--georep-session-working-dir', metavar='STATF',
                   type=str, action='callback', callback=store_abs)
     op.add_option('--access-mount', default=False, action='store_true')
+    op.add_option('--slave-access-mount', default=False, action='store_true')
     op.add_option('--ignore-deletes', default=False, action='store_true')
     op.add_option('--isolated-slave', default=False, action='store_true')
     op.add_option('--use-rsync-xattrs', default=False, action='store_true')
@@ -431,7 +432,7 @@ def main_i():
                     o.get_opt_string() not in ('--version', '--help'))]
     remote_tunables = ['listen', 'go_daemon', 'timeout',
                        'session_owner', 'config_file', 'use_rsync_xattrs',
-                       'local_id', 'local_node', 'access_mount']
+                       'local_id', 'local_node', 'slave_access_mount']
     rq_remote_tunables = {'listen': True}
 
     # precedence for sources of values: 1) commandline, 2) cfg file, 3)
@@ -768,15 +769,15 @@ def main_i():
     else:
         log_file = gconf.log_file
     if be_monitor:
-        label = 'monitor'
+        gconf.label = 'monitor'
     elif be_agent:
-        label = gconf.local_path
+        gconf.label = gconf.local_path
     elif remote:
         # master
-        label = gconf.local_path
+        gconf.label = gconf.local_path
     else:
-        label = 'slave'
-    startup(go_daemon=go_daemon, log_file=log_file, label=label)
+        gconf.label = 'slave'
+    startup(go_daemon=go_daemon, log_file=log_file, label=gconf.label)
     resource.Popen.init_errhandler()
 
     if be_agent:

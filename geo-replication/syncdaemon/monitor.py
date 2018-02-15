@@ -24,7 +24,7 @@ import random
 from gconf import gconf
 from syncdutils import select, waitpid, errno_wrap, lf
 from syncdutils import set_term_handler, is_host_local, GsyncdError
-from syncdutils import escape, Thread, finalize, memoize
+from syncdutils import escape, Thread, finalize, memoize, boolify
 from syncdutils import gf_event, EVENT_GEOREP_FAULTY
 
 from gsyncdstatus import GeorepStatus, set_monitor_status
@@ -306,19 +306,29 @@ class Monitor(object):
                 os.close(pr)
                 os.close(ra)
                 os.close(wa)
-                os.execv(sys.executable, argv + ['--feedback-fd', str(pw),
-                                                 '--local-path', w[0]['dir'],
-                                                 '--local-node', w[0]['host'],
-                                                 '--local-node-id',
-                                                 w[0]['uuid'],
-                                                 '--local-id',
-                                                 '.' + escape(w[0]['dir']),
-                                                 '--rpc-fd',
-                                                 ','.join([str(rw), str(ww),
-                                                           str(ra), str(wa)]),
-                                                 '--subvol-num', str(w[2])] +
-                         (['--is-hottier'] if w[3] else []) +
-                         ['--resource-remote', remote_host])
+                args_to_worker = argv + ['--feedback-fd', str(pw),
+                                         '--local-path', w[0]['dir'],
+                                         '--local-node', w[0]['host'],
+                                         '--local-node-id',
+                                         w[0]['uuid'],
+                                         '--local-id',
+                                         '.' + escape(w[0]['dir']),
+                                         '--rpc-fd',
+                                         ','.join([str(rw), str(ww),
+                                         str(ra), str(wa)]),
+                                         '--subvol-num', str(w[2])]
+
+                if w[3]:
+                    args_to_worker.append('--is-hottier')
+                args_to_worker += ['--resource-remote', remote_host]
+
+                access_mount = boolify(gconf.access_mount)
+                if access_mount:
+                    os.execv(sys.executable, args_to_worker)
+                else:
+                    unshare_cmd = ['unshare', '-m', '--propagation', 'private']
+                    cmd = unshare_cmd + args_to_worker
+                    os.execvp("unshare", cmd)
 
             cpids.add(cpid)
             agents.add(apid)
