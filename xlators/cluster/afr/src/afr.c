@@ -664,7 +664,6 @@ struct xlator_fops fops = {
         .lk          = afr_lk,
         .flush       = afr_flush,
         .statfs      = afr_statfs,
-        .fsync       = afr_fsync,
         .fsyncdir    = afr_fsyncdir,
         .inodelk     = afr_inodelk,
         .finodelk    = afr_finodelk,
@@ -696,6 +695,7 @@ struct xlator_fops fops = {
         .zerofill    = afr_zerofill,
         .xattrop     = afr_xattrop,
         .fxattrop    = afr_fxattrop,
+        .fsync       = afr_fsync,
 
         /*inode open*/
         .opendir     = afr_opendir,
