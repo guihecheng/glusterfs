@@ -168,15 +168,6 @@ reconfigure (xlator_t *this, dict_t *options)
                           priv->data_self_heal_window_size, options,
                           uint32, out);
 
-        GF_OPTION_RECONF ("data-change-log", priv->data_change_log, options,
-                          bool, out);
-
-        GF_OPTION_RECONF ("metadata-change-log",
-                          priv->metadata_change_log, options, bool, out);
-
-        GF_OPTION_RECONF ("entry-change-log", priv->entry_change_log, options,
-                          bool, out);
-
         GF_OPTION_RECONF ("data-self-heal-algorithm",
                           priv->data_self_heal_algorithm, options, str, out);
 
@@ -516,19 +507,8 @@ init (xlator_t *this)
 
         GF_OPTION_INIT ("iam-nfs-daemon", priv->nfsd.iamnfsd, bool, out);
 
-        GF_OPTION_INIT ("data-change-log", priv->data_change_log, bool, out);
-
-        GF_OPTION_INIT ("metadata-change-log", priv->metadata_change_log, bool,
-                        out);
-
-        GF_OPTION_INIT ("entry-change-log", priv->entry_change_log, bool, out);
-
         GF_OPTION_INIT ("optimistic-change-log", priv->optimistic_change_log,
                         bool, out);
-
-        GF_OPTION_INIT ("inodelk-trace", priv->inodelk_trace, bool, out);
-
-        GF_OPTION_INIT ("entrylk-trace", priv->entrylk_trace, bool, out);
 
         GF_OPTION_INIT ("pre-op-compat", priv->pre_op_compat, bool, out);
         GF_OPTION_INIT ("locking-scheme", priv->locking_scheme, str, out);
@@ -878,23 +858,20 @@ struct volume_options options[] = {
         { .key  = {"data-change-log"},
           .type = GF_OPTION_TYPE_BOOL,
           .default_value = "on",
-          .description = "Data fops like write/truncate will not perform "
-                         "pre/post fop changelog operations in afr transaction "
-                         "if this option is disabled"
+          .description = "This option exists only for backward compatibility "
+                         "and configuring it doesn't have any effect"
         },
         { .key  = {"metadata-change-log"},
           .type = GF_OPTION_TYPE_BOOL,
           .default_value = "on",
-          .description = "Metadata fops like setattr/setxattr will not perform "
-                         "pre/post fop changelog operations in afr transaction "
-                         "if this option is disabled"
+          .description = "This option exists only for backward compatibility "
+                         "and configuring it doesn't have any effect"
         },
         { .key  = {"entry-change-log"},
           .type = GF_OPTION_TYPE_BOOL,
           .default_value = "on",
-          .description = "Entry fops like create/unlink will not perform "
-                         "pre/post fop changelog operations in afr transaction "
-                         "if this option is disabled"
+          .description = "This option exists only for backward compatibility "
+                         "and configuring it doesn't have any effect"
         },
         { .key  = {"optimistic-change-log"},
           .type = GF_OPTION_TYPE_BOOL,
