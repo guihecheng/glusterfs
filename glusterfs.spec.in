@@ -1093,7 +1093,6 @@ exit 0
 %exclude %{_libexecdir}/ganesha/*
 %exclude %{_prefix}/lib/ocf/resource.d/heartbeat/*
 %exclude %{_sysconfdir}/ganesha/ganesha-ha.conf.sample
-%exclude %{_sysconfdir}/ganesha/ganesha-ha.conf
 
 # exclude incrementalapi
 %exclude %{_libexecdir}/glusterfs/*
