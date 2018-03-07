@@ -263,7 +263,6 @@ first_of (volgen_graph_t *graph)
  *
  *************************/
 
-
 static int
 volopt_selector (int lvl, char **patt, void *param,
                      int (*optcbk)(char *word, void *param))
@@ -514,6 +513,11 @@ volgen_graph_set_options_generic (volgen_graph_t *graph, dict_t *dict,
                 odt.data_t_fake = _gf_false;
 
                 data = dict_get (dict, vme->key);
+                if (!strcmp (vme->key, "performance.client-io-threads") &&
+                    dict_get_str_boolean (dict, "skip-CLIOT",
+                                          _gf_false) == _gf_true) {
+                        continue;
+                }
 
                 if (data)
                         process_option (vme->key, data, &odt);
@@ -6392,6 +6396,8 @@ glusterd_create_volfiles (glusterd_volinfo_t *volinfo)
                 gf_msg (this->name, GF_LOG_ERROR, 0,
                         GD_MSG_VOLFILE_CREATE_FAIL,
                         "Could not generate client volfiles");
+
+        dict_del (volinfo->dict, "skip-CLIOT");
 
 out:
         return ret;
