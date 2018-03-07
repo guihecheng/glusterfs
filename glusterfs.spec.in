@@ -826,7 +826,7 @@ install -D -p -m 0644 extras/glusterfs-logrotate \
     %{buildroot}%{_sysconfdir}/logrotate.d/glusterfs
 
 # ganesha ghosts
-%if ( ! 0%{?_build_server} )
+%if ( 0%{?_build_server} )
 mkdir -p %{buildroot}%{_sysconfdir}/ganesha
 touch %{buildroot}%{_sysconfdir}/ganesha/ganesha-ha.conf
 mkdir -p %{buildroot}%{_localstatedir}/run/gluster/shared_storage/nfs-ganesha/exports
