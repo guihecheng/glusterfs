@@ -959,7 +959,7 @@ struct volume_options options[] = {
           .max = INT_MAX,
           .default_value = 0,
           .description = "If quorum-type is \"fixed\" only allow writes if "
-                         "this many bricks or present.  Other quorum types "
+                         "this many bricks are present.  Other quorum types "
                          "will OVERWRITE this value.",
         },
         { .key = {"quorum-reads"},
