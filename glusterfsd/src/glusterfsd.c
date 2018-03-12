@@ -87,15 +87,7 @@ static char gf_doc[] = "";
 static char argp_doc[] = "--volfile-server=SERVER [MOUNT-POINT]\n"       \
         "--volfile=VOLFILE [MOUNT-POINT]";
 const char *argp_program_version = ""                                         \
-        PACKAGE_NAME" "PACKAGE_VERSION                                        \
-        "\nRepository revision: " GLUSTERFS_REPOSITORY_REVISION "\n"          \
-        "Copyright (c) 2006-2016 Red Hat, Inc. "                              \
-        "<https://www.gluster.org/>\n"                                        \
-        "GlusterFS comes with ABSOLUTELY NO WARRANTY.\n"                      \
-        "It is licensed to you under your choice of the GNU Lesser\n"         \
-        "General Public License, version 3 or any later version (LGPLv3\n"    \
-        "or later), or the GNU General Public License, version 2 (GPLv2),\n"  \
-        "in all cases as published by the Free Software Foundation.";
+        PACKAGE_NAME" "PACKAGE_VERSION;
 const char *argp_program_bug_address = "<" PACKAGE_BUGREPORT ">";
 
 static error_t parse_opts (int32_t key, char *arg, struct argp_state *_state);
