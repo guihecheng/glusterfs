@@ -467,7 +467,16 @@ server_rpc_notify (rpcsvc_t *rpc, void *xl, rpcsvc_event_t event,
         server_ctx_t        *serv_ctx   = NULL;
         struct timespec     grace_ts    = {0, };
         char                *auth_path  = NULL;
-        int                 ret         = -1;
+        int                  ret        = -1;
+        gf_boolean_t         victim_found = _gf_false;
+        char                *xlator_name  = NULL;
+        glusterfs_ctx_t     *ctx          = NULL;
+        xlator_t            *top          = NULL;
+        xlator_list_t      **trav_p       = NULL;
+        xlator_t            *travxl       = NULL;
+        uint64_t             xprtrefcount = 0;
+        struct _child_status *tmp         = NULL;
+
 
         if (!xl || !data) {
                 gf_msg_callingfn ("server", GF_LOG_WARNING, 0,
@@ -479,6 +488,7 @@ server_rpc_notify (rpcsvc_t *rpc, void *xl, rpcsvc_event_t event,
         this = xl;
         trans = data;
         conf = this->private;
+        ctx = glusterfsd_ctx;
 
         switch (event) {
         case RPCSVC_EVENT_ACCEPT:
@@ -626,10 +636,48 @@ unref_transport:
                 client = trans->xl_private;
                 if (!client)
                         break;
+                pthread_mutex_lock (&conf->mutex);
+                list_for_each_entry (tmp, &conf->child_status->status_list,
+                                     status_list) {
+                        if (tmp->name && client->bound_xl &&
+                            client->bound_xl->cleanup_starting &&
+                            !strcmp (tmp->name, client->bound_xl->name)) {
+                                xprtrefcount = GF_ATOMIC_GET (tmp->xprtrefcnt);
+                                if (xprtrefcount > 0) {
+                                        xprtrefcount = GF_ATOMIC_DEC (tmp->xprtrefcnt);
+                                        if (xprtrefcount == 0)
+                                                xlator_name = gf_strdup(client->bound_xl->name);
+                                }
+                                break;
+                        }
+                }
+                pthread_mutex_unlock (&conf->mutex);
 
                 /* unref only for if (!client->lk_heal) */
                 if (!conf->lk_heal)
                         gf_client_unref (client);
+
+                if (xlator_name) {
+                        if (this->ctx->active) {
+                                top = this->ctx->active->first;
+                                LOCK (&ctx->volfile_lock);
+                                for (trav_p = &top->children; *trav_p;
+                                                   trav_p = &(*trav_p)->next) {
+                                        travxl = (*trav_p)->xlator;
+                                        if (!travxl->call_cleanup &&
+                                            strcmp (travxl->name, xlator_name) == 0) {
+                                                victim_found = _gf_true;
+                                                break;
+                                        }
+                                }
+                                UNLOCK (&ctx->volfile_lock);
+                                if (victim_found) {
+                                        xlator_mem_cleanup (travxl);
+                                        glusterfs_autoscale_threads (ctx, -1, this);
+                                }
+                        }
+                        GF_FREE (xlator_name);
+                }
 
                 trans->xl_private = NULL;
                 break;
@@ -1078,6 +1126,7 @@ init (xlator_t *this)
         conf->child_status = GF_CALLOC (1, sizeof (struct _child_status),
                                           gf_server_mt_child_status);
         INIT_LIST_HEAD (&conf->child_status->status_list);
+        GF_ATOMIC_INIT (conf->child_status->xprtrefcnt, 0);
 
         /*ret = dict_get_str (this->options, "statedump-path", &statedump_path);
         if (!ret) {
@@ -1392,14 +1441,53 @@ server_process_child_event (xlator_t *this, int32_t event, void *data,
         int              ret          = -1;
         server_conf_t    *conf        = NULL;
         rpc_transport_t  *xprt        = NULL;
+        xlator_t         *victim      = NULL;
+        struct  _child_status *tmp    = NULL;
 
         GF_VALIDATE_OR_GOTO(this->name, data, out);
 
         conf = this->private;
         GF_VALIDATE_OR_GOTO(this->name, conf, out);
 
+        victim = data;
         pthread_mutex_lock (&conf->mutex);
         {
+                if (cbk_procnum == GF_CBK_CHILD_UP) {
+                        list_for_each_entry (tmp, &conf->child_status->status_list,
+                                             status_list) {
+                                if (tmp->name == NULL)
+                                        break;
+                                if (strcmp (tmp->name, victim->name) == 0)
+                                        break;
+                        }
+                        if (tmp->name) {
+                                tmp->child_up = _gf_true;
+                        } else {
+                                tmp  = GF_CALLOC (1, sizeof (struct _child_status),
+                                                  gf_server_mt_child_status);
+                                INIT_LIST_HEAD (&tmp->status_list);
+                                tmp->name  = gf_strdup (victim->name);
+                                tmp->child_up = _gf_true;
+                                list_add_tail (&tmp->status_list,
+                                               &conf->child_status->status_list);
+                        }
+                }
+
+                if (cbk_procnum == GF_CBK_CHILD_DOWN) {
+                        list_for_each_entry (tmp, &conf->child_status->status_list,
+                                             status_list) {
+                                if (strcmp (tmp->name, victim->name) == 0) {
+                                        tmp->child_up = _gf_false;
+                                        break;
+                                }
+                        }
+
+                        if (!tmp->name)
+                                gf_msg (this->name, GF_LOG_ERROR, 0,
+                                        PS_MSG_CHILD_STATUS_FAILED,
+                                        "No xlator %s is found in "
+                                        "child status list", victim->name);
+                }
                 list_for_each_entry (xprt, &conf->xprt_list, list) {
                         if (!xprt->xl_private) {
                                 continue;
@@ -1433,6 +1521,8 @@ notify (xlator_t *this, int32_t event, void *data, ...)
         struct  _child_status *tmp    = NULL;
         gf_boolean_t     victim_found = _gf_false;
         glusterfs_ctx_t  *ctx         = NULL;
+        gf_boolean_t     xprt_found   = _gf_false;
+        uint64_t         totxprt      = 0;
 
         GF_VALIDATE_OR_GOTO (THIS->name, this, out);
         conf = this->private;
@@ -1467,24 +1557,6 @@ notify (xlator_t *this, int32_t event, void *data, ...)
 
         case GF_EVENT_CHILD_UP:
         {
-                list_for_each_entry (tmp, &conf->child_status->status_list,
-                                                                 status_list) {
-                        if (tmp->name == NULL)
-                                break;
-                        if (strcmp (tmp->name, victim->name) == 0)
-                                break;
-                }
-                if (tmp->name) {
-                        tmp->child_up = _gf_true;
-                } else {
-                        tmp  = GF_CALLOC (1, sizeof (struct _child_status),
-                                          gf_server_mt_child_status);
-                        INIT_LIST_HEAD (&tmp->status_list);
-                        tmp->name  = gf_strdup (victim->name);
-                        tmp->child_up = _gf_true;
-                        list_add_tail (&tmp->status_list,
-                                              &conf->child_status->status_list);
-                }
                 ret = server_process_child_event (this, event, data,
                                                   GF_CBK_CHILD_UP);
                 if (ret) {
@@ -1499,19 +1571,6 @@ notify (xlator_t *this, int32_t event, void *data, ...)
 
         case GF_EVENT_CHILD_DOWN:
         {
-                list_for_each_entry (tmp, &conf->child_status->status_list,
-                                                                  status_list) {
-                        if (strcmp (tmp->name, victim->name) == 0) {
-                                tmp->child_up = _gf_false;
-                                break;
-                        }
-                }
-                if (!tmp->name)
-                        gf_msg (this->name, GF_LOG_ERROR, 0,
-                                PS_MSG_CHILD_STATUS_FAILED,
-                                "No xlator %s is found in "
-                                "child status list", victim->name);
-
                 ret = server_process_child_event (this, event, data,
                                                   GF_CBK_CHILD_DOWN);
                 if (ret) {
@@ -1528,6 +1587,28 @@ notify (xlator_t *this, int32_t event, void *data, ...)
         case GF_EVENT_CLEANUP:
                 conf = this->private;
                 pthread_mutex_lock (&conf->mutex);
+                /* Calculate total no. of xprt available in list for this
+                   brick xlator
+                 */
+                list_for_each_entry_safe (xprt, xp_next,
+                                          &conf->xprt_list, list) {
+                        if (!xprt->xl_private) {
+                                continue;
+                        }
+                        if (xprt->xl_private->bound_xl == data) {
+                                totxprt++;
+                        }
+                }
+
+                list_for_each_entry (tmp, &conf->child_status->status_list,
+                                     status_list) {
+                        if (strcmp (tmp->name, victim->name) == 0) {
+                                tmp->child_up = _gf_false;
+                                GF_ATOMIC_INIT (tmp->xprtrefcnt, totxprt);
+                                break;
+                        }
+                }
+
                 /*
                  * Disconnecting will (usually) drop the last ref, which will
                  * cause the transport to be unlinked and freed while we're
@@ -1543,18 +1624,11 @@ notify (xlator_t *this, int32_t event, void *data, ...)
                                 gf_log (this->name, GF_LOG_INFO,
                                         "disconnecting %s",
                                         xprt->peerinfo.identifier);
+                                xprt_found = _gf_true;
                                 rpc_transport_disconnect (xprt, _gf_false);
                         }
                 }
-                list_for_each_entry (tmp, &conf->child_status->status_list,
-                                                                 status_list) {
-                        if (strcmp (tmp->name, victim->name) == 0)
-                                break;
-                }
-                if (tmp->name && (strcmp (tmp->name, victim->name) == 0)) {
-                        GF_FREE (tmp->name);
-                        list_del (&tmp->status_list);
-                }
+
                 pthread_mutex_unlock (&conf->mutex);
                 if (this->ctx->active) {
                         top = this->ctx->active->first;
@@ -1562,8 +1636,8 @@ notify (xlator_t *this, int32_t event, void *data, ...)
                                 for (trav_p = &top->children; *trav_p;
                                                    trav_p = &(*trav_p)->next) {
                                         travxl = (*trav_p)->xlator;
-                                        if (travxl &&
-                                                   strcmp (travxl->name, victim->name) == 0) {
+                                        if (!travxl->call_cleanup &&
+                                            strcmp (travxl->name, victim->name) == 0) {
                                                 victim_found = _gf_true;
                                                 break;
                                         }
@@ -1572,12 +1646,14 @@ notify (xlator_t *this, int32_t event, void *data, ...)
                                         glusterfs_delete_volfile_checksum (ctx,
                                                  victim->volfile_id);
                         UNLOCK (&ctx->volfile_lock);
-                        if (victim_found)
-                                (*trav_p) = (*trav_p)->next;
+
                         glusterfs_mgmt_pmap_signout (ctx,
                                                      victim->name);
-                        /* we need the protocol/server xlator here as 'this' */
-                        glusterfs_autoscale_threads (ctx, -1, this);
+
+                        if (!xprt_found && victim_found) {
+                                xlator_mem_cleanup (victim);
+                                glusterfs_autoscale_threads (ctx, -1, this);
+                        }
                 }
                 break;
 
