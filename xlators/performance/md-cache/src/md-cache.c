@@ -424,7 +424,8 @@ mdc_to_iatt (struct md_cache *mdc, struct iatt *iatt)
 
 int
 mdc_inode_iatt_set_validate(xlator_t *this, inode_t *inode, struct iatt *prebuf,
-			    struct iatt *iatt, gf_boolean_t update_time)
+			    struct iatt *iatt, gf_boolean_t update_time,
+                            gf_boolean_t untrust_dentries)
 {
         int              ret = 0;
         struct md_cache *mdc = NULL;
@@ -499,6 +500,9 @@ mdc_inode_iatt_set_validate(xlator_t *this, inode_t *inode, struct iatt *prebuf,
                 if (update_time)
                         time (&mdc->ia_time);
 
+                if (untrust_dentries)
+                        mdc->trusted = _gf_false;
+
                 gf_msg_callingfn ("md-cache", GF_LOG_TRACE, 0,
                                   MD_CACHE_MSG_CACHE_UPDATE, "Updated iatt(%s)"
                                   " time:%lld ", uuid_utoa (inode->gfid),
@@ -513,7 +517,8 @@ out:
 
 int mdc_inode_iatt_set(xlator_t *this, inode_t *inode, struct iatt *iatt)
 {
-	return mdc_inode_iatt_set_validate(this, inode, NULL, iatt, _gf_true);
+	return mdc_inode_iatt_set_validate(this, inode, NULL, iatt, _gf_true,
+                                           _gf_false);
 }
 
 int
@@ -878,20 +883,18 @@ out:
 
 
 static int
-mdc_update_gfid_stat (xlator_t *this, struct iatt *iatt)
+mdc_update_gfid_stat (xlator_t *this, inode_table_t *itable, struct iatt *iatt)
 {
         int              ret        = 0;
-        inode_table_t   *itable     = NULL;
         inode_t         *inode      = NULL;
 
-        itable = ((xlator_t *)this->graph->top)->itable;
         inode = inode_find (itable, iatt->ia_gfid);
         if (!inode) {
                 ret = -1;
                 goto out;
         }
         ret = mdc_inode_iatt_set_validate (this, inode, NULL,
-                                           iatt, _gf_true);
+                                           iatt, _gf_true, _gf_true);
 out:
         return ret;
 }
@@ -989,7 +992,13 @@ mdc_dentry_for_name (const char *name, uuid_t gfid)
 }
 
 static void
-mdc_dentry_to_dirent(struct mdc_dentry *dentry, gf_dirent_t *dirent)
+mdc_dentry_free (struct mdc_entry *dentry)
+{
+        GF_FREE (dentry);
+}
+
+static void
+mdc_dentry_to_dirent (struct mdc_dentry *dentry, gf_dirent_t *dirent)
 {
         dirent->d_ino = dentry->d_ino;
         dirent->d_off = dentry->d_off;
@@ -1045,12 +1054,24 @@ mdc_dentry_remove(struct md_cache *mdc, const char *name, uuid_t gfid)
                         if (dentry->d_ino == gfid_to_ino (gfid) &&
                             !strcmp(dentry->d_name, name)) {
                                 list_del(&dentry->list);
+                                mdc_dentry_free (dentry);
                                 break;
                         }
                 }
         }
         UNLOCK (&mdc->lock);
         return 0;
+}
+
+static void
+__mdc_dentry_clear(struct md_cache *mdc)
+{
+        struct mdc_dentry *dentry = NULL, *tmp = NULL;
+
+        list_for_each_entry_safe (dentry, tmp, &mdc->dentry_list, list) {
+                list_del(&dentry->list);
+                mdc_dentry_free(dentry);
+        }
 }
 
 static int
@@ -1470,7 +1491,7 @@ mdc_truncate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
         mdc_inode_iatt_set_validate(this, local->loc.inode, prebuf, postbuf,
-                                    _gf_true);
+                                    _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND (truncate, frame, op_ret, op_errno, prebuf, postbuf,
@@ -1513,7 +1534,7 @@ mdc_ftruncate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
         mdc_inode_iatt_set_validate(this, local->fd->inode, prebuf, postbuf,
-                                    _gf_true);
+                                    _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND (ftruncate, frame, op_ret, op_errno, prebuf, postbuf,
@@ -2061,7 +2082,7 @@ mdc_writev_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
         mdc_inode_iatt_set_validate(this, local->fd->inode, prebuf, postbuf,
-                                    _gf_true);
+                                    _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND (writev, frame, op_ret, op_errno, prebuf, postbuf,
@@ -2107,7 +2128,7 @@ mdc_setattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
 	mdc_inode_iatt_set_validate(this, local->loc.inode, prebuf, postbuf,
-                                    _gf_true);
+                                    _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND (setattr, frame, op_ret, op_errno, prebuf, postbuf,
@@ -2150,7 +2171,7 @@ mdc_fsetattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
         mdc_inode_iatt_set_validate(this, local->fd->inode, prebuf, postbuf,
-                                    _gf_true);
+                                    _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND (fsetattr, frame, op_ret, op_errno, prebuf, postbuf,
@@ -2193,7 +2214,7 @@ mdc_fsync_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
         mdc_inode_iatt_set_validate(this, local->fd->inode, prebuf, postbuf,
-                                     _gf_true);
+                                     _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND (fsync, frame, op_ret, op_errno, prebuf, postbuf,
@@ -2631,11 +2652,11 @@ mdc_readdir_helper(xlator_t *this, struct md_cache *parent_mdc,
                 goto unlock;
         }
 
-        if (parent_mdc->fullfilled && !parent_mdc->trusted && offset != 0) {
-                ret = 1;
+        if (parent_mdc->fullfilled && !parent_mdc->trusted) {
+                __mdc_dentry_clear (parent_mdc);
+                parent_mdc->fullfilled = _gf_false;
+                ret = 2;
                 goto unlock;
-        } else {
-                parent_mdc->trusted = _gf_true;
         }
 
         list_for_each_entry (dentry, &parent_mdc->dentry_list, list) {
@@ -2670,7 +2691,7 @@ mdc_readdir_helper(xlator_t *this, struct md_cache *parent_mdc,
         }
 
         if (*filled == 0)
-                ret = 1;
+                ret = 3;
 
 unlock:
         UNLOCK (&parent_mdc->lock);
@@ -2753,6 +2774,7 @@ mdc_readdirp_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
         if (mdc && op_errno == ENOENT) {
                 LOCK (&mdc->lock);
                 mdc->fullfilled = _gf_true;
+                mdc->trusted = _gf_true;
                 UNLOCK (&mdc->lock);
         }
 
@@ -2842,6 +2864,7 @@ mdc_readdir_cbk(call_frame_t *frame, void *cookie, xlator_t *this, int op_ret,
         if (op_errno == ENOENT) {
                 LOCK (&mdc->lock);
                 mdc->fullfilled = _gf_true;
+                mdc->trusted = _gf_true;
                 UNLOCK (&mdc->lock);
         }
 
@@ -2937,7 +2960,7 @@ mdc_fallocate_cbk(call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
         mdc_inode_iatt_set_validate(this, local->fd->inode, prebuf, postbuf,
-                                    _gf_true);
+                                    _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND (fallocate, frame, op_ret, op_errno, prebuf, postbuf,
@@ -2977,7 +3000,7 @@ mdc_discard_cbk(call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
         mdc_inode_iatt_set_validate(this, local->fd->inode, prebuf, postbuf,
-                                    _gf_true);
+                                    _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND(discard, frame, op_ret, op_errno, prebuf, postbuf,
@@ -3017,7 +3040,7 @@ mdc_zerofill_cbk(call_frame_t *frame, void *cookie, xlator_t *this,
                 goto out;
 
         mdc_inode_iatt_set_validate(this, local->fd->inode, prebuf, postbuf,
-                                    _gf_true);
+                                    _gf_true, _gf_false);
 
 out:
         MDC_STACK_UNWIND(zerofill, frame, op_ret, op_errno, prebuf, postbuf,
@@ -3190,6 +3213,7 @@ mdc_invalidate (xlator_t *this, void *data)
         struct set                           tmp        = {0, };
         inode_table_t                       *itable     = NULL;
         struct mdc_conf                     *conf       = this->private;
+        xlator_list_t                       *cl         = NULL;
 
         up_data = (struct gf_upcall *)data;
 
@@ -3199,16 +3223,35 @@ mdc_invalidate (xlator_t *this, void *data)
         up_ci = (struct gf_upcall_cache_invalidation *)up_data->data;
 
         itable = ((xlator_t *)this->graph->top)->itable;
-        inode = inode_find (itable, up_data->gfid);
+
+        if (itable) {
+                inode = inode_find (itable, up_data->gfid);
+        } else {
+                cl = ((xlator_t *)this->graph->top)->children;
+
+                while (cl) {
+                        itable = cl->xlator->itable;
+
+                        if (!itable)
+                                continue;
+
+                        inode = inode_find(itable, up_data->gfid);
+                        if (inode)
+                                break;
+
+                        cl = cl->next;
+                }
+        }
+
         if (!inode) {
                 ret = -1;
                 goto out;
         }
 
         if (up_ci->flags & UP_PARENT_DENTRY_FLAGS) {
-                mdc_update_gfid_stat (this, &up_ci->p_stat);
+                mdc_update_gfid_stat (this, itable, &up_ci->p_stat);
                         if (up_ci->flags & UP_RENAME_FLAGS)
-                                mdc_update_gfid_stat (this, &up_ci->oldp_stat);
+                                mdc_update_gfid_stat (this, itable, &up_ci->oldp_stat);
         }
 
         if (up_ci->flags & UP_EXPLICIT_LOOKUP) {
@@ -3226,7 +3269,8 @@ mdc_invalidate (xlator_t *this, void *data)
 
         if (up_ci->flags & IATT_UPDATE_FLAGS) {
                 ret = mdc_inode_iatt_set_validate (this, inode, NULL,
-                                                   &up_ci->stat, _gf_false);
+                                                   &up_ci->stat, _gf_false,
+                                                   _gf_false);
                 /* one of the scenarios where ret < 0 is when this invalidate
                  * is older than the current stat, in that case do not
                  * update the xattrs as well
