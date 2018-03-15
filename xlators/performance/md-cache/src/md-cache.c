@@ -2694,6 +2694,22 @@ mdc_readdirp_fill_stat(struct md_cache *mdc,
         UNLOCK (&mdc->lock);
 }
 
+static gf_boolean_t
+is_dentry_cache_valid (xlator_t *this, struct md_cache *mdc)
+{
+        gf_boolean_t     ret = _gf_true;
+
+        LOCK (&mdc->lock);
+        {
+                ret = __is_cache_valid (this, mdc->xa_time);
+                if (ret == _gf_false)
+                        mdc->xa_time = 0;
+        }
+        UNLOCK (&mdc->lock);
+
+	return ret;
+}
+
 static int
 mdc_readdir_helper(xlator_t *this, struct md_cache *parent_mdc,
                    inode_t *parent, off_t offset, size_t size,
@@ -2716,6 +2732,14 @@ mdc_readdir_helper(xlator_t *this, struct md_cache *parent_mdc,
                 parent_mdc->fullfilled = _gf_false;
                 parent_mdc->filling = _gf_false;
                 ret = 2;
+                goto unlock;
+        }
+
+        if (!is_dentry_cache_valid(this, parent_mdc)) {
+                __mdc_dentry_clear (parent_mdc);
+                parent_mdc->fullfilled = _gf_false;
+                parent_mdc->filling = _gf_false;
+                ret = 3;
                 goto unlock;
         }
 
@@ -2756,7 +2780,7 @@ mdc_readdir_helper(xlator_t *this, struct md_cache *parent_mdc,
         }
 
         if (*filled == 0)
-                ret = 3;
+                ret = 4;
 
 unlock:
         UNLOCK (&parent_mdc->lock);
