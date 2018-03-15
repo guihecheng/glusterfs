@@ -25,7 +25,6 @@
 #include "md-cache-messages.h"
 #include "statedump.h"
 #include "atomic.h"
-#include "xxhash.h"
 
 /* TODO:
    - cache symlink() link names and nuke symlink-cache
@@ -106,6 +105,9 @@ struct mdc_dentry {
 	char             d_name[];
 };
 
+#define DENTRY_HASH_SIZE   65536
+#define NAME_HASH_SIZE     65536
+
 struct md_cache {
         ia_prot_t          md_prot;
         uint32_t           md_nlink;
@@ -125,7 +127,8 @@ struct md_cache {
 	time_t             ia_time;
 	time_t             xa_time;
         gf_boolean_t       need_lookup;
-        struct list_head   dentry_list;
+        struct list_head  *dentry_hash;
+        gf_boolean_t       filling;
         gf_boolean_t       fullfilled;
         gf_boolean_t       trusted;
         gf_lock_t          lock;
@@ -276,6 +279,7 @@ mdc_inode_prep (xlator_t *this, inode_t *inode)
 {
         int              ret = 0;
         struct md_cache *mdc = NULL;
+        int              i;
 
         LOCK (&inode->lock);
         {
@@ -290,13 +294,27 @@ mdc_inode_prep (xlator_t *this, inode_t *inode)
                         goto unlock;
                 }
 
-                INIT_LIST_HEAD (&mdc->dentry_list);
+                mdc->dentry_hash = (void *)GF_CALLOC (DENTRY_HASH_SIZE,
+                                           sizeof (struct list_head),
+                                           gf_common_mt_list_head);
+                if (!mdc->dentry_hash) {
+                        gf_msg (this->name, GF_LOG_ERROR, ENOMEM,
+                                MD_CACHE_MSG_NO_MEMORY, "out of memory");
+                        GF_FREE (mdc);
+                        goto unlock;
+                }
+
+                for (i = 0; i < DENTRY_HASH_SIZE; i++) {
+                        INIT_LIST_HEAD (&mdc->dentry_hash[i]);
+                }
+
                 LOCK_INIT (&mdc->lock);
 
                 ret = __mdc_inode_ctx_set (this, inode, mdc);
                 if (ret) {
                         gf_msg (this->name, GF_LOG_ERROR, ENOMEM,
                                 MD_CACHE_MSG_NO_MEMORY, "out of memory");
+                        GF_FREE (mdc->dentry_hash);
                         GF_FREE (mdc);
                         mdc = NULL;
                 }
@@ -1004,12 +1022,41 @@ mdc_dentry_to_dirent (struct mdc_dentry *dentry, gf_dirent_t *dirent)
         dirent->d_off = dentry->d_off;
 }
 
-static uint64_t
-mdc_dentry_cookie_hash(const void *data, size_t len)
+static uint32_t
+mdc_dentry_hash_name (struct md_cache *parent, const char *name)
 {
-        uint64_t seed = 233;
-        return gf_xxh64_wrapper_raw(data, len, seed);
+        uint32_t hash = 0;
+        uint32_t ret = 0;
+
+        hash = *name;
+        if (hash) {
+                for (name += 1; *name != '\0'; name++) {
+                        hash = (hash << 5) - hash + *name;
+                }
+        }
+        ret = (hash + (uint64_t)parent) % NAME_HASH_SIZE;
+
+        return ret;
 }
+
+static uint32_t
+mdc_dentry_hash_gfid (uuid_t uuid)
+{
+        uint32_t ret = 0;
+
+        ret = uuid[15] + (uuid[14] << 8);
+
+        return ret % DENTRY_HASH_SIZE;
+}
+
+static uint64_t
+mdc_dentry_cookie(uint32_t gfid_hash, uint32_t name_hash)
+{
+        return (gfid_hash << 32) | (name_hash);
+}
+
+#define NAME_HASH_MASK       (1ULL << 32 - 1)
+#define NAME_HASH(d_off)     (d_off & NAME_HASH_MASK)
 
 static int
 dentry_orderfn (struct list_head *pos1, struct list_head *pos2)
@@ -1020,7 +1067,7 @@ dentry_orderfn (struct list_head *pos1, struct list_head *pos2)
         dentry1 = list_entry (pos1, struct mdc_dentry, list);
         dentry2 = list_entry (pos2, struct mdc_dentry, list);
 
-        if  (dentry1->d_off > dentry2->d_off)
+        if  (NAME_HASH(dentry1->d_off) > NAME_HASH(dentry2->d_off))
                 return 1;
         return -1;
 }
@@ -1029,14 +1076,20 @@ static struct mdc_dentry*
 mdc_dentry_insert(struct md_cache *mdc, const char *name, uuid_t gfid)
 {
         struct mdc_dentry *dentry;
+        uint32_t           gfid_hash;
+        uint32_t           name_hash;
 
         dentry = mdc_dentry_for_name(name, gfid);
-        dentry->d_off = mdc_dentry_cookie_hash(dentry->d_name,
-                                               dentry->d_len);
+
+        gfid_hash = mdc_dentry_hash_gfid(gfid);
+        name_hash = mdc_dentry_hash_name(mdc, name);
+
+        dentry->d_off = mdc_dentry_cookie(gfid_hash, name_hash);
 
         LOCK (&mdc->lock);
         {
-                list_add_order (&dentry->list, &mdc->dentry_list, dentry_orderfn);
+                list_add_order (&dentry->list, &mdc->dentry_hash[gfid_hash],
+                                dentry_orderfn);
         }
         UNLOCK (&mdc->lock);
 
@@ -1047,10 +1100,13 @@ static int
 mdc_dentry_remove(struct md_cache *mdc, const char *name, uuid_t gfid)
 {
         struct mdc_dentry *dentry = NULL, *tmp = NULL;
+        uint32_t           gfid_hash;
+
+        gfid_hash = mdc_dentry_hash_gfid(gfid);
 
         LOCK (&mdc->lock);
         {
-                list_for_each_entry_safe (dentry, tmp, &mdc->dentry_list, list) {
+                list_for_each_entry_safe (dentry, tmp, &mdc->dentry_hash[gfid_hash], list) {
                         if (dentry->d_ino == gfid_to_ino (gfid) &&
                             !strcmp(dentry->d_name, name)) {
                                 list_del(&dentry->list);
@@ -1067,10 +1123,13 @@ static void
 __mdc_dentry_clear(struct md_cache *mdc)
 {
         struct mdc_dentry *dentry = NULL, *tmp = NULL;
+        int i;
 
-        list_for_each_entry_safe (dentry, tmp, &mdc->dentry_list, list) {
-                list_del(&dentry->list);
-                mdc_dentry_free(dentry);
+        for (i = 0; i < DENTRY_HASH_SIZE; i++) {
+                list_for_each_entry_safe (dentry, tmp, &mdc->dentry_hash[i], list) {
+                        list_del(&dentry->list);
+                        mdc_dentry_free(dentry);
+                }
         }
 }
 
@@ -2643,11 +2702,11 @@ mdc_readdir_helper(xlator_t *this, struct md_cache *parent_mdc,
         struct mdc_dentry *dentry = NULL;
         struct md_cache *mdc      = NULL;
         int ret                   = 0;
+        int i;
 
         LOCK (&parent_mdc->lock);
 
-        if (list_empty (&parent_mdc->dentry_list) ||
-            !parent_mdc->fullfilled) {
+        if (!parent_mdc->filling || !parent_mdc->fullfilled) {
                 ret = 1;
                 goto unlock;
         }
@@ -2655,36 +2714,42 @@ mdc_readdir_helper(xlator_t *this, struct md_cache *parent_mdc,
         if (parent_mdc->fullfilled && !parent_mdc->trusted) {
                 __mdc_dentry_clear (parent_mdc);
                 parent_mdc->fullfilled = _gf_false;
+                parent_mdc->filling = _gf_false;
                 ret = 2;
                 goto unlock;
         }
 
-        list_for_each_entry (dentry, &parent_mdc->dentry_list, list) {
-                if (dentry->d_off <= offset)
-                        continue;
+        for (i = 0; i < DENTRY_HASH_SIZE; i++) {
+                list_for_each_entry (dentry, &parent_mdc->dentry_hash[i], list) {
+                        if (dentry->d_off <= offset)
+                                continue;
 
-                gf_dirent_t *dirent = gf_dirent_for_name (dentry->d_name);
+                        gf_dirent_t *dirent = gf_dirent_for_name (dentry->d_name);
 
-                mdc_dentry_to_dirent(dentry, dirent);
+                        mdc_dentry_to_dirent(dentry, dirent);
 
-                if (readdirp) {
-                        inode_t *inode = inode_find(parent->table, dentry->gfid);
-                        if (!inode) {
-                                gf_msg_trace ("md-cache", 0, "inode_find failed for (%s %s)",
-                                              dentry->d_name, uuid_utoa (dentry->gfid));
-                        } else {
-                                if (mdc_inode_ctx_get (this, inode, &mdc) != 0) {
-                                        gf_msg_trace ("md-cache", 0, "mdc_inode_ctx_get failed (%s)",
-                                                      uuid_utoa (inode->gfid));
+                        if (readdirp) {
+                                inode_t *inode = inode_find(parent->table, dentry->gfid);
+                                if (!inode) {
+                                        gf_msg_trace ("md-cache", 0, "inode_find failed for (%s %s)",
+                                                      dentry->d_name, uuid_utoa (dentry->gfid));
                                 } else {
-                                        mdc_readdirp_fill_stat(mdc, dentry, dirent);
+                                        if (mdc_inode_ctx_get (this, inode, &mdc) != 0) {
+                                                gf_msg_trace ("md-cache", 0, "mdc_inode_ctx_get failed (%s)",
+                                                              uuid_utoa (inode->gfid));
+                                        } else {
+                                                mdc_readdirp_fill_stat(mdc, dentry, dirent);
+                                        }
+
                                 }
-
                         }
-                }
 
-                list_add_tail(&dirent->list, &entries->list);
-                (*filled) += gf_dirent_size(dentry->d_name);
+                        list_add_tail(&dirent->list, &entries->list);
+                        (*filled) += gf_dirent_size(dentry->d_name);
+
+                        if (*filled >= size)
+                                break;
+                }
 
                 if (*filled >= size)
                         break;
@@ -2703,14 +2768,20 @@ static struct mdc_dentry*
 mdc_dentry_update(struct md_cache *mdc, gf_dirent_t *dirent)
 {
         struct mdc_dentry *dentry = NULL;
+        uint32_t           gfid_hash;
+
+        gfid_hash = mdc_dentry_hash_gfid(dirent->d_stat.ia_gfid);
 
         LOCK (&mdc->lock);
-        list_for_each_entry (dentry, &mdc->dentry_list, list) {
+        list_for_each_entry (dentry, &mdc->dentry_hash[gfid_hash], list) {
                 if (!strcmp(dentry->d_name, dirent->d_name)) {
                         UNLOCK (&mdc->lock);
                         return dentry;
                 }
         }
+
+        if (!mdc->filling)
+                mdc->filling = _gf_true;
         UNLOCK (&mdc->lock);
 
         return mdc_dentry_insert(mdc, dirent->d_name, dirent->d_stat.ia_gfid);
