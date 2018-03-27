@@ -57,12 +57,12 @@ class SambaCtl:
                 pass
 
         def smb_user_add(self, user, passwd):
-                cmd = "echo -e \"" + passwd + "\n" + passwd + "\n\"" + " | pdbedit -a -u " + user
+                cmd = "echo -e \"" + passwd + "\n" + passwd + "\n\"" + " | smbpasswd -a " + user
                 ret, out = commands.getstatusoutput(cmd)
                 return ret, out
 
         def smb_user_del(self, user):
-                cmd = "pdbedit -x -u " + user
+                cmd = "smbpasswd -x " + user
                 ret, out = commands.getstatusoutput(cmd)
                 return ret, out
 
@@ -107,13 +107,13 @@ def samba_ctl_config_samba(ugrecords):
         sambactl = SambaCtl()
         for record in ugrecords:
                 sambactl.smb_user_add(record.user, record.passwd)
-        sambactl.smb_reconfig()
+#        sambactl.smb_reconfig()
 
 def samba_ctl_drop_samba(ugrecords):
         sambactl = SambaCtl()
         for record in ugrecords:
                 sambactl.smb_user_del(record.user)
-        sambactl.smb_reconfig()
+#        sambactl.smb_reconfig()
 
 def samba_ctl_push(filetopush):
 	groups, ugrecords = extract_ugdata(filetopush)
@@ -192,7 +192,7 @@ if __name__ == '__main__':
                 else:
                         print "Unknown User Operation"
                         sys.exit(1)
-                sambaCtl.smb_reconfig()
+#                sambaCtl.smb_reconfig()
         elif args.subcommand == "group":
                 if args.groupop == "add":
                         localCtl.group_add(args.group)
