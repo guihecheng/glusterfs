@@ -33,7 +33,7 @@ class GlfsSSH:
                 try:
                         shutil.copyfile(self.pem_key_path + ".pub", os.path.join(FILE_DESTINATION, ".keys", "%s_secret.pem.pub" % self.node_uuid))
                 except (IOError, OSError) as e:
-                        fail("Failed to copy public key to %s: %s" % os.path.join(FILE_DESTINATION, ".keys"), e, logger=self.logger)
+                        fail("Failed to copy public key to %s: %s" % (os.path.join(FILE_DESTINATION, ".keys"), e), logger=self.logger)
 
         def auth_nodes(self):
                 cmd = ["gluster", "system::", "copy", "file", "/gluster_usergroup_adm/.keys/%s.pub" % os.path.basename(self.pem_key_path)]
@@ -66,7 +66,6 @@ class GlfsSSH:
                         execute(cmd, exit_msg="Failed to copy file, please ensure %s has your file" % FILE_DESTINATION, logger=self.logger)
                 except KeyboardInterrupt:
                         sys.exit(2)
-                pass
 
         def ssh_recv_ret(self):
                 pass
@@ -90,6 +89,10 @@ def run_cluster_cmd(cmd, logger):
                         logger.warn("Command %s failed in %s" % (cmd, nodes[num].hostname))
 
 def run_cluster_copy(filetocopy, logger):
-        shutil.copyfile(filetocopy, os.path.join(FILE_DESTINATION, os.path.basename(filetocopy)))
+        try:
+                shutil.copyfile(filetocopy, os.path.join(FILE_DESTINATION, os.path.basename(filetocopy)))
+        except (IOError, OSError) as e:
+                fail("Failed to prepare to-send file %s: %s" % (os.path.join(FILE_DESTINATION, os.path.basename(filetocopy)), e), logger=logger)
+
         glfsSSH = GlfsSSH(self_uuid(), logger)
         glfsSSH.ssh_send_scp(filetocopy)
