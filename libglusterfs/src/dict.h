@@ -60,6 +60,10 @@ typedef struct _data_pair data_pair_t;
                                                                         \
         } while (0)
 
+#define DICT_MAX_FLAGS            256
+#define DICT_FLAG_SET          1
+#define DICT_FLAG_CLEAR        0
+
 struct _data {
         unsigned char  is_static:1;
         unsigned char  is_const:1;
@@ -221,6 +225,10 @@ GF_MUST_CHECK int dict_set_uint32 (dict_t *this, char *key, uint32_t val);
 
 GF_MUST_CHECK int dict_get_uint64 (dict_t *this, char *key, uint64_t *val);
 GF_MUST_CHECK int dict_set_uint64 (dict_t *this, char *key, uint64_t val);
+
+GF_MUST_CHECK int dict_check_flag (dict_t *this, char *key, int flag);
+GF_MUST_CHECK int dict_set_flag (dict_t *this, char *key, int flag);
+GF_MUST_CHECK int dict_clear_flag (dict_t *this, char *key, int flag);
 
 GF_MUST_CHECK int dict_get_double (dict_t *this, char *key, double *val);
 GF_MUST_CHECK int dict_set_double (dict_t *this, char *key, double val);

@@ -46,7 +46,7 @@
  */
 
 #define GLFS_QUOTA_BASE          GLFS_MSGID_COMP_QUOTA
-#define GLFS_NUM_MESSAGES        23
+#define GLFS_NUM_MESSAGES        25
 #define GLFS_MSGID_END     (GLFS_QUOTA_BASE + GLFS_NUM_MESSAGES + 1)
 /* Messaged with message IDs */
 #define glfs_msg_start_x GLFS_QUOTA_BASE, "Invalid: Start of messages"
@@ -239,6 +239,23 @@
  */
 
 #define Q_MSG_RPC_SUBMIT_FAILED     (GLFS_QUOTA_BASE + 23)
+
+/*!
+ * @messageid 120024
+ * @diagnosis
+ * @recommendedaction
+ */
+
+#define Q_MSG_ENFORCEMENT_SKIPPED     (GLFS_QUOTA_BASE + 24)
+
+/*!
+ * @messageid 120025
+ * @diagnosis
+ * @recommendedaction
+ */
+
+#define Q_MSG_INTERNAL_FOP_KEY_MISSING    (GLFS_QUOTA_BASE + 25)
+
 
 /*------------*/
 #define glfs_msg_end_x GLFS_MSGID_END, "Invalid: End of messages"
