@@ -6,6 +6,6 @@ gluster_usergroup_adm_SCRIPTS = samba-ctl.py
 
 gluster_usergroup_adm_DATA = ugadm.conf
 
-EXTRA_DIST = ugdata.example
+EXTRA_DIST = samba-ctl.py data.py ugadm.conf ugdata.example
 
 CLEANFILES =

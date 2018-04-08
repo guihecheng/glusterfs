@@ -1371,6 +1371,8 @@ exit 0
             %attr(0644,-,-) %{_sharedstatedir}/glusterd/groups/nl-cache
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/glusterfind
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/glusterfind/.keys
+       %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/gluster_usergroup_adm
+       %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/gluster_usergroup_adm/.keys
 %ghost %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/glustershd
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1
@@ -1434,6 +1436,8 @@ exit 0
 # Incrementalapi
      %{_libexecdir}/glusterfs/glusterfind
 %{_bindir}/glusterfind
+     %{_libexecdir}/glusterfs/gluster_usergroup_adm
+%{_bindir}/gluster_usergroup_adm
      %{_libexecdir}/glusterfs/peer_add_secret_pub
 
 %if ( 0%{?_with_firewalld:1} )
