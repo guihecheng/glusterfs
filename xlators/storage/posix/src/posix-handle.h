@@ -285,4 +285,7 @@ int posix_create_link_if_gfid_exists (xlator_t *this, uuid_t gfid,
 
 int
 posix_handle_trash_init (xlator_t *this);
+
+void
+posix_disk_space_check (xlator_t *this);
 #endif /* !_POSIX_HANDLE_H */
