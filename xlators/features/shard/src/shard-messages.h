@@ -40,7 +40,7 @@
  */
 
 #define GLFS_COMP_BASE_SHARD      GLFS_MSGID_COMP_SHARD
-#define GLFS_NUM_MESSAGES         20
+#define GLFS_NUM_MESSAGES         22
 #define GLFS_MSGID_END          (GLFS_COMP_BASE_SHARD + GLFS_NUM_MESSAGES + 1)
 
 #define glfs_msg_start_x GLFS_COMP_BASE_SHARD, "Invalid: Start of messages"
@@ -58,7 +58,7 @@
  * @diagnosis
  * @recommendedaction
  */
-#define SHARD_MSG_DICT_SET_FAILED                     (GLFS_COMP_BASE_SHARD + 2)
+#define SHARD_MSG_DICT_OP_FAILED                     (GLFS_COMP_BASE_SHARD + 2)
 
 
 /*!
@@ -193,6 +193,20 @@
  * @recommendedaction
 */
 #define SHARD_MSG_FOP_FAILED                         (GLFS_COMP_BASE_SHARD + 20)
+
+/*!
+ * @messageid 133021
+ * @diagnosis
+ * @recommendedaction
+*/
+#define SHARD_MSG_SHARDS_DELETION_FAILED             (GLFS_COMP_BASE_SHARD + 21)
+
+/*!
+ * @messageid 133022
+ * @diagnosis
+ * @recommendedaction
+*/
+#define SHARD_MSG_SHARDS_DELETION_COMPLETED          (GLFS_COMP_BASE_SHARD + 22)
 
 #define glfs_msg_end_x GLFS_MSGID_END, "Invalid: End of messages"
 #endif /* !_SHARD_MESSAGES_H_ */
