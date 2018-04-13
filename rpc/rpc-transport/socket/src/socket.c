@@ -4613,6 +4613,13 @@ struct volume_options options[] = {
           .min   = GF_MIN_SOCKET_WINDOW_SIZE,
           .max   = GF_MAX_SOCKET_WINDOW_SIZE
         },
+        { .key   = {"transport.listen-backlog"},
+          .type  = GF_OPTION_TYPE_SIZET,
+          .description = "This option uses the value of backlog argument that "
+                         "defines the maximum length to which the queue of "
+                         "pending connections for socket fd may grow.",
+          .default_value = "1024",
+        },
         { .key   = {"transport.tcp-user-timeout"},
           .type  = GF_OPTION_TYPE_INT,
           .default_value = "0"
