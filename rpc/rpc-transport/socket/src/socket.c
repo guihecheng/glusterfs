@@ -2746,6 +2746,9 @@ socket_server_event_handler (int fd, int idx, int gen, void *data,
         if (poll_in) {
                 new_sock = accept (priv->sock, SA (&new_sockaddr), &addrlen);
 
+                if (ctx)
+                        event_handled (ctx->event_pool, fd, idx, gen);
+
                 if (new_sock == -1) {
                         gf_log (this->name, GF_LOG_WARNING,
                                 "accept on %d failed (%s)",
@@ -2968,8 +2971,6 @@ socket_server_event_handler (int fd, int idx, int gen, void *data,
                 }
         }
 out:
-        event_handled (ctx->event_pool, fd, idx, gen);
-
         if (cname && (cname != this->ssl_name)) {
                 GF_FREE(cname);
         }
