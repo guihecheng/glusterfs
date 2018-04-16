@@ -1523,7 +1523,6 @@ exit 0
             %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/add-brick/pre/S28Quota-enable-root-xattr-heal.sh
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/create
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/create/post
-            %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/create/post/S10selinux-label-brick.sh
 %ghost %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/create/pre
 %ghost %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/copy-file
 %ghost %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/copy-file/post
@@ -1532,7 +1531,6 @@ exit 0
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/delete/post
                             %{_sharedstatedir}/glusterd/hooks/1/delete/post/S57glusterfind-delete-post
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/delete/pre
-            %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/delete/pre/S10selinux-del-fcontext.sh
 %ghost %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/remove-brick
 %ghost %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/remove-brick/post
 %ghost %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/hooks/1/remove-brick/pre
@@ -2157,6 +2155,9 @@ fi
 %endif
 
 %changelog
+* Wed Apr 18 2018 Atin Mukherjee  <amukherj@redhat.com>
+- Revert SELinux hooks (#1565962)
+
 * Thu Feb 22 2018 Kotresh HR <khiremat@redhat.com>
 - Added util-linux as dependency to georeplication rpm (#1544382)
 
