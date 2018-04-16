@@ -3236,7 +3236,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key         = VKEY_FEATURES_SELINUX,
           .voltype     = "features/selinux",
           .type        = NO_DOC,
-          .value       = "on",
+          .value       = "off",
           .op_version  = GD_OP_VERSION_3_11_0,
           .description = "Convert security.selinux xattrs to "
                          "trusted.gluster.selinux on the bricks. Recommended "
