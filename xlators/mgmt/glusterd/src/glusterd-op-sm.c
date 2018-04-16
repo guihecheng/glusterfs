@@ -85,7 +85,7 @@ glusterd_all_vol_opts valid_all_vol_opts[] = {
          * TBD: Discuss the default value for this. Maybe this should be a
          * dynamic value depending on the memory specifications per node */
         { GLUSTERD_BRICKMUX_LIMIT_KEY,          "0"},
-        { GLUSTERD_LOCALTIME_LOGGING_KEY,       "disable"},
+        /*{ GLUSTERD_LOCALTIME_LOGGING_KEY,       "disable"},*/
         { NULL },
 };
 

@@ -3567,12 +3567,12 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .op_version = GD_OP_VERSION_3_11_0,
           .flags      = OPT_FLAG_CLIENT_OPT
         },
-        { .key         = GLUSTERD_LOCALTIME_LOGGING_KEY,
+        /*{ .key         = GLUSTERD_LOCALTIME_LOGGING_KEY,
           .voltype     = "mgmt/glusterd",
           .type        = GLOBAL_DOC,
           .op_version  = GD_OP_VERSION_3_12_0,
           .validate_fn = validate_boolean
-        },
+        },*/
         { .key        = "disperse.parallel-writes",
           .voltype    = "cluster/disperse",
           .type       = NO_DOC,
