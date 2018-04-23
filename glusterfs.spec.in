@@ -865,6 +865,10 @@ find ./tests ./run-tests.sh -type f | cpio -pd %{buildroot}%{_prefix}/share/glus
 install -p -m 0744 -D extras/command-completion/gluster.bash \
     %{buildroot}%{_sysconfdir}/bash_completion.d/gluster
 
+%if ( 0%{?_build_server} )
+echo "RHGS 3.4.0" > %{buildroot}%{_datadir}/glusterfs/release
+%endif
+
 %clean
 rm -rf %{buildroot}
 
@@ -1566,6 +1570,7 @@ exit 0
 
 # Extra utility script
 %dir %{_libexecdir}/glusterfs
+     %{_datadir}/glusterfs/release
 %dir %{_datadir}/glusterfs/scripts
      %{_datadir}/glusterfs/scripts/stop-all-gluster-processes.sh
 %if ( 0%{?_with_systemd:1} )
@@ -2155,6 +2160,9 @@ fi
 %endif
 
 %changelog
+* Mon Apr 23 2018 Milind Changire <mchangir@redhat.com>
+- make RHGS release number available in /usr/share/glusterfs/release (#1570514)
+
 * Wed Apr 18 2018 Atin Mukherjee  <amukherj@redhat.com>
 - Revert SELinux hooks (#1565962)
 
