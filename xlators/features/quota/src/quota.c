@@ -5259,7 +5259,9 @@ fini (xlator_t *this)
         priv->rpc_clnt = NULL;
         this->private = NULL;
         if (rpc) {
-                cnt = GF_ATOMIC_GET (rpc->refcount);
+                pthread_mutex_lock (&rpc->lock);
+                cnt = rpc->refcount;
+                pthread_mutex_unlock (&rpc->lock);
                 for (i = 0; i < cnt; i++)
                         rpc_clnt_unref (rpc);
         }
