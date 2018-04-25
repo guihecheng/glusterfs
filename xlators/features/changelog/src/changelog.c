@@ -2102,7 +2102,6 @@ notify (xlator_t *this, int event, void *data, ...)
         int                     ret             = 0;
         int                     ret1            = 0;
         struct list_head        queue           = {0, };
-        int                     i               = 0;
 
         INIT_LIST_HEAD (&queue);
 
