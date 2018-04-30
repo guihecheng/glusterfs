@@ -834,15 +834,18 @@ pre_setup (gf_boolean_t run_setup, char **op_errstr)
 {
         int    ret = 0;
 
-        if (check_host_list()) {
-                ret = setup_cluster(run_setup);
-                if (ret == -1)
-                        gf_asprintf (op_errstr, "Failed to set up HA "
-                                     "config for NFS-Ganesha. "
-                                     "Please check the log file for details");
-        } else
-		ret = -1;
-
+        if (run_setup) {
+                if (!check_host_list()) {
+                        gf_asprintf (op_errstr, "Running nfs-ganesha setup command "
+                                     "from node which is not part of ganesha cluster");
+                        return -1;
+                }
+        }
+        ret = setup_cluster(run_setup);
+        if (ret == -1)
+                gf_asprintf (op_errstr, "Failed to set up HA "
+                             "config for NFS-Ganesha. "
+                             "Please check the log file for details");
         return ret;
 }
 
