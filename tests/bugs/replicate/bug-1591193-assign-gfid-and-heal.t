@@ -108,10 +108,7 @@ TEST stat $M0/file2
 
 # Though file is created on all 3 bricks, lookup will fail as arbiter blames the
 # other 2 bricks and ariter is not 'readable'.
-# TEST ! stat $M0/file3
-# But the checks for failing lookups when quorum is not met is not yet there in
-# rhgs-3.4.0, so stat will succeed.
-TEST  stat $M0/file3
+TEST ! stat $M0/file3
 
 # Launch index heal to complete any pending data/metadata heals.
 TEST $CLI volume heal $V0

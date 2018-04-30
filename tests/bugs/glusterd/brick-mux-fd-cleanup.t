@@ -76,3 +76,6 @@ EXPECT_WITHIN $UMOUNT_TIMEOUT "Y" force_umount $M0
 EXPECT_WITHIN $UMOUNT_TIMEOUT "Y" force_umount $M1
 
 cleanup
+
+#delay-gen in not present downstream
+#G_TESTDEF_TEST_STATUS_CENTOS6=BAD_TEST,BUG=000000

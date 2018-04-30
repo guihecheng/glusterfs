@@ -78,7 +78,7 @@ function links_across_directories()
     TEST [ $LINES = 2 ]
 
     for i in $(seq 1  2); do
-        HL=`getfattr -m "trusted.pgfid.*" -de hex $B0/brick/dir$i/file$i 2>&1 | grep "trusted.pgfid" | cut -d$'\n' -f$i | cut -d'=' -f2`
+        HL=`getfattr -m "trusted.pgfid.*" -de hex $B0/brick/dir$i/file$i 2>&1 | grep "trusted.pgfid" | awk -v n=$i 'NR==n' | cut -d'=' -f2`
         TEST_IN_LOOP [ $HL = "0x00000001" ]
     done
 

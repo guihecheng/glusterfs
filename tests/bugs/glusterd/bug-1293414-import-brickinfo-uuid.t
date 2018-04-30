@@ -24,6 +24,7 @@ EXPECT_WITHIN $PROBE_TIMEOUT 3 peer_count
 TEST ! $CLI_3 peer detach $H1
 TEST ! $CLI_3 peer detach $H2
 
+EXPECT_WITHIN $PROBE_TIMEOUT 3 peer_count
 
 # peer not hosting bricks should be detachable
 TEST $CLI_3 peer detach $H4
