@@ -261,6 +261,10 @@ start_glusterfs ()
         cmd_line=$(echo "$cmd_line --xlator-option=$xlator_option");
     fi
 
+    if [ -n "$dump_fuse" ]; then
+        cmd_line=$(echo "$cmd_line --dump-fuse=$dump_fuse");
+    fi
+
     # if trasnport type is specified, we have to append it to
     # volume name, so that it fetches the right client vol file
 
@@ -485,6 +489,9 @@ with_options()
             ;;
         "use-readdirp")
             use_readdirp=$value
+            ;;
+        "dump-fuse")
+            dump_fuse=$value
             ;;
         "event-history")
             event_history=$value
