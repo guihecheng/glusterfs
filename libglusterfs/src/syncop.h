@@ -562,4 +562,9 @@ syncop_setactivelk (xlator_t *subvol, loc_t *loc,
                      lock_migration_info_t *locklist,  dict_t *xdata_in,
                      dict_t **xdata_out);
 
+int
+syncop_entrylk (xlator_t *subvol, const char *volume, loc_t *loc,
+                const char *basename, entrylk_cmd cmd, entrylk_type type,
+                dict_t *xdata_in, dict_t **xdata_out);
+
 #endif /* _SYNCOP_H */
