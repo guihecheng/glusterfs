@@ -208,9 +208,6 @@ server_submit_reply (call_frame_t *frame, rpcsvc_request_t *req, void *arg,
 
         ret = 0;
 ret:
-        if (state)
-                free_state (state);
-
         if (client)
                 gf_client_unref (client);
 
@@ -219,6 +216,9 @@ ret:
 
         if (new_iobref)
                 iobref_unref (iobref);
+
+        if (state)
+                free_state (state);
 
         return ret;
 }
