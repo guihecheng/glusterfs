@@ -4,6 +4,7 @@
 typedef struct {
 	gf_boolean_t dir_worm_on;
 	gf_boolean_t dir_worm_files_deletable;
+	gf_boolean_t dir_worm_files_editable;
 } dir_worm_priv_t;
 
 typedef struct {

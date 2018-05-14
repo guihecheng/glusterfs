@@ -394,11 +394,21 @@ dir_worm_state_transition (xlator_t *this, gf_boolean_t fop_with_fd,
                 dir_worm_state_finish (this, fop_with_fd, file_ptr,
                                        &reten_state, &stbuf);
         }
-        if (reten_state.worm && !reten_state.retain &&
-                priv->dir_worm_files_deletable && op == GF_FOP_UNLINK) {
+        if (reten_state.worm && !reten_state.retain) {
+            if (priv->dir_worm_files_deletable && op == GF_FOP_UNLINK) {
                 op_errno = 0;
                 goto out;
+            }
+            if (priv->dir_worm_files_editable &&
+                (op == GF_FOP_WRITE ||
+                 op == GF_FOP_TRUNCATE ||
+                 op == GF_FOP_FTRUNCATE ||
+                 op == GF_FOP_LINK)) {
+                op_errno = 0;
+                goto out;
+            }
         }
+
 
 out:
         if (dict)

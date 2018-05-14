@@ -564,6 +564,8 @@ init (xlator_t *this)
                         bool, out);
         GF_OPTION_INIT ("dir-worm-files-deletable", priv->dir_worm_files_deletable,
                         bool, out);
+        GF_OPTION_INIT ("dir-worm-files-editable", priv->dir_worm_files_editable,
+                        bool, out);
 
         ret = 0;
 out:
@@ -582,6 +584,8 @@ reconfigure (xlator_t *this, dict_t *options)
         GF_OPTION_RECONF ("dir-worm", priv->dir_worm_on,
                           options, bool, out);
         GF_OPTION_RECONF ("dir-worm-files-deletable", priv->dir_worm_files_deletable,
+                          options, bool, out);
+        GF_OPTION_RECONF ("dir-worm-files-editable", priv->dir_worm_files_editable,
                           options, bool, out);
         ret = 0;
 out:
@@ -636,6 +640,13 @@ struct volume_options options[] = {
           .flags = OPT_FLAG_SETTABLE,
           .description = "When \"off\", doesn't allow the Worm files"
                          "to be deleted. It is turned \"on\" by default."
+        },
+        { .key = {"dir-worm-files-editable"},
+          .type = GF_OPTION_TYPE_BOOL,
+          .default_value = "on",
+          /*.validate_fn = validate_boolean,*/
+          .description = "When \"off\", doesn't allow the Worm files"
+                         "to be modified. It is turned \"off\" by default."
         },
 	{ .key  = {NULL} },
 };

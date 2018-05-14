@@ -2886,6 +2886,14 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .op_version  = GD_OP_VERSION_3_8_4,
           .flags       = VOLOPT_FLAG_CLIENT_OPT | VOLOPT_FLAG_XLATOR_OPT
         },
+        { .key         = "features.dir-worm-files-editable",
+          .voltype     = "features/dir-worm",
+          .option      = "dir-worm-files-editable",
+          .value       = "on",
+          .validate_fn = validate_boolean,
+          .op_version  = GD_OP_VERSION_3_8_4,
+          .flags       = OPT_FLAG_CLIENT_OPT | OPT_FLAG_XLATOR_OPT
+        },
         { .key         = "storage.linux-aio",
           .voltype     = "storage/posix",
           .op_version  = 1
