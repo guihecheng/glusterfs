@@ -1331,6 +1331,7 @@ int32_t ec_dump_private(xlator_t *this)
     gf_proc_dump_write("healers", "%d", ec->healers);
     gf_proc_dump_write("heal-waiters", "%d", ec->heal_waiters);
     gf_proc_dump_write("read-policy", "%s", ec_read_policies[ec->read_policy]);
+    gf_proc_dump_write("parallel-writes", "%d", ec->parallel_writes);
 
     return 0;
 }
