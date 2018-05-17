@@ -39,6 +39,43 @@ static int format_brickname(char *);
 int pl_lockinfo_get_brickname (xlator_t *, inode_t *, int32_t *);
 static int fetch_pathinfo(xlator_t *, inode_t *, int32_t *, char **);
 
+#define PL_STACK_UNWIND_AND_FREE(__local, fop, frame, op_ret, params ...)   \
+        do {                                                                \
+                frame->local = NULL;                                        \
+                STACK_UNWIND_STRICT (fop, frame, op_ret, params);           \
+                if (__local) {                                              \
+                        if (__local->inodelk_dom_count_req)                 \
+                                data_unref (__local->inodelk_dom_count_req);\
+                        loc_wipe (&__local->loc[0]);                        \
+                        loc_wipe (&__local->loc[1]);                        \
+                        if (__local->fd)                                    \
+                                fd_unref (__local->fd);                     \
+                        mem_put (__local);                                  \
+                }                                                           \
+        } while (0)
+
+/*
+ * The client is always requesting data, but older
+ * servers were not returning it. Newer ones are, so
+ * the client is receiving a mix of NULL and non-NULL
+ * xdata in the answers when bricks are of different
+ * versions. This triggers a bug in older clients.
+ * To prevent that, we avoid returning extra xdata to
+ * older clients (making the newer brick to behave as
+ * an old brick).
+ */
+#define PL_STACK_UNWIND_FOR_CLIENT(fop, xdata, frame, op_ret, params ...)     \
+        do {                                                                  \
+                pl_local_t *__local = NULL;                                   \
+                if (frame->root->client &&                                    \
+                    (frame->root->client->opversion < GD_OP_VERSION_3_12_0)) {\
+                        __local = frame->local;                               \
+                        PL_STACK_UNWIND_AND_FREE (__local, fop, frame, op_ret, params);\
+                } else {                                                      \
+                        PL_STACK_UNWIND (fop, xdata, frame, op_ret, params);  \
+                }                                                             \
+        } while (0)
+
 #define PL_STACK_UNWIND(fop, xdata, frame, op_ret, params ...)          \
         do {                                                            \
                 pl_local_t *__local = NULL;                             \
@@ -68,17 +105,7 @@ static int fetch_pathinfo(xlator_t *, inode_t *, int32_t *, char **);
                                 }                                       \
                         }                                               \
                 }                                                       \
-                frame->local = NULL;                                    \
-                STACK_UNWIND_STRICT (fop, frame, op_ret, params);       \
-                if (__local) {                                          \
-                        if (__local->inodelk_dom_count_req)             \
-                                data_unref (__local->inodelk_dom_count_req);\
-                        loc_wipe (&__local->loc[0]);                    \
-                        loc_wipe (&__local->loc[1]);                    \
-                        if (__local->fd)                                \
-                                fd_unref (__local->fd);                 \
-                        mem_put (__local);                              \
-                }                                                       \
+                PL_STACK_UNWIND_AND_FREE (__local, fop, frame, op_ret, params);\
                 if (__unref)                                            \
                         dict_unref (__unref);                           \
         } while (0)
@@ -1492,7 +1519,8 @@ int32_t
 pl_fsetxattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                   int32_t op_ret, int32_t op_errno, dict_t *xdata)
 {
-        PL_STACK_UNWIND (fsetxattr, xdata, frame, op_ret, op_errno, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (fsetxattr, xdata, frame,
+                                    op_ret, op_errno, xdata);
         return 0;
 }
 
@@ -1564,12 +1592,8 @@ pl_flush_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
               int32_t op_ret, int32_t op_errno, dict_t *xdata)
 {
 
-        if (frame->root->client &&
-            (frame->root->client->opversion < GD_OP_VERSION_3_12_0)) {
-                STACK_UNWIND_STRICT (flush, frame, op_ret, op_errno, xdata);
-        } else {
-                PL_STACK_UNWIND (flush, xdata, frame, op_ret, op_errno, xdata);
-        }
+        PL_STACK_UNWIND_FOR_CLIENT (flush, xdata, frame,
+                                    op_ret, op_errno, xdata);
 
         return 0;
 }
@@ -3081,7 +3105,8 @@ int32_t
 pl_setxattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                  int32_t op_ret, int32_t op_errno, dict_t *xdata)
 {
-        PL_STACK_UNWIND (setxattr, xdata, frame, op_ret, op_errno, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (setxattr, xdata, frame,
+                                    op_ret, op_errno, xdata);
         return 0;
 }
 
@@ -3107,8 +3132,8 @@ pl_setxattr (call_frame_t *frame, xlator_t *this,
                 goto usual;
         }
 
-        PL_STACK_UNWIND (setxattr, xdata_rsp, frame, op_ret, op_errno,
-                         xdata_rsp);
+        PL_STACK_UNWIND_FOR_CLIENT (setxattr, xdata_rsp, frame,
+                                    op_ret, op_errno, xdata_rsp);
         return 0;
 
 usual:
@@ -3937,8 +3962,8 @@ pl_mkdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
               struct iatt *buf, struct iatt *preparent,
               struct iatt *postparent, dict_t *xdata)
 {
-        PL_STACK_UNWIND (mkdir, xdata, frame, op_ret, op_errno,
-                         inode, buf, preparent, postparent, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (mkdir, xdata, frame, op_ret, op_errno,
+                                    inode, buf, preparent, postparent, xdata);
         return 0;
 }
 
@@ -3958,7 +3983,8 @@ pl_stat_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
              int32_t op_ret, int32_t op_errno, struct iatt *buf,
              dict_t *xdata)
 {
-        PL_STACK_UNWIND (stat, xdata, frame, op_ret, op_errno, buf, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (stat, xdata, frame,
+                                    op_ret, op_errno, buf, xdata);
         return 0;
 }
 
@@ -3978,8 +4004,8 @@ pl_mknod_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
               struct iatt *buf, struct iatt *preparent,
               struct iatt *postparent, dict_t *xdata)
 {
-        PL_STACK_UNWIND (mknod, xdata, frame, op_ret, op_errno,
-                         inode, buf, preparent, postparent, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (mknod, xdata, frame, op_ret, op_errno,
+                                    inode, buf, preparent, postparent, xdata);
         return 0;
 }
 
@@ -4000,8 +4026,8 @@ pl_rmdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
               int32_t op_ret, int32_t op_errno, struct iatt *preparent,
               struct iatt *postparent, dict_t *xdata)
 {
-        PL_STACK_UNWIND (rmdir, xdata, frame, op_ret, op_errno,
-                         preparent, postparent, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (rmdir, xdata, frame, op_ret, op_errno,
+                                    preparent, postparent, xdata);
         return 0;
 }
 
@@ -4022,8 +4048,8 @@ pl_symlink_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 struct iatt *buf, struct iatt *preparent,
                 struct iatt *postparent, dict_t *xdata)
 {
-        PL_STACK_UNWIND (symlink, xdata, frame, op_ret, op_errno,
-                         inode, buf, preparent, postparent, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (symlink, xdata, frame, op_ret, op_errno,
+                                    inode, buf, preparent, postparent, xdata);
         return 0;
 }
 
@@ -4045,8 +4071,8 @@ pl_link_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
              struct iatt *buf, struct iatt *preparent,
              struct iatt *postparent, dict_t *xdata)
 {
-        PL_STACK_UNWIND (link, xdata, frame, op_ret, op_errno,
-                         inode, buf, preparent, postparent, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (link, xdata, frame, op_ret, op_errno,
+                                    inode, buf, preparent, postparent, xdata);
         return 0;
 }
 
@@ -4066,8 +4092,8 @@ pl_fsync_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
               struct iatt *postbuf,
               dict_t *xdata)
 {
-        PL_STACK_UNWIND (fsync, xdata, frame, op_ret, op_errno,
-                         prebuf, postbuf, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (fsync, xdata, frame, op_ret, op_errno,
+                                    prebuf, postbuf, xdata);
         return 0;
 }
 
@@ -4086,8 +4112,8 @@ pl_readdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 int32_t op_ret, int32_t op_errno, gf_dirent_t *entries,
                 dict_t *xdata)
 {
-        PL_STACK_UNWIND (readdir, xdata, frame, op_ret, op_errno,
-                         entries, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (readdir, xdata, frame, op_ret, op_errno,
+                                    entries, xdata);
         return 0;
 }
 
@@ -4108,7 +4134,8 @@ int32_t
 pl_fsyncdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                  int32_t op_ret, int32_t op_errno, dict_t *xdata)
 {
-        PL_STACK_UNWIND (fsyncdir, xdata, frame, op_ret, op_errno, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (fsyncdir, xdata, frame,
+                                    op_ret, op_errno, xdata);
         return 0;
 }
 
@@ -4128,7 +4155,8 @@ pl_statfs_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                int32_t op_ret, int32_t op_errno, struct statvfs *buf,
                dict_t *xdata)
 {
-        PL_STACK_UNWIND (statfs, xdata, frame, op_ret, op_errno, buf, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (statfs, xdata, frame,
+                                    op_ret, op_errno, buf, xdata);
         return 0;
 }
 
@@ -4146,7 +4174,8 @@ int32_t
 pl_removexattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                     int32_t op_ret, int32_t op_errno, dict_t *xdata)
 {
-        PL_STACK_UNWIND (removexattr, xdata, frame, op_ret, op_errno, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (removexattr, xdata, frame,
+                                    op_ret, op_errno, xdata);
         return 0;
 }
 
@@ -4164,7 +4193,8 @@ int32_t
 pl_fremovexattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                      int32_t op_ret, int32_t op_errno, dict_t *xdata)
 {
-        PL_STACK_UNWIND (fremovexattr, xdata, frame, op_ret, op_errno, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (fremovexattr, xdata, frame,
+                                    op_ret, op_errno, xdata);
         return 0;
 }
 
@@ -4183,8 +4213,8 @@ pl_rchecksum_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                   int32_t op_ret, int32_t op_errno, uint32_t weak_cksum,
                   uint8_t *strong_cksum, dict_t *xdata)
 {
-        PL_STACK_UNWIND (rchecksum, xdata, frame, op_ret, op_errno,
-                         weak_cksum, strong_cksum, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (rchecksum, xdata, frame, op_ret, op_errno,
+                                    weak_cksum, strong_cksum, xdata);
         return 0;
 }
 
@@ -4204,7 +4234,8 @@ pl_xattrop_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 int32_t op_ret, int32_t op_errno, dict_t *dict,
                 dict_t *xdata)
 {
-        PL_STACK_UNWIND (xattrop, xdata, frame, op_ret, op_errno, dict, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (xattrop, xdata, frame,
+                                    op_ret, op_errno, dict, xdata);
         return 0;
 }
 
@@ -4225,7 +4256,8 @@ pl_fxattrop_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                  int32_t op_ret, int32_t op_errno, dict_t *dict,
                  dict_t *xdata)
 {
-        PL_STACK_UNWIND (fxattrop, xdata, frame, op_ret, op_errno, dict, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (fxattrop, xdata, frame,
+                                    op_ret, op_errno, dict, xdata);
         return 0;
 }
 
@@ -4247,8 +4279,8 @@ pl_setattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 struct iatt *statpost,
                 dict_t *xdata)
 {
-        PL_STACK_UNWIND (setattr, xdata, frame, op_ret, op_errno,
-                         statpre, statpost, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (setattr, xdata, frame, op_ret, op_errno,
+                                    statpre, statpost, xdata);
         return 0;
 }
 
@@ -4267,8 +4299,8 @@ pl_fsetattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                  int32_t op_ret, int32_t op_errno, struct iatt *statpre,
                  struct iatt *statpost, dict_t *xdata)
 {
-        PL_STACK_UNWIND (fsetattr, xdata, frame, op_ret, op_errno,
-                         statpre, statpost, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (fsetattr, xdata, frame, op_ret, op_errno,
+                                    statpre, statpost, xdata);
         return 0;
 }
 
@@ -4287,8 +4319,8 @@ pl_fallocate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                   int32_t op_ret, int32_t op_errno, struct iatt *pre,
                   struct iatt *post, dict_t *xdata)
 {
-        PL_STACK_UNWIND (fallocate, xdata, frame, op_ret, op_errno,
-                         pre, post, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (fallocate, xdata, frame, op_ret, op_errno,
+                                    pre, post, xdata);
         return 0;
 }
 
@@ -4309,8 +4341,8 @@ pl_readlink_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                  int32_t op_ret, int32_t op_errno, const char *path,
                  struct iatt *buf, dict_t *xdata)
 {
-        PL_STACK_UNWIND (readlink, xdata, frame, op_ret, op_errno,
-                         path, buf, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (readlink, xdata, frame, op_ret, op_errno,
+                                    path, buf, xdata);
         return 0;
 }
 
@@ -4328,7 +4360,8 @@ int32_t
 pl_access_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                int32_t op_ret, int32_t op_errno, dict_t *xdata)
 {
-        PL_STACK_UNWIND (access, xdata, frame, op_ret, op_errno, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (access, xdata, frame,
+                                    op_ret, op_errno, xdata);
         return 0;
 }
 
@@ -4347,7 +4380,8 @@ pl_seek_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
              int32_t op_ret, int32_t op_errno, off_t offset,
              dict_t *xdata)
 {
-        PL_STACK_UNWIND (seek, xdata, frame, op_ret, op_errno, offset, xdata);
+        PL_STACK_UNWIND_FOR_CLIENT (seek, xdata, frame,
+                                    op_ret, op_errno, offset, xdata);
         return 0;
 }
 
