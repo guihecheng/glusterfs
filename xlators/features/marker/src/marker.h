@@ -118,6 +118,8 @@ struct marker_local{
 
         quota_inode_ctx_t    *ctx;
         inode_contribution_t *contri;
+        ug_contribution_t    *contri_u;
+        ug_contribution_t    *contri_g;
 
         int xflag;
         dict_t *xdata;

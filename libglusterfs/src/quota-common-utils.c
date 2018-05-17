@@ -242,4 +242,3 @@ quota_conf_skip_header (int fd)
 {
         return gf_skip_header_section (fd, strlen (QUOTA_CONF_HEADER));
 }
-

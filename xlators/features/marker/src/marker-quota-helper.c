@@ -142,6 +142,8 @@ mq_alloc_inode_ctx ()
         ctx->updation_status = _gf_false;
         LOCK_INIT (&ctx->lock);
         INIT_LIST_HEAD (&ctx->contribution_head);
+        ctx->contri_u = NULL;
+        ctx->contri_g = NULL;
 out:
         return ctx;
 }
@@ -476,4 +478,66 @@ mq_get_contribution_from_loc (xlator_t *this, loc_t *loc)
 
 err:
         return contribution;
+}
+
+static void
+mq_contri_ug_fini (ug_contribution_t *contri_ug)
+{
+        LOCK_DESTROY (&contri_ug->lock);
+        GF_FREE (contri_ug);
+}
+
+ug_contribution_t*
+mq_contri_ug_init (struct iatt *st, gf_boolean_t is_grp)
+{
+        ug_contribution_t *contri_ug   = NULL;
+        int32_t            ret         = 0;
+
+        QUOTA_ALLOC (contri_ug, ug_contribution_t, ret);
+        if (ret == -1)
+                goto out;
+
+        GF_REF_INIT (contri_ug, mq_contri_ug_fini);
+
+        contri_ug->contribution = 0;
+        contri_ug->ugid = is_grp ? st->ia_gid : st->ia_uid;
+
+        LOCK_INIT (&contri_ug->lock);
+
+out:
+        return contri_ug;
+}
+
+int32_t
+mq_set_contribution_ug(xlator_t *this, quota_inode_ctx_t *ctx, struct iatt *st)
+{
+        int32_t            ret              = -1;
+        ug_contribution_t *contri_u         = NULL;
+        ug_contribution_t *contri_g         = NULL;
+
+        if ((ctx == NULL) || (st == NULL))
+                goto out;
+
+        if (st->ia_type != IA_IFREG)
+                goto out;
+
+        LOCK (&ctx->lock);
+        {
+                contri_u =  mq_contri_ug_init (st, _gf_false);
+                if (contri_u == NULL)
+                        goto unlock;
+                contri_g =  mq_contri_ug_init (st, _gf_true);
+                if (contri_g == NULL) {
+                        GF_REF_PUT (contri_u);
+                        goto unlock;
+                }
+                ctx->contri_u = contri_u;
+                ctx->contri_g = contri_g;
+        }
+
+unlock:
+        UNLOCK (&ctx->lock);
+
+out:
+        return ret;
 }

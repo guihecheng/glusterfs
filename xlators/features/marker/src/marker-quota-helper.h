@@ -75,4 +75,10 @@ mq_get_contribution_node (inode_t *, quota_inode_ctx_t *);
 inode_contribution_t *
 mq_get_contribution_from_loc (xlator_t *this, loc_t *loc);
 
+ug_contribution_t*
+mq_contri_ug_init (struct iatt *, gf_boolean_t);
+
+int32_t
+mq_set_contribution_ug(xlator_t *, quota_inode_ctx_t *, struct iatt *);
+
 #endif

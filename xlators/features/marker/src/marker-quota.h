@@ -23,6 +23,9 @@
 #define QUOTA_KEY_MAX 512
 #define READDIR_BUF 4096
 
+#define CONTRIBUTION_U "contri.u"
+#define CONTRIBUTION_G "contri.g"
+
 
 #define QUOTA_STACK_DESTROY(_frame, _this)              \
         do {                                            \
@@ -91,12 +94,54 @@
                 GET_QUOTA_KEY (_this, var, QUOTA_SIZE_KEY, _ret);         \
         }
 
+#define GET_CONTRI_U_KEY(_this, var, _uid, _ret)                          \
+        do {                                                              \
+                char  _tmp_var[QUOTA_KEY_MAX] = {0, };                    \
+                if (_uid >= 0) {                                          \
+                        _ret = snprintf (_tmp_var, QUOTA_KEY_MAX,         \
+                                         QUOTA_XATTR_PREFIX               \
+                                         ".%s.%d." CONTRIBUTION_U,        \
+                                         "quota", _uid);        \
+                } else {                                                  \
+                        _ret = snprintf (_tmp_var, QUOTA_KEY_MAX,         \
+                                         QUOTA_XATTR_PREFIX               \
+                                         ".%s.." CONTRIBUTION_U,          \
+                                         "quota");                        \
+                }                                                         \
+                GET_QUOTA_KEY (_this, var, _tmp_var, _ret);               \
+        } while (0)
+
+#define GET_CONTRI_G_KEY(_this, var, _gid, _ret)                          \
+        do {                                                              \
+                char  _tmp_var[QUOTA_KEY_MAX] = {0, };                    \
+                if (_gid >= 0) {                                          \
+                        _ret = snprintf (_tmp_var, QUOTA_KEY_MAX,         \
+                                         QUOTA_XATTR_PREFIX               \
+                                         ".%s.%d." CONTRIBUTION_G,        \
+                                         "quota", _gid);        \
+                } else {                                                  \
+                        _ret = snprintf (_tmp_var, QUOTA_KEY_MAX,         \
+                                         QUOTA_XATTR_PREFIX               \
+                                         ".%s.." CONTRIBUTION_G,          \
+                                         "quota");                        \
+                }                                                         \
+                GET_QUOTA_KEY (_this, var, _tmp_var, _ret);               \
+        } while (0)
+
 #define QUOTA_SAFE_INCREMENT(lock, var)         \
         do {                                    \
                 LOCK (lock);                    \
                 var ++;                         \
                 UNLOCK (lock);                  \
         } while (0)
+
+struct ug_contribution {
+        int64_t          contribution;
+        int32_t          ugid;
+        gf_lock_t        lock;
+        GF_REF_DECL;
+};
+typedef struct ug_contribution ug_contribution_t;
 
 struct quota_inode_ctx {
         int64_t                size;
@@ -108,6 +153,8 @@ struct quota_inode_ctx {
         gf_boolean_t           dirty_status;
         gf_lock_t              lock;
         struct list_head       contribution_head;
+        ug_contribution_t     *contri_u;
+        ug_contribution_t     *contri_g;
 };
 typedef struct quota_inode_ctx quota_inode_ctx_t;
 

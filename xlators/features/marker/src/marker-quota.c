@@ -842,9 +842,9 @@ int32_t
 mq_get_delta (xlator_t *this, loc_t *loc, quota_meta_t *delta,
               quota_inode_ctx_t *ctx, inode_contribution_t *contribution)
 {
-        int32_t         ret      = -1;
-        quota_meta_t    size     = {0, };
-        quota_meta_t    contri   = {0, };
+        int32_t          ret       = -1;
+        quota_meta_t     size      = {0, };
+        quota_meta_t     contri    = {0, };
 
         GF_VALIDATE_OR_GOTO ("marker", loc, out);
         GF_VALIDATE_OR_GOTO ("marker", loc->inode, out);
@@ -920,16 +920,19 @@ out:
 
 int32_t
 mq_update_contri (xlator_t *this, loc_t *loc, inode_contribution_t *contri,
-                  quota_meta_t *delta)
+                  quota_meta_t *delta, quota_inode_ctx_t *ctx)
 {
-        int32_t              ret                         = -1;
-        char                 contri_key[QUOTA_KEY_MAX]   = {0, };
-        dict_t              *dict                        = NULL;
+        int32_t              ret                           = -1;
+        char                 contri_key[QUOTA_KEY_MAX]     = {0, };
+        char                 contri_u_key[QUOTA_KEY_MAX]   = {0, };
+        char                 contri_g_key[QUOTA_KEY_MAX]   = {0, };
+        dict_t              *dict                          = NULL;
 
         GF_VALIDATE_OR_GOTO ("marker", loc, out);
         GF_VALIDATE_OR_GOTO ("marker", loc->inode, out);
         GF_VALIDATE_OR_GOTO ("marker", delta, out);
         GF_VALIDATE_OR_GOTO ("marker", contri, out);
+        GF_VALIDATE_OR_GOTO ("marker", ctx, out);
 
         if (quota_meta_is_null (delta)) {
                 ret = 0;
@@ -955,6 +958,30 @@ mq_update_contri (xlator_t *this, loc_t *loc, inode_contribution_t *contri,
         if (ret < 0)
                 goto out;
 
+        if (loc->inode->ia_type == IA_IFREG) {
+                GET_CONTRI_U_KEY (this, contri_u_key, ctx->contri_u->ugid, ret);
+                if (ret < 0) {
+                        gf_log (this->name, GF_LOG_ERROR, "get contri_u_key "
+                                "failed for %d", ctx->contri_u->ugid);
+                        goto out;
+                }
+                ret = quota_dict_set_meta (dict, contri_u_key, delta,
+                                           loc->inode->ia_type);
+                if (ret < 0)
+                        goto out;
+
+                GET_CONTRI_G_KEY (this, contri_g_key, ctx->contri_g->ugid, ret);
+                if (ret < 0) {
+                        gf_log (this->name, GF_LOG_ERROR, "get contri_g_key "
+                                "failed for %d", ctx->contri_g->ugid);
+                        goto out;
+                }
+                ret = quota_dict_set_meta (dict, contri_g_key, delta,
+                                           loc->inode->ia_type);
+                if (ret < 0)
+                        goto out;
+        }
+
         ret = syncop_xattrop(FIRST_CHILD(this), loc, GF_XATTROP_ADD_ARRAY64,
                              dict, NULL, NULL, NULL);
         if (ret < 0) {
@@ -969,6 +996,8 @@ mq_update_contri (xlator_t *this, loc_t *loc, inode_contribution_t *contri,
                 contri->contribution += delta->size;
                 contri->file_count += delta->file_count;
                 contri->dir_count += delta->dir_count;
+                ctx->contri_u->contribution += delta->size;
+                ctx->contri_g->contribution += delta->size;
         }
         UNLOCK (&contri->lock);
 
@@ -1246,6 +1275,11 @@ _mq_create_xattrs_txn (xlator_t *this, loc_t *origin_loc, struct iatt *buf,
                         goto out;
                 } else {
                         GF_REF_PUT (contribution);
+                }
+                if (loc.inode->ia_type == IA_IFREG) {
+                        ret = mq_set_contribution_ug(this, ctx, buf);
+                        if (ret < 0)
+                                goto out;
                 }
         }
 
@@ -1628,7 +1662,7 @@ mq_initiate_quota_task (void *opaque)
                         goto out;
                 dirty = _gf_true;
 
-                ret = mq_update_contri (this, &child_loc, contri, &delta);
+                ret = mq_update_contri (this, &child_loc, contri, &delta, ctx);
                 if (ret < 0)
                         goto out;
 
@@ -1637,7 +1671,7 @@ mq_initiate_quota_task (void *opaque)
                         gf_log (this->name, GF_LOG_DEBUG, "rollback "
                                 "contri updation");
                         mq_sub_meta (&delta, NULL);
-                        mq_update_contri (this, &child_loc, contri, &delta);
+                        mq_update_contri (this, &child_loc, contri, &delta, ctx);
                         goto out;
                 }
 
