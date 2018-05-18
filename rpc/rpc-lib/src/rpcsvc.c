@@ -1482,7 +1482,7 @@ rpcsvc_get_listener (rpcsvc_t *svc, uint16_t port, rpc_transport_t *trans)
         pthread_mutex_lock (&svc->rpclock);
         {
                 list_for_each_entry (listener, &svc->listeners, list) {
-                        if (trans != NULL) {
+                        if (listener && trans) {
                                 if (listener->trans == trans) {
                                         found = 1;
                                         break;
