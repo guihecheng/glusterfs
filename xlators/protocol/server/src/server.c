@@ -1042,11 +1042,10 @@ do_rpc:
         }
 
         /*
-         * Update:
-         * We don't need to reset auto_thread_count since it has been derived
-         * out of the total bricks attached. We can reconfigure event threads
-         * but not auto threads.
+         * Let the event subsystem know that we're auto-scaling, with an
+         * initial count of one.
          */
+        ((struct event_pool *)(this->ctx->event_pool))->auto_thread_count = 1;
 
         GF_OPTION_RECONF ("event-threads", new_nthread, options, int32, out);
         ret = server_check_event_threads (this, conf, new_nthread);
