@@ -195,6 +195,12 @@ keys = (
     #brick/inodes events
     "EVENT_DHT_DISK_USAGE",
     "EVENT_DHT_INODES_USAGE",
+
+    #user/group quota events
+    "EVENT_QUOTA_ENABLE_USER",
+    "EVENT_QUOTA_DISABLE_USER",
+    "EVENT_QUOTA_SET_USAGE_LIMIT_USER",
+    "EVENT_QUOTA_REMOVE_USAGE_LIMIT_USER",
 )
 
 LAST_EVENT = "EVENT_LAST"

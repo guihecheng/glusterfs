@@ -1737,6 +1737,228 @@ out:
         return ret;
 }
 
+int
+cli_cmd_quota_handle_list_user_all (const char **words, dict_t *options)
+{
+        int                      all_failed = 1;
+        int                      count      = 0;
+        int                      ret        = -1;
+        rpc_clnt_procedure_t    *proc       = NULL;
+        cli_local_t             *local      = NULL;
+        call_frame_t            *frame      = NULL;
+        dict_t                  *xdata      = NULL;
+        char                    *gfid_str   = NULL;
+        char                    *volname    = NULL;
+        char                    *volname_dup = NULL;
+        unsigned char            buf[16]   = {0};
+        int                      fd        = -1;
+        char                     quota_conf_file[PATH_MAX] = {0};
+        gf_boolean_t             xml_err_flag   = _gf_false;
+        char                     err_str[NAME_MAX] = {0,};
+        int32_t                  type       = 0;
+        char                     gfid_type  = 0;
+        float                    version    = 0.0f;
+        int32_t                  max_count  = 0;
+
+        xdata = dict_new ();
+        if (!xdata) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = dict_get_str (options, "volname", &volname);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get volume name");
+                goto out;
+        }
+
+        ret = dict_get_int32 (options, "type", &type);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get quota option type");
+                goto out;
+        }
+
+        ret = dict_set_int32 (xdata, "type", type);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set type in xdata");
+                goto out;
+        }
+
+        ret = cli_get_soft_limit (options, words, xdata);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to fetch default "
+                        "soft-limit");
+                goto out;
+        }
+
+        /* Check if at least one limit is set on volume. No need to check for
+         * quota enabled as cli_get_soft_limit() handles that
+         */
+        if (!_limits_set_on_volume (volname, type)) {
+                snprintf (err_str, sizeof (err_str), "No%s quota configured on"
+                          " volume %s",
+                          (type == GF_QUOTA_OPTION_TYPE_LIST) ? "" : " inode",
+                          volname);
+                if (global_state->mode & GLUSTER_MODE_XML) {
+                        xml_err_flag = _gf_true;
+                } else {
+                        cli_out ("quota: %s", err_str);
+                }
+                ret = 0;
+                goto out;
+        }
+
+        frame = create_frame (THIS, THIS->ctx->pool);
+        if (!frame) {
+                ret = -1;
+                goto out;
+        }
+
+        volname_dup = gf_strdup (volname);
+        if (!volname_dup) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = dict_set_dynstr (xdata, "volume-uuid", volname_dup);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set volume-uuid");
+                GF_FREE (volname_dup);
+                goto out;
+        }
+
+        //TODO: fix hardcoding; Need to perform an RPC call to glusterd
+        //to fetch working directory
+        snprintf (quota_conf_file, sizeof quota_conf_file,
+                  "%s/vols/%s/quota.conf",
+                  GLUSTERD_DEFAULT_WORKDIR,
+                  volname);
+        fd = open (quota_conf_file, O_RDONLY);
+        if (fd == -1) {
+                //This may because no limits were yet set on the volume
+                gf_log ("cli", GF_LOG_TRACE, "Unable to open "
+                        "quota.conf");
+                ret = 0;
+                goto out;
+         }
+
+        ret = quota_conf_read_version (fd, &version);
+        if (ret)
+                goto out;
+
+        CLI_LOCAL_INIT (local, words, frame, xdata);
+        proc = &cli_quotad_clnt.proctable[GF_AGGREGATOR_GETLIMIT];
+
+        gfid_str = GF_CALLOC (1, gf_common_mt_char, 64);
+        if (!gfid_str) {
+                ret = -1;
+                goto out;
+        }
+
+        for (count = 0;; count++) {
+                ret = quota_conf_read_gfid (fd, buf, &gfid_type, version);
+                if (ret == 0) {
+                        break;
+                } else if (ret < 0) {
+                        gf_log (THIS->name, GF_LOG_CRITICAL, "Quota "
+                                "configuration store may be corrupt.");
+                        goto out;
+                }
+
+                if ((type == GF_QUOTA_OPTION_TYPE_LIST &&
+                     gfid_type == GF_QUOTA_CONF_TYPE_OBJECTS) ||
+                    (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS &&
+                     gfid_type == GF_QUOTA_CONF_TYPE_USAGE))
+                        continue;
+
+                max_count++;
+        }
+        ret = dict_set_int32 (xdata, "max_count", max_count);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set max_count");
+                goto out;
+        }
+
+        ret = sys_lseek (fd, 0L, SEEK_SET);
+        if (ret < 0) {
+                gf_log (THIS->name, GF_LOG_ERROR, "failed to move offset to "
+                        "the beginning: %s", strerror (errno));
+                goto out;
+        }
+        ret = quota_conf_read_version (fd, &version);
+        if (ret)
+                goto out;
+
+        for (count = 0;; count++) {
+                ret = quota_conf_read_gfid (fd, buf, &gfid_type, version);
+                if (ret == 0) {
+                        break;
+                } else if (ret < 0) {
+                        gf_log (THIS->name, GF_LOG_CRITICAL, "Quota "
+                                "configuration store may be corrupt.");
+                        goto out;
+                }
+
+                if ((type == GF_QUOTA_OPTION_TYPE_LIST &&
+                     gfid_type == GF_QUOTA_CONF_TYPE_OBJECTS) ||
+                    (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS &&
+                     gfid_type == GF_QUOTA_CONF_TYPE_USAGE))
+                        continue;
+
+                uuid_utoa_r (buf, gfid_str);
+                ret = dict_set_str (xdata, "gfid", gfid_str);
+                if (ret) {
+                        gf_log ("cli", GF_LOG_ERROR, "Failed to set gfid");
+                        goto out;
+                }
+
+                ret = proc->fn (frame, THIS, xdata);
+                if (ret) {
+                        gf_log ("cli", GF_LOG_ERROR, "Failed to get quota "
+                                "limits for %s", uuid_utoa ((unsigned char*)buf));
+                }
+
+                dict_del (xdata, "gfid");
+                all_failed = all_failed && ret;
+        }
+
+        if (global_state->mode & GLUSTER_MODE_XML) {
+                ret = cli_xml_output_vol_quota_limit_list_end (local);
+                if (ret) {
+                        gf_log ("cli", GF_LOG_ERROR, "Error in printing "
+                                "xml output");
+                        goto out;
+                }
+        }
+
+        if (count > 0) {
+                ret = all_failed? -1: 0;
+        } else {
+                ret = 0;
+        }
+
+
+out:
+        if (xml_err_flag) {
+                ret = cli_xml_output_str ("volQuota", NULL, -1, 0, err_str);
+                if (ret) {
+                        gf_log ("cli", GF_LOG_ERROR, "Error outputting in "
+                                "xml format");
+                }
+        }
+
+        if (fd != -1) {
+                sys_close (fd);
+        }
+
+        GF_FREE (gfid_str);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Could not fetch and display quota"
+                        " limits");
+        }
+        CLI_STACK_DESTROY (frame);
+        return ret;
+}
 
 
 int
@@ -1911,6 +2133,7 @@ cli_cmd_quota_cbk (struct cli_state *state, struct cli_cmd_word *word,
         //handle quota-disable and quota-list-all different from others
         switch (type) {
         case GF_QUOTA_OPTION_TYPE_DISABLE:
+        case GF_QUOTA_OPTION_TYPE_DISABLE_USER:
                 answer = cli_cmd_get_confirmation (state, question);
                 if (answer == GF_ANSWER_NO)
                         goto out;
@@ -1920,6 +2143,11 @@ cli_cmd_quota_cbk (struct cli_state *state, struct cli_cmd_word *word,
                 if (wordcount != 4)
                         break;
                 ret = cli_cmd_quota_handle_list_all (words, options);
+                goto out;
+        case GF_QUOTA_OPTION_TYPE_LIST_USER:
+                if (wordcount != 4)
+                        break;
+                ret = cli_cmd_quota_handle_list_user_all (words, options);
                 goto out;
         default:
                 break;
@@ -1993,6 +2221,21 @@ out:
                 case GF_QUOTA_OPTION_TYPE_DEFAULT_SOFT_LIMIT:
                         gf_event (EVENT_QUOTA_DEFAULT_SOFT_LIMIT, "volume=%s;"
                                   "default-soft-limit=%s", volname, words[4]);
+                        break;
+                case GF_QUOTA_OPTION_TYPE_ENABLE_USER:
+                        gf_event (EVENT_QUOTA_ENABLE_USER, "volume=%s", volname);
+                        break;
+                case GF_QUOTA_OPTION_TYPE_DISABLE_USER:
+                        gf_event (EVENT_QUOTA_DISABLE_USER, "volume=%s", volname);
+                        break;
+                case GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER:
+                        gf_event (EVENT_QUOTA_SET_USAGE_LIMIT_USER, "volume=%s;"
+                                  "uid=%s;limit=%s", volname, words[4],
+                                  words[5]);
+                        break;
+                case GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER:
+                        gf_event (EVENT_QUOTA_REMOVE_USAGE_LIMIT_USER, "volume=%s;"
+                                  "uid=%s", volname, words[4]);
                         break;
                 }
         }
@@ -3294,11 +3537,35 @@ struct cli_cmd quota_cmds[] = {
           "Enable/disable inode-quota for <VOLNAME>"
         },
 
+        { "volume quota <VOLNAME> {enable-user|disable-user}",
+          cli_cmd_quota_cbk,
+          "Enable/disable user quota for <VOLNAME>"
+        },
+
+        {"volume quota <VOLNAME> {limit-usage-user <uid> <size> [<percent>]}",
+         cli_cmd_quota_cbk,
+         "Set maximum size for user with uid:<uid> for <VOLNAME>"
+        },
+
+        {"volume quota <VOLNAME> {remove-usage-user <uid>}",
+         cli_cmd_quota_cbk,
+         "Clear maximum size limit for user with uid:<uid> for <VOLNAME>"
+        },
+
+        {"volume quota <VOLNAME> {list-user}",
+         cli_cmd_quota_cbk,
+         "List maximum size limit for all users for <VOLNAME>"
+        },
+
         { "volume quota <VOLNAME> {enable|disable|list [<path> ...]| "
           "list-objects [<path> ...] | remove <path>| remove-objects <path> | "
+          "enable-user|disable-user|list-user [<uid> ...]|"
+          "limit-usage-user <uid> <size> [<percent>]|"
+          "remove-usage-user <uid>|"
           "default-soft-limit <percent>}\n"
           "volume quota <VOLNAME> {limit-usage <path> <size> [<percent>]}\n"
           "volume quota <VOLNAME> {limit-objects <path> <number> [<percent>]}\n"
+          "volume quota <VOLNAME> {limit-usage-user <uid> <size> [<percent>]}\n"
           "volume quota <VOLNAME> {alert-time|soft-timeout|hard-timeout} {<time>}",
           cli_cmd_quota_cbk,
           NULL

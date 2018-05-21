@@ -1084,7 +1084,10 @@ cli_cmd_quota_parse (const char **words, int wordcount, dict_t **options)
                                       "remove", "list", "alert-time",
                                       "soft-timeout", "hard-timeout",
                                       "default-soft-limit", "limit-objects",
-                                      "list-objects", "remove-objects", NULL};
+                                      "list-objects", "remove-objects",
+                                      "enable-user", "disable-user",
+                                      "limit-usage-user", "remove-usage-user",
+                                      "list-user", NULL};
         char            *w       = NULL;
         uint32_t         time    = 0;
         double           percent = 0;
@@ -1316,6 +1319,122 @@ cli_cmd_quota_parse (const char **words, int wordcount, dict_t **options)
                                 "limit count in request dictionary");
                         goto out;
                 }
+
+                goto set_type;
+        }
+
+        if (strcmp (w, "enable-user") == 0) {
+                if (wordcount == 4) {
+                        type = GF_QUOTA_OPTION_TYPE_ENABLE_USER;
+                        ret = 0;
+                        goto set_type;
+                } else {
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        if (strcmp (w, "disable-user") == 0) {
+                if (wordcount == 4) {
+                        type = GF_QUOTA_OPTION_TYPE_DISABLE_USER;
+                        ret = 0;
+                        goto set_type;
+                } else {
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        if (strcmp (w, "limit-usage-user") == 0) {
+                type = GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER;
+        }
+
+        if (type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER) {
+
+                if (wordcount < 6 || wordcount > 7) {
+                        ret = -1;
+                        goto out;
+                }
+
+                ret = dict_set_str (dict, "uid", (char *) words[4]);
+                if (ret)
+                        goto out;
+
+                if (!words[5]) {
+                        cli_err ("Please enter the limit value to be set");
+                        ret = -1;
+                        goto out;
+                }
+
+                if (type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER) {
+                        ret = gf_string2bytesize_int64 (words[5], &value);
+                        if (ret != 0 || value <= 0) {
+                                if (errno == ERANGE || value <= 0) {
+                                        ret = -1;
+                                        cli_err ("Please enter an integer "
+                                                 "value in the range of "
+                                                 "(1 - %"PRId64 ")",
+                                                 INT64_MAX);
+                                } else
+                                        cli_err ("Please enter a correct "
+                                                 "value");
+                                goto out;
+                        }
+                }
+
+                ret  = dict_set_str (dict, "hard-limit", (char *) words[5]);
+                if (ret < 0)
+                        goto out;
+
+                if (wordcount == 7) {
+
+                        ret = gf_string2percent (words[6], &percent);
+                        if (ret != 0 || percent > 100) {
+                                ret = -1;
+                                cli_err ("Please enter a correct value "
+                                         "in the range of 0 to 100");
+                                goto out;
+                        }
+
+                        ret = dict_set_str (dict, "soft-limit",
+                                            (char *) words[6]);
+                        if (ret < 0)
+                                goto out;
+                }
+
+                goto set_type;
+        }
+
+        if (strcmp (w, "remove-usage-user") == 0) {
+                if (wordcount != 5) {
+                        ret = -1;
+                        goto out;
+                }
+
+                type = GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER;
+
+                ret = dict_set_str (dict, "uid", (char *) words[4]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        }
+
+        if (strcmp (w, "list-user") == 0) {
+
+                type = GF_QUOTA_OPTION_TYPE_LIST_USER;
+
+                i = 4;
+                while (i < wordcount) {
+                        snprintf (key, 20, "uid%d", i - 4);
+
+                        ret = dict_set_str (dict, key, (char *) words [i++]);
+                        if (ret < 0)
+                                goto out;
+                }
+
+                ret = dict_set_int32 (dict, "count", i - 4);
+                if (ret < 0)
+                        goto out;
 
                 goto set_type;
         }
