@@ -685,7 +685,7 @@ unref_transport:
                                 UNLOCK (&ctx->volfile_lock);
                                 if (victim_found) {
                                         xlator_mem_cleanup (travxl);
-                                        glusterfs_autoscale_threads (ctx, -1, this);
+                                        glusterfs_autoscale_threads (ctx, -1);
                                 }
                         }
                         GF_FREE (xlator_name);
@@ -1054,12 +1054,6 @@ do_rpc:
 
         ret = server_init_grace_timer (this, options, conf);
 
-        /* rpcsvc thread reconfigure should be after events thread
-         * reconfigure
-         */
-        new_nthread =
-        ((struct event_pool *)(this->ctx->event_pool))->eventthreadcount;
-        ret = rpcsvc_ownthread_reconf (rpc_conf, new_nthread);
 out:
         THIS = oldTHIS;
         gf_msg_debug ("", 0, "returning %d", ret);
@@ -1672,10 +1666,9 @@ notify (xlator_t *this, int32_t event, void *data, ...)
 
                         glusterfs_mgmt_pmap_signout (ctx,
                                                      victim->name);
-
                         if (!xprt_found && victim_found) {
                                 xlator_mem_cleanup (victim);
-                                glusterfs_autoscale_threads (ctx, -1, this);
+                                glusterfs_autoscale_threads (ctx, -1);
                         }
                 }
                 break;

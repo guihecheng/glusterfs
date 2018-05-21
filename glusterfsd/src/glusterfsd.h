@@ -124,7 +124,7 @@ int glusterfs_volume_top_read_perf (uint32_t blk_size, uint32_t blk_count,
                                     char *brick_path, double *throughput,
                                     double *time);
 void
-glusterfs_autoscale_threads (glusterfs_ctx_t *ctx, int incr, xlator_t *this);
+glusterfs_autoscale_threads (glusterfs_ctx_t *ctx, int incr);
 
 void
 xlator_mem_cleanup (xlator_t *this);
