@@ -19,6 +19,10 @@
 #define QUOTA_CONF_HEADER_1_1                       \
         "GlusterFS Quota conf | version: v1.1\n"
 
+#define GF_QUOTA_UG_HIDDEN_PATH ".quota_ug"
+#define GF_QUOTA_U_DIR GF_QUOTA_UG_HIDDEN_PATH"/user"
+#define GF_QUOTA_G_DIR GF_QUOTA_UG_HIDDEN_PATH"/group"
+
 typedef enum {
         GF_QUOTA_CONF_TYPE_USAGE = 1,
         GF_QUOTA_CONF_TYPE_OBJECTS

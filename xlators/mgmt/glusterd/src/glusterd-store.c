@@ -1238,17 +1238,19 @@ glusterd_store_node_state_path_set (glusterd_volinfo_t *volinfo,
 
 static void
 glusterd_store_quota_conf_path_set (glusterd_volinfo_t *volinfo,
-                                    char *quota_conf_path, size_t len)
+                                    char *quota_conf_path, size_t len,
+                                    const char *quota_conf_name)
 {
         char    voldirpath[PATH_MAX] = {0,};
         GF_ASSERT (volinfo);
         GF_ASSERT (quota_conf_path);
         GF_ASSERT (len <= PATH_MAX);
+        GF_ASSERT (quota_conf_name);
 
         glusterd_store_voldirpath_set (volinfo, voldirpath,
                                        sizeof (voldirpath));
         snprintf (quota_conf_path, len, "%s/%s", voldirpath,
-                  GLUSTERD_VOLUME_QUOTA_CONFIG);
+                  quota_conf_name);
 }
 
 static void
@@ -1320,10 +1322,33 @@ glusterd_store_create_quota_conf_sh_on_absence (glusterd_volinfo_t *volinfo)
         GF_ASSERT (volinfo);
 
         glusterd_store_quota_conf_path_set (volinfo, quota_conf_path,
-                                            sizeof (quota_conf_path));
+                                            sizeof (quota_conf_path),
+                                            GLUSTERD_VOLUME_QUOTA_CONFIG);
         ret =
           gf_store_handle_create_on_absence (&volinfo->quota_conf_shandle,
                                              quota_conf_path);
+
+        return ret;
+}
+
+int32_t
+glusterd_store_create_quota_ug_conf_sh_on_absence (glusterd_volinfo_t *volinfo,
+                                                   gf_boolean_t is_grp)
+{
+        char            quota_ug_conf_path[PATH_MAX] = {0};
+        int32_t         ret                          = 0;
+
+        GF_ASSERT (volinfo);
+
+        glusterd_store_quota_conf_path_set (volinfo, quota_ug_conf_path,
+                                            sizeof (quota_ug_conf_path),
+                                            is_grp ? GLUSTERD_VOLUME_QUOTA_G_CONFIG
+                                                   : GLUSTERD_VOLUME_QUOTA_U_CONFIG);
+
+        ret =
+          gf_store_handle_create_on_absence (is_grp ? &volinfo->quota_g_conf_shandle
+                                                    : &volinfo->quota_u_conf_shandle,
+                                             quota_ug_conf_path);
 
         return ret;
 }
@@ -4925,6 +4950,42 @@ out:
                                   GD_MSG_QUOTA_CONF_WRITE_FAIL,
                                   "failed to write "
                                   "gfid %s to a quota conf", uuid_utoa (buf));
+
+        return ret;
+}
+
+int32_t
+glusterd_quota_conf_write_ugid (int fd, void *buf, char type)
+{
+        int                 ret            = -1;
+        xlator_t           *this           = NULL;
+        glusterd_conf_t    *conf           = NULL;
+        char                ugid_buf[10]   = {0,};
+        int                 offset         = 0;
+
+        offset = 10 - strlen(buf);
+        memcpy((void *)ugid_buf + offset, buf, strlen(buf));
+
+        this = THIS;
+        GF_VALIDATE_OR_GOTO ("quota", this, out);
+
+        conf = this->private;
+        GF_VALIDATE_OR_GOTO (this->name, conf, out);
+
+        ret = gf_nwrite (fd, ugid_buf, 10);
+        if (ret != 10) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = 0;
+
+out:
+        if (ret < 0)
+                gf_msg_callingfn ("quota", GF_LOG_ERROR, 0,
+                                  GD_MSG_QUOTA_CONF_WRITE_FAIL,
+                                  "failed to write "
+                                  "ugid %s to a ugquota conf", (char *)buf);
 
         return ret;
 }

@@ -435,6 +435,8 @@ struct glusterd_volinfo_ {
         gf_store_handle_t        *shandle;
         gf_store_handle_t        *node_state_shandle;
         gf_store_handle_t        *quota_conf_shandle;
+        gf_store_handle_t        *quota_u_conf_shandle;
+        gf_store_handle_t        *quota_g_conf_shandle;
 
         /* Defrag/rebalance related */
         glusterd_rebalance_t      rebal;
@@ -449,6 +451,8 @@ struct glusterd_volinfo_ {
 
         int                       version;
         uint32_t                  quota_conf_version;
+        uint32_t                  quota_u_conf_version;
+        uint32_t                  quota_g_conf_version;
         uint32_t                  cksum;
         uint32_t                  quota_conf_cksum;
         gf_transport_type         transport_type;
@@ -576,6 +580,8 @@ typedef enum {
 #define GLUSTERD_DEFAULT_PORT    GF_DEFAULT_BASE_PORT
 #define GLUSTERD_INFO_FILE      "glusterd.info"
 #define GLUSTERD_VOLUME_QUOTA_CONFIG "quota.conf"
+#define GLUSTERD_VOLUME_QUOTA_U_CONFIG "quota_user.conf"
+#define GLUSTERD_VOLUME_QUOTA_G_CONFIG "quota_group.conf"
 #define GLUSTERD_VOLUME_DIR_PREFIX "vols"
 #define GLUSTERD_PEER_DIR_PREFIX "peers"
 #define GLUSTERD_VOLUME_INFO_FILE "info"
@@ -679,6 +685,16 @@ do {                                                                       \
                   DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_list%s", volname, path);\
         } while (0)
 
+#define GLUSTERD_GET_QUOTA_UG_WR_MOUNT_PATH(abspath, volname, path) do {       \
+        snprintf (abspath, sizeof (abspath)-1,                                 \
+                  DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_ug_wr%s", volname, path);\
+        } while (0)
+
+#define GLUSTERD_GET_QUOTA_UG_RD_MOUNT_PATH(abspath, volname, path) do {       \
+        snprintf (abspath, sizeof (abspath)-1,                                 \
+                  DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_ug_rd%s", volname, path);\
+        } while (0)
+
 #define GLUSTERD_GET_TMP_PATH(abspath, path) do {                       \
         snprintf (abspath, sizeof (abspath)-1,                          \
                   DEFAULT_VAR_RUN_DIRECTORY"/tmp%s", path);             \
@@ -778,6 +794,17 @@ do {                                                                       \
                           volname);                                       \
         }
 
+#define GLUSTERFS_GET_QUOTA_UG_WR_MOUNT_PIDFILE(pidfile, volname) {       \
+                snprintf (pidfile, PATH_MAX-1,                            \
+                          DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_ug_wr.pid", \
+                          volname);                                       \
+        }
+
+#define GLUSTERFS_GET_QUOTA_UG_RD_MOUNT_PIDFILE(pidfile, volname) {       \
+                snprintf (pidfile, PATH_MAX-1,                            \
+                          DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_ug_rd.pid", \
+                          volname);                                       \
+        }
 
 #define GLUSTERD_GET_UUID_NOHYPHEN(ret_string, uuid) do {               \
                 char *snap_volname_ptr = ret_string;                    \

@@ -177,6 +177,10 @@ glusterd_store_perform_volume_store (glusterd_volinfo_t *volinfo);
 int32_t
 glusterd_store_create_quota_conf_sh_on_absence (glusterd_volinfo_t *volinfo);
 
+int32_t
+glusterd_store_create_quota_ug_conf_sh_on_absence (glusterd_volinfo_t *volinfo,
+                                                   gf_boolean_t is_grp);
+
 int
 glusterd_store_retrieve_quota_version (glusterd_volinfo_t *volinfo);
 
@@ -200,6 +204,9 @@ glusterd_quota_conf_write_header (int fd);
 
 int32_t
 glusterd_quota_conf_write_gfid (int fd, void *buf, char type);
+
+int32_t
+glusterd_quota_conf_write_ugid (int fd, void *buf, char type);
 
 int32_t
 glusterd_recreate_vol_brick_mounts (xlator_t  *this,
