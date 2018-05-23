@@ -1609,6 +1609,94 @@ glusterd_quota_ug_meta_cleanup (char *volname, gf_boolean_t is_grp)
         recursive_rmdir (meta_dir);
 }
 
+static int
+glusterd_set_quota_ug_limit (char *volname, char *ugid, gf_boolean_t is_grp,
+                             char *hard_limit, char *soft_limit,
+                             char *key, char **op_errstr)
+{
+        int               ret                  = -1;
+        xlator_t         *this                 = NULL;
+        char              abspath[PATH_MAX]    = {0,};
+        char              ugid_path[PATH_MAX]  = {0,};
+        glusterd_conf_t  *priv                 = NULL;
+	quota_limits_t    existing_limit       = {0,};
+	quota_limits_t    new_limit            = {0,};
+        double            soft_limit_double    = 0;
+
+        this = THIS;
+        GF_ASSERT (this);
+        priv = this->private;
+        GF_ASSERT (priv);
+
+        snprintf (ugid_path, sizeof (ugid_path), "/%s/%s",
+                  is_grp ? GF_QUOTA_G_DIR : GF_QUOTA_U_DIR, ugid);
+        GLUSTERD_GET_QUOTA_UG_WR_MOUNT_PATH (abspath, volname, ugid_path);
+        ret = gf_lstat_dir (abspath, NULL);
+        if (ret) {
+                if (errno == ENOENT) {
+                        ret = sys_mkdir (abspath, 0700);
+                        if (ret && errno != EEXIST) {
+                                goto out;
+                        }
+                } else {
+                        gf_asprintf (op_errstr, "Failed to find the directory"
+                                     " %s. Reason : %s", abspath,
+                                     strerror (errno));
+                        goto out;
+                }
+        }
+
+        if (!soft_limit) {
+                ret = sys_lgetxattr (abspath, key, (void *)&existing_limit,
+                                     sizeof (existing_limit));
+                if (ret < 0) {
+                        switch (errno) {
+#if defined(ENOATTR) && (ENOATTR != ENODATA)
+                        case ENODATA: /* FALLTHROUGH */
+#endif
+                        case ENOATTR:
+                                existing_limit.sl = -1;
+                            break;
+                        default:
+                                gf_asprintf (op_errstr, "Failed to get the "
+                                             "xattr %s from %s. Reason : %s",
+                                             key, abspath, strerror (errno));
+                                goto out;
+                        }
+                } else {
+                        existing_limit.hl = ntoh64 (existing_limit.hl);
+                        existing_limit.sl = ntoh64 (existing_limit.sl);
+                }
+                new_limit.sl = existing_limit.sl;
+
+        } else {
+                ret = gf_string2percent (soft_limit, &soft_limit_double);
+                if (ret)
+                        goto out;
+                new_limit.sl = soft_limit_double;
+        }
+
+        new_limit.sl = hton64 (new_limit.sl);
+
+        ret = gf_string2bytesize_int64 (hard_limit, &new_limit.hl);
+        if (ret)
+                goto out;
+
+        new_limit.hl = hton64 (new_limit.hl);
+
+        ret = sys_lsetxattr (abspath, key, (char *)(void *)&new_limit,
+                             sizeof (new_limit), 0);
+        if (ret == -1) {
+                gf_asprintf (op_errstr, "setxattr of %s failed on %s."
+                             " Reason : %s", key, abspath, strerror (errno));
+                goto out;
+        }
+        ret = 0;
+
+out:
+        return ret;
+}
+
 int32_t
 glusterd_quota_limit_usage (glusterd_volinfo_t *volinfo, dict_t *dict,
                             int opcode, char **op_errstr)
@@ -1902,6 +1990,80 @@ out:
         return ret;
 }
 
+int32_t
+glusterd_quota_limit_usage_user (glusterd_volinfo_t *volinfo, dict_t *dict,
+                                 char **op_errstr)
+{
+        int32_t          ret                = -1;
+        char            *hard_limit         = NULL;
+        char            *soft_limit         = NULL;
+        char            *ugid               = NULL;
+        xlator_t        *this               = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        GF_VALIDATE_OR_GOTO (this->name, dict, out);
+        GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
+        GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        ret = glusterd_check_if_quota_trans_enabled (volinfo);
+        if (ret == -1) {
+                *op_errstr = gf_strdup ("Quota is disabled, please enable "
+                                        "quota");
+                goto out;
+        }
+
+        ret = dict_get_str (dict, "uid", &ugid);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED, "Unable to fetch ugid");
+                goto out;
+        }
+
+        ret = dict_get_str (dict, "hard-limit", &hard_limit);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED, "Unable to fetch hard limit");
+                goto out;
+        }
+
+        if (dict_get (dict, "soft-limit")) {
+                ret = dict_get_str (dict, "soft-limit", &soft_limit);
+                if (ret) {
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_DICT_GET_FAILED, "Unable to fetch "
+                                "soft limit");
+                        goto out;
+                }
+        }
+
+        if (is_origin_glusterd (dict)) {
+                ret = glusterd_set_quota_ug_limit (volinfo->volname, ugid,
+                                                   _gf_false, hard_limit,
+                                                   soft_limit,
+                                                   QUOTA_LIMIT_KEY,
+                                                   op_errstr);
+                if (ret)
+                        goto out;
+        }
+
+        ret = glusterd_store_quota_ug_config (volinfo, ugid, _gf_false,
+                                          GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER,
+                                          op_errstr);
+        if (ret)
+                goto out;
+
+        ret = 0;
+out:
+
+        if (ret && op_errstr && !*op_errstr)
+                gf_asprintf (op_errstr, "Failed to set hard limit on user"
+                             " with uid %s for volume %s",
+                             ugid, volinfo->volname);
+        return ret;
+}
+
 int
 glusterd_set_quota_option (glusterd_volinfo_t *volinfo, dict_t *dict,
                            char *key, char **op_errstr)
@@ -2070,6 +2232,11 @@ glusterd_op_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
                         if (ret < 0)
                                 goto out;
                         break;
+
+                case GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER:
+                        ret = glusterd_quota_limit_usage_user (volinfo, dict,
+                                                               op_errstr);
+                        goto out;
 
                 case GF_QUOTA_OPTION_TYPE_SOFT_TIMEOUT:
                         ret = glusterd_set_quota_option (volinfo, dict,
