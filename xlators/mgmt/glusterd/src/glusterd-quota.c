@@ -1697,6 +1697,51 @@ out:
         return ret;
 }
 
+static int
+glusterd_remove_quota_ug_limit_user (char *volname, char *ugid,
+                                     gf_boolean_t is_grp, char **op_errstr)
+{
+        int               ret                  = -1;
+        xlator_t         *this                 = NULL;
+        char              abspath[PATH_MAX]    = {0,};
+        char              ugid_path[PATH_MAX]  = {0,};
+        glusterd_conf_t  *priv                 = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+        priv = this->private;
+        GF_ASSERT (priv);
+
+        snprintf (ugid_path, sizeof (ugid_path), "/%s/%s",
+                  is_grp ? GF_QUOTA_G_DIR : GF_QUOTA_U_DIR, ugid);
+        GLUSTERD_GET_QUOTA_UG_WR_MOUNT_PATH (abspath, volname, ugid_path);
+        ret = gf_lstat_dir (abspath, NULL);
+        if (ret) {
+                gf_asprintf (op_errstr, "Failed to find the directory %s. "
+                             "Reason : %s", abspath, strerror (errno));
+                goto out;
+        }
+
+        ret = sys_lremovexattr (abspath, QUOTA_LIMIT_KEY);
+        if (ret) {
+                gf_asprintf (op_errstr, "removexattr failed on %s. "
+                             "Reason : %s", abspath, strerror (errno));
+                goto out;
+        }
+
+        ret = sys_rmdir (abspath);
+        if (ret) {
+                gf_asprintf (op_errstr, "rmdir failed on %s. "
+                             "Reason : %s", abspath, strerror (errno));
+                goto out;
+        }
+
+        ret = 0;
+
+out:
+        return ret;
+}
+
 int32_t
 glusterd_quota_limit_usage (glusterd_volinfo_t *volinfo, dict_t *dict,
                             int opcode, char **op_errstr)
@@ -2064,6 +2109,55 @@ out:
         return ret;
 }
 
+int32_t
+glusterd_quota_remove_usage_user (glusterd_volinfo_t *volinfo, dict_t *dict,
+                                  char **op_errstr)
+{
+        int32_t         ret                   = -1;
+        char            *ugid                 = NULL;
+        xlator_t        *this                 = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        GF_VALIDATE_OR_GOTO (this->name, dict, out);
+        GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
+        GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        ret = glusterd_check_if_quota_trans_enabled (volinfo);
+        if (ret == -1) {
+                *op_errstr = gf_strdup ("Quota is disabled, please enable "
+                                        "quota");
+                goto out;
+        }
+
+        ret = dict_get_str (dict, "uid", &ugid);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED, "Unable to fetch ugid");
+                goto out;
+        }
+
+        if (is_origin_glusterd (dict)) {
+                ret = glusterd_remove_quota_ug_limit_user (volinfo->volname, ugid,
+                                                           _gf_false, op_errstr);
+                if (ret)
+                        goto out;
+        }
+
+        ret = glusterd_store_quota_ug_config (volinfo, ugid, _gf_false,
+                                          GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER,
+                                          op_errstr);
+        if (ret)
+                goto out;
+
+
+        ret = 0;
+
+out:
+        return ret;
+}
+
 int
 glusterd_set_quota_option (glusterd_volinfo_t *volinfo, dict_t *dict,
                            char *key, char **op_errstr)
@@ -2236,6 +2330,11 @@ glusterd_op_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
                 case GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER:
                         ret = glusterd_quota_limit_usage_user (volinfo, dict,
                                                                op_errstr);
+                        goto out;
+
+                case GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER:
+                        ret = glusterd_quota_remove_usage_user (volinfo, dict,
+                                                                op_errstr);
                         goto out;
 
                 case GF_QUOTA_OPTION_TYPE_SOFT_TIMEOUT:
