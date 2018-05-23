@@ -4502,6 +4502,11 @@ recursive_rmdir (const char *delete_path)
         struct dirent  *entry           = NULL;
         struct dirent   scratch[2]      = {{0,},};
         xlator_t       *this            = NULL;
+        ssize_t         size            = -1;
+        ssize_t         remaining_size  = -1;
+        ssize_t         list_offset     = 0;
+        char           *list            = NULL;
+        char            key[4096]       = {0, };
 
         this = THIS;
         GF_ASSERT (this);
@@ -4547,6 +4552,33 @@ recursive_rmdir (const char *delete_path)
                               " %s", delete_path, strerror (errno));
         }
 
+        size = sys_llistxattr (delete_path, NULL, 0);
+
+        if (size == 0) {
+                ret = 0;
+                goto rmdir;
+        }
+
+        list = alloca (size);
+        if (!list) {
+                goto out;
+        }
+
+        size = sys_llistxattr (delete_path, list, size);
+        if (size <= 0) {
+                ret = size;
+                goto out;
+        }
+
+        remaining_size = size;
+
+        while (remaining_size > 0) {
+                strcpy (key, list + list_offset);
+                sys_lremovexattr (delete_path, key);
+                remaining_size -= strlen (key) + 1;
+                list_offset += strlen (key) + 1;
+        }
+rmdir:
         ret = sys_rmdir (delete_path);
         if (ret) {
                 gf_msg_debug (this->name, 0, "Failed to rmdir: %s,err: %s",
