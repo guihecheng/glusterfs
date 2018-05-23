@@ -1533,7 +1533,43 @@ out:
        return ret;
 }
 
-int32_t glusterd_quota_ug_meta_mkdir (char *volname, gf_boolean_t is_grp)
+void
+glusterd_clean_up_quota_ug_store (glusterd_volinfo_t *volinfo,
+                                  gf_boolean_t is_grp)
+{
+        char                voldir[PATH_MAX]         = {0,};
+        char                confpath[PATH_MAX]       = {0,};
+        xlator_t           *this                     = NULL;
+        glusterd_conf_t    *conf                     = NULL;
+        gf_store_handle_t **conf_handle              = NULL;
+        uint32_t           *conf_version             = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+        conf = this->private;
+        GF_ASSERT (conf);
+
+        GLUSTERD_GET_VOLUME_DIR (voldir, volinfo, conf);
+
+        snprintf (confpath, sizeof (confpath), "%s/%s", voldir,
+                  is_grp ? GLUSTERD_VOLUME_QUOTA_G_CONFIG
+                         : GLUSTERD_VOLUME_QUOTA_U_CONFIG);
+
+        sys_unlink (confpath);
+
+        conf_handle = is_grp ? &volinfo->quota_g_conf_shandle :
+                               &volinfo->quota_u_conf_shandle;
+        gf_store_handle_destroy (*conf_handle);
+        *conf_handle = NULL;
+
+        conf_version = is_grp ? &volinfo->quota_g_conf_version :
+                                &volinfo->quota_u_conf_version;
+        *conf_version = 0;
+
+}
+
+int32_t
+glusterd_quota_ug_meta_mkdir (char *volname, gf_boolean_t is_grp)
 {
         char       meta_dir[PATH_MAX]       = {0};
         char       meta_root_dir[PATH_MAX]  = {0};
@@ -1558,6 +1594,19 @@ int32_t glusterd_quota_ug_meta_mkdir (char *volname, gf_boolean_t is_grp)
         ret = 0;
 out:
         return ret;
+}
+
+void
+glusterd_quota_ug_meta_cleanup (char *volname, gf_boolean_t is_grp)
+{
+        char           meta_dir[PATH_MAX]       = {0};
+        char           mount_dir[PATH_MAX]      = {0,};
+
+        GLUSTERD_GET_QUOTA_UG_WR_MOUNT_PATH (mount_dir, volname, "/");
+        snprintf (meta_dir, sizeof (meta_dir), "%s%s",
+                  mount_dir, is_grp ? GF_QUOTA_G_DIR : GF_QUOTA_U_DIR);
+
+        recursive_rmdir (meta_dir);
 }
 
 int32_t
@@ -1829,6 +1878,30 @@ out:
         return ret;
 }
 
+int32_t
+glusterd_quota_disable_user (glusterd_volinfo_t *volinfo, char **op_errstr)
+{
+        int32_t    ret            = -1;
+        xlator_t  *this           = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
+        GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        (void) glusterd_quota_ug_meta_cleanup (volinfo->volname, _gf_false);
+
+        (void) glusterd_clean_up_quota_ug_store (volinfo, _gf_false);
+
+        ret = 0;
+out:
+        if (ret && op_errstr && !*op_errstr)
+                gf_asprintf (op_errstr, "Disabling user quota on volume %s"
+                             "has been unsuccessful", volinfo->volname);
+        return ret;
+}
+
 int
 glusterd_set_quota_option (glusterd_volinfo_t *volinfo, dict_t *dict,
                            char *key, char **op_errstr)
@@ -1988,6 +2061,12 @@ glusterd_op_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
 
                 case GF_QUOTA_OPTION_TYPE_ENABLE_USER:
                         ret = glusterd_quota_enable_user (volinfo, op_errstr);
+                        if (ret < 0)
+                                goto out;
+                        break;
+
+                case GF_QUOTA_OPTION_TYPE_DISABLE_USER:
+                        ret = glusterd_quota_disable_user (volinfo, op_errstr);
                         if (ret < 0)
                                 goto out;
                         break;
