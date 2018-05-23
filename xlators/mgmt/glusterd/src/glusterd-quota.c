@@ -2424,7 +2424,11 @@ out:
         if (type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE ||
             type == GF_QUOTA_OPTION_TYPE_LIMIT_OBJECTS ||
             type == GF_QUOTA_OPTION_TYPE_REMOVE ||
-            type == GF_QUOTA_OPTION_TYPE_REMOVE_OBJECTS) {
+            type == GF_QUOTA_OPTION_TYPE_REMOVE_OBJECTS ||
+            type == GF_QUOTA_OPTION_TYPE_ENABLE_USER ||
+            type == GF_QUOTA_OPTION_TYPE_DISABLE_USER ||
+            type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER ||
+            type == GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER) {
                 /* During a list operation we need the aux mount to be
                  * accessible until the listing is done at the cli
                  */

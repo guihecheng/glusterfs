@@ -12554,6 +12554,18 @@ glusterd_remove_auxiliary_mount (char *volname)
                        ret = 0;
         }
 
+        GLUSTERD_GET_QUOTA_UG_WR_MOUNT_PATH (mountdir, volname, "/");
+        ret = gf_umount_lazy (this->name, mountdir, 1);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, errno,
+                        GD_MSG_LAZY_UMOUNT_FAIL, "umount on %s failed, "
+                        "reason : %s", mountdir, strerror (errno));
+
+                /* Hide EBADF as it means the mount is already gone */
+                if (errno == EBADF)
+                       ret = 0;
+        }
+
         return ret;
 }
 
