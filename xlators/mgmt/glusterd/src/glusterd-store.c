@@ -4961,9 +4961,11 @@ glusterd_quota_conf_write_ugid (int fd, void *buf, char type)
         xlator_t           *this           = NULL;
         glusterd_conf_t    *conf           = NULL;
         char                ugid_buf[10]   = {0,};
+        char               *pad_buf        = "0000000000";  // 10
         int                 offset         = 0;
 
         offset = 10 - strlen(buf);
+        memcpy((void *)ugid_buf, pad_buf, offset);
         memcpy((void *)ugid_buf + offset, buf, strlen(buf));
 
         this = THIS;

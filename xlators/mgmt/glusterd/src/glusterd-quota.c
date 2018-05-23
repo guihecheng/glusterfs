@@ -932,9 +932,11 @@ glusterd_find_ugid_match (char* ugid, unsigned char *buf,
         int           shift_count  = 0;
         char          tmp_buf[10]  = {0,};
         char          ugid_buf[10] = {0,};
+        char         *pad_buf      = "0000000000";  // 10
         int           offset       = 0;
 
         offset = 10 - strlen(ugid);
+        memcpy((void *)ugid_buf, (void *)pad_buf, offset);
         memcpy((void *)ugid_buf + offset, (void *)ugid, strlen(ugid));
 
         while (ugid_index != bytes_read) {
