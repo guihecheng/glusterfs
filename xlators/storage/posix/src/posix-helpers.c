@@ -3353,3 +3353,53 @@ unlock:
 
         return ret;
 }
+
+dict_t *posix_get_ugquota_gfid (xlator_t *this, int32_t *op_ret,
+                                int32_t *op_errno, dict_t *xdata)
+{
+        int         ret               = 0;
+        ssize_t     size              = 0;
+        dict_t     *xattr             = NULL;
+        uuid_t      gfid;
+        char       *path              = NULL;
+        char       *real_path         = NULL;
+
+        *op_ret = -1;
+
+        ret = dict_get_str (xdata, "path", &path);
+        if (ret) {
+                gf_log (this->name, GF_LOG_ERROR, "Failed to get path "
+                        "%s", path);
+                *op_errno = ENOENT;
+                goto out;
+        }
+
+        MAKE_REAL_PATH (real_path, this, path);
+
+        size = sys_lgetxattr (real_path, GFID_XATTR_KEY, gfid, 16);
+        if (size == -1) {
+                *op_errno = ENOENT;
+        } else if (size != 16) {
+                *op_errno = ENOENT;
+        } else {
+                *op_errno = 0;
+        }
+
+        if (*op_errno != 0)
+                goto out;
+
+        xattr = dict_new ();
+        if (!xattr) {
+                *op_errno = ENOMEM;
+                goto out;
+        }
+        ret = dict_set_dynstr (xattr, "gfid", gf_strdup(uuid_utoa(gfid)));
+        if (ret) {
+                *op_errno = -ret;
+                goto out;
+        }
+
+        *op_ret = 0;
+out:
+        return xattr;
+}

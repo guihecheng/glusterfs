@@ -149,6 +149,8 @@
 #define GET_ANCESTRY_PATH_KEY "glusterfs.ancestry.path"
 #define GET_ANCESTRY_DENTRY_KEY "glusterfs.ancestry.dentry"
 
+#define GET_UGQUOTA_GFID "glusterfs.ugquota.gfid"
+
 #define BITROT_DEFAULT_CURRENT_VERSION  (unsigned long)1
 #define BITROT_DEFAULT_SIGNING_VERSION  (unsigned long)0
 
@@ -325,6 +327,9 @@ enum gf_internal_fop_indicator {
 /*CTR and Marker requires inode dentry link count from posix*/
 #define GF_RESPONSE_LINK_COUNT_XDATA "gf_response_link_count"
 #define GF_REQUEST_LINK_COUNT_XDATA  "gf_request_link_count"
+
+#define GF_RESPONSE_UGID_XDATA "gf_response_ugid"
+#define GF_REQUEST_UGID_XDATA  "gf_request_ugid"
 
 #define CTR_ATTACH_TIER_LOOKUP    "ctr_attach_tier_lookup"
 

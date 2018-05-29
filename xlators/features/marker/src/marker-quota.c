@@ -996,15 +996,220 @@ mq_update_contri (xlator_t *this, loc_t *loc, inode_contribution_t *contri,
                 contri->contribution += delta->size;
                 contri->file_count += delta->file_count;
                 contri->dir_count += delta->dir_count;
-                ctx->contri_u->contribution += delta->size;
-                ctx->contri_g->contribution += delta->size;
         }
         UNLOCK (&contri->lock);
+
+        if (loc->inode->ia_type == IA_IFREG) {
+                LOCK (&ctx->lock);
+                {
+                        ctx->contri_u->contribution += delta->size;
+                        ctx->contri_g->contribution += delta->size;
+                }
+                UNLOCK (&ctx->lock);
+        }
 
 out:
         if (dict)
                 dict_unref (dict);
 
+        return ret;
+}
+
+int32_t
+_mq_lookup_ug (xlator_t *this, loc_t *child_loc, char *ugid,
+               gf_boolean_t is_grp, loc_t *ug_loc)
+{
+        int32_t        ret                = -1;
+        char           path[PATH_MAX]     = {0,};
+        dict_t        *xattr_req          = NULL;
+        dict_t        *xattr_rsp          = NULL;
+        char          *gfid_str           = NULL;
+        fd_t          *fd                 = NULL;
+        gf_dirent_t    entries;
+
+        GF_VALIDATE_OR_GOTO ("marker", child_loc, out);
+        GF_VALIDATE_OR_GOTO ("marker", child_loc->inode, out);
+        GF_VALIDATE_OR_GOTO ("marker", child_loc->inode->table, out);
+
+        INIT_LIST_HEAD (&entries.list);
+
+        fd = fd_anonymous (child_loc->inode);
+        if (fd == NULL) {
+                gf_log (this->name, GF_LOG_ERROR, "fd creation failed");
+                ret = -ENOMEM;
+                goto out;
+        }
+
+        fd_bind (fd);
+
+        snprintf (path, sizeof (path), "/%s/%s", is_grp ? GF_QUOTA_G_DIR
+                                                        : GF_QUOTA_U_DIR, ugid);
+
+        xattr_req = dict_new ();
+        if (xattr_req == NULL) {
+                gf_log (this->name, GF_LOG_ERROR, "dict_new failed");
+                ret = -ENOMEM;
+                goto out;
+        }
+
+        ret = dict_set_str (xattr_req, "path", path);
+        if (ret < 0)
+                goto out;
+
+        ret = dict_set_int8 (xattr_req, GET_UGQUOTA_GFID, 1);
+        if (ret < 0)
+                goto out;
+
+        ret = syncop_readdirp (FIRST_CHILD(this), fd, 131072, 0, &entries, xattr_req,
+                               &xattr_rsp);
+        if (ret) {
+                if (ret == -ENOENT) {
+                        ret = 1;
+                        goto out;
+                }
+
+                gf_log (this->name, GF_LOG_ERROR, "lookup for "
+                        "%s", path);
+                goto out;
+        }
+
+        ret = dict_get_str (xattr_rsp, "gfid", &gfid_str);
+        if (ret) {
+                gf_log (this->name, GF_LOG_ERROR, "Failed to get gfid of path "
+                        "%s", path);
+                goto out;
+        }
+
+        ug_loc->path = gf_strdup (path);
+        ug_loc->inode = inode_new (child_loc->inode->table);
+        gf_uuid_parse (gfid_str, ug_loc->gfid);
+        gf_uuid_parse (gfid_str, ug_loc->inode->gfid);
+
+        ret = 0;
+
+out:
+        gf_dirent_free (&entries);
+
+        if (fd)
+                fd_unref (fd);
+
+        if (xattr_req)
+                dict_unref (xattr_req);
+
+        return ret;
+}
+
+int32_t
+_mq_update_ug_size (xlator_t *this, loc_t *child_loc, quota_meta_t *delta,
+                    char *ugid, gf_boolean_t is_grp)
+{
+        int32_t              ret          = -1;
+        loc_t                loc          = {0, };
+        dict_t              *dict         = NULL;
+        quota_inode_ctx_t   *ctx          = NULL;
+        gf_boolean_t         locked    = _gf_false;
+
+        ret = _mq_lookup_ug (this, child_loc, ugid, is_grp, &loc);
+        if (ret) {
+                if (ret == 1) {
+                        ret = 0;
+                        goto out;
+                }
+                gf_log (this->name, GF_LOG_ERROR, "lookup failed for ugid "
+                        "%s", ugid);
+                goto out;
+        }
+
+        ret = mq_lock (this, &loc, F_WRLCK);
+        if (ret < 0)
+                goto out;
+        locked = _gf_true;
+
+        ret = mq_inode_ctx_get (loc.inode, this, &ctx);
+        if (ret < 0) {
+                ctx = mq_inode_ctx_new (loc.inode, this);
+                if (ctx == NULL) {
+                        gf_log (this->name, GF_LOG_WARNING, "mq_inode_ctx_new "
+                                "failed for %s",
+                                uuid_utoa (loc.inode->gfid));
+                        ret = -ENOMEM;
+                        goto out;
+                }
+        }
+
+        dict = dict_new ();
+        if (!dict) {
+                gf_log (this->name, GF_LOG_ERROR, "dict_new failed");
+                ret = -1;
+                goto out;
+        }
+
+        ret = quota_dict_set_size_meta (this, dict, delta);
+        if (ret < 0)
+                goto out;
+
+        ret = syncop_xattrop(FIRST_CHILD(this), &loc,
+                             GF_XATTROP_ADD_ARRAY64_WITH_DEFAULT, dict, NULL,
+                             NULL, NULL);
+        if (ret < 0) {
+                gf_log_callingfn (this->name, (-ret == ENOENT || -ret == ESTALE)
+                                  ? GF_LOG_DEBUG:GF_LOG_ERROR, "xattrop failed "
+                                  "for %s: %s", ugid, strerror (-ret));
+                goto out;
+        }
+
+        LOCK (&ctx->lock);
+        {
+                ctx->size += delta->size;
+        }
+        UNLOCK (&ctx->lock);
+
+out:
+        if (locked)
+                mq_lock (this, &loc, F_UNLCK);
+
+        if (dict)
+                dict_unref (dict);
+
+        loc_wipe (&loc);
+
+        return ret;
+}
+
+int32_t
+mq_update_ug_size (xlator_t *this, loc_t *child_loc, quota_meta_t *delta,
+                   quota_inode_ctx_t *child_ctx)
+{
+        int32_t              ret                = -1;
+        char                 uid_str[PATH_MAX]  = {0,};
+        char                 gid_str[PATH_MAX]  = {0,};
+
+        GF_VALIDATE_OR_GOTO ("marker", delta, out);
+        GF_VALIDATE_OR_GOTO ("marker", child_ctx, out);
+
+        if (quota_meta_is_null (delta)) {
+                ret = 0;
+                goto out;
+        }
+
+        snprintf (uid_str, sizeof (uid_str), "%"PRId32,
+                  child_ctx->contri_u->ugid);
+        snprintf (gid_str, sizeof (gid_str), "%"PRId32,
+                  child_ctx->contri_g->ugid);
+
+        ret = _mq_update_ug_size (this, child_loc, delta,
+                                  uid_str, _gf_false);
+        if (ret < 0) {
+                goto out;
+        }
+
+        ret = _mq_update_ug_size (this, child_loc, delta,
+                                  gid_str, _gf_true);
+        if (ret < 0) {
+                goto out;
+        }
+
+out:
         return ret;
 }
 
@@ -1092,7 +1297,7 @@ mq_synctask_cleanup (int ret, call_frame_t *frame, void *opaque)
 int
 mq_synctask1 (xlator_t *this, synctask_fn_t task, gf_boolean_t spawn,
               loc_t *loc, quota_meta_t *contri, uint32_t nlink,
-              call_stub_t *stub)
+              uint64_t ugid, call_stub_t *stub)
 {
         int32_t              ret         = -1;
         quota_synctask_t    *args        = NULL;
@@ -1110,6 +1315,7 @@ mq_synctask1 (xlator_t *this, synctask_fn_t task, gf_boolean_t spawn,
         args->stub = stub;
         loc_copy (&args->loc, loc);
         args->ia_nlink = nlink;
+        args->ia_ugid = ugid;
 
         if (contri) {
                 args->contri = *contri;
@@ -1120,7 +1326,7 @@ mq_synctask1 (xlator_t *this, synctask_fn_t task, gf_boolean_t spawn,
         }
 
         if (spawn) {
-                ret = synctask_new1 (this->ctx->env, 1024 * 16, task,
+                ret = synctask_new1 (this->ctx->env, 1024 * 32, task,
                                       mq_synctask_cleanup, NULL, args);
                 if (ret) {
                         gf_log (this->name, GF_LOG_ERROR, "Failed to spawn "
@@ -1139,7 +1345,7 @@ out:
 int
 mq_synctask (xlator_t *this, synctask_fn_t task, gf_boolean_t spawn, loc_t *loc)
 {
-        return mq_synctask1 (this, task, spawn, loc, NULL, -1, NULL);
+        return mq_synctask1 (this, task, spawn, loc, NULL, -1, -1, NULL);
 }
 
 int32_t
@@ -1176,6 +1382,13 @@ mq_prevalidate_txn (xlator_t *this, loc_t *origin_loc, loc_t *loc,
                                   "is NULL for %s", loc->path);
                 goto out;
         }
+
+        if (ctxtmp && buf) {
+                ret = mq_set_contribution_ug(this, ctxtmp, buf);
+                if (ret < 0)
+                        goto out;
+        }
+
         if (ctx)
                 *ctx = ctxtmp;
 
@@ -1276,11 +1489,6 @@ _mq_create_xattrs_txn (xlator_t *this, loc_t *origin_loc, struct iatt *buf,
                 } else {
                         GF_REF_PUT (contribution);
                 }
-                if (loc.inode->ia_type == IA_IFREG) {
-                        ret = mq_set_contribution_ug(this, ctx, buf);
-                        if (ret < 0)
-                                goto out;
-                }
         }
 
         ret = mq_synctask (this, mq_create_xattrs_task, spawn, &loc);
@@ -1336,6 +1544,7 @@ mq_reduce_parent_size_task (void *opaque)
         loc_t                   *loc           = NULL;
         gf_boolean_t             remove_xattr  = _gf_true;
         uint32_t                 nlink         = 0;
+        uint64_t                 ugid          = 0;
 
         GF_ASSERT (opaque);
 
@@ -1343,6 +1552,7 @@ mq_reduce_parent_size_task (void *opaque)
         loc = &args->loc;
         contri = args->contri;
         nlink = args->ia_nlink;
+        ugid = args->ia_ugid;
         this = args->this;
         THIS = this;
 
@@ -1412,6 +1622,12 @@ mq_reduce_parent_size_task (void *opaque)
         if (quota_meta_is_null (&delta))
                 goto out;
 
+        if (nlink == 1 && ctx && loc->inode->ia_type == IA_IFREG) {
+                ret = mq_update_ug_size (this, loc, &delta, ctx);
+                if (ret < 0)
+                        goto out;
+        }
+
         ret = mq_update_size (this, &parent_loc, &delta);
         if (ret < 0)
                 goto out;
@@ -1452,7 +1668,7 @@ out:
 int32_t
 mq_reduce_parent_size_txn (xlator_t *this, loc_t *origin_loc,
                            quota_meta_t *contri, uint32_t nlink,
-                           call_stub_t *stub)
+                           uint64_t ugid, call_stub_t *stub)
 {
         int32_t                  ret           = -1;
         loc_t                    loc           = {0, };
@@ -1472,7 +1688,7 @@ mq_reduce_parent_size_txn (xlator_t *this, loc_t *origin_loc,
 
         resume_stub = _gf_false;
         ret = mq_synctask1 (this, mq_reduce_parent_size_task, _gf_true, &loc,
-                            contri, nlink, stub);
+                            contri, nlink, ugid, stub);
 out:
         loc_wipe (&loc);
 
@@ -1665,6 +1881,17 @@ mq_initiate_quota_task (void *opaque)
                 ret = mq_update_contri (this, &child_loc, contri, &delta, ctx);
                 if (ret < 0)
                         goto out;
+
+                if (child_loc.inode->ia_type == IA_IFREG) {
+                        ret = mq_update_ug_size (this, &child_loc, &delta, ctx);
+                        if (ret < 0) {
+                                gf_log (this->name, GF_LOG_DEBUG, "rollback "
+                                        "contri_ug updation");
+                                mq_sub_meta (&delta, NULL);
+                                mq_update_contri (this, &child_loc, contri, &delta, ctx);
+                                goto out;
+                        }
+                }
 
                 ret = mq_update_size (this, &parent_loc, &delta);
                 if (ret < 0) {

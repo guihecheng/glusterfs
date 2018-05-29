@@ -512,28 +512,25 @@ int32_t
 mq_set_contribution_ug(xlator_t *this, quota_inode_ctx_t *ctx, struct iatt *st)
 {
         int32_t            ret              = -1;
-        ug_contribution_t *contri_u         = NULL;
-        ug_contribution_t *contri_g         = NULL;
 
         if ((ctx == NULL) || (st == NULL))
                 goto out;
 
-        if (st->ia_type != IA_IFREG)
-                goto out;
-
         LOCK (&ctx->lock);
         {
-                contri_u =  mq_contri_ug_init (st, _gf_false);
-                if (contri_u == NULL)
+                if (ctx->contri_u == NULL)
+                        ctx->contri_u =  mq_contri_ug_init (st, _gf_false);
+                if (ctx->contri_u == NULL)
                         goto unlock;
-                contri_g =  mq_contri_ug_init (st, _gf_true);
-                if (contri_g == NULL) {
-                        GF_REF_PUT (contri_u);
+
+                if (ctx->contri_g == NULL)
+                        ctx->contri_g =  mq_contri_ug_init (st, _gf_true);
+                if (ctx->contri_g == NULL) {
+                        GF_REF_PUT (ctx->contri_u);
                         goto unlock;
                 }
-                ctx->contri_u = contri_u;
-                ctx->contri_g = contri_g;
         }
+        ret = 0;
 
 unlock:
         UNLOCK (&ctx->lock);

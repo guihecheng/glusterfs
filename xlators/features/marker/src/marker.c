@@ -991,7 +991,7 @@ marker_rmdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 stub = fop_rmdir_cbk_stub (frame, default_rmdir_cbk, op_ret,
                                            op_errno, preparent, postparent,
                                            xdata);
-                mq_reduce_parent_size_txn (this, &local->loc, NULL, 1, stub);
+                mq_reduce_parent_size_txn (this, &local->loc, NULL, 1, -1, stub);
 
                 if (stub) {
                         marker_local_unref (local);
@@ -1048,6 +1048,7 @@ marker_unlink_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
         marker_conf_t      *priv    = NULL;
         marker_local_t     *local   = NULL;
         uint32_t            nlink   = -1;
+        uint64_t            ugid    = 0;
         GF_UNUSED int32_t   ret     = 0;
         call_stub_t        *stub    = NULL;
 
@@ -1079,6 +1080,13 @@ marker_unlink_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                                         "dict get failed %s ",
                                         strerror (-ret));
                         }
+                        ret = dict_get_uint64 (xdata,
+                                GF_RESPONSE_UGID_XDATA, &ugid);
+                        if (ret) {
+                                gf_log (this->name, GF_LOG_TRACE,
+                                        "dict get failed %s ",
+                                        strerror (-ret));
+                        }
                 }
 
                 /* If a 'rm -rf' is performed by a client, unlink can be faster
@@ -1095,7 +1103,7 @@ marker_unlink_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                                             op_errno, preparent, postparent,
                                             xdata);
                 mq_reduce_parent_size_txn (this, &local->loc, NULL, nlink,
-                                           stub);
+                                           ugid, stub);
 
                 if (stub) {
                         marker_local_unref (local);
@@ -1149,6 +1157,10 @@ marker_unlink (call_frame_t *frame, xlator_t *this, loc_t *loc, int xflag,
         }
 
         ret = dict_set_int32 (xdata, GF_REQUEST_LINK_COUNT_XDATA, 1);
+        if (ret < 0)
+                goto err;
+
+        ret = dict_set_int32 (xdata, GF_REQUEST_UGID_XDATA, 1);
         if (ret < 0)
                 goto err;
 
@@ -1270,14 +1282,14 @@ marker_rename_done (call_frame_t *frame, void *cookie, xlator_t *this,
                 goto err;
 
         mq_reduce_parent_size_txn (this, &oplocal->loc, &oplocal->contribution,
-                                   -1, NULL);
+                                   -1, -1, NULL);
 
         if (local->loc.inode != NULL) {
                 /* If destination file exits before rename, it would have
                  * been unlinked while renaming a file
                  */
                 mq_reduce_parent_size_txn (this, &local->loc, NULL,
-                                           local->ia_nlink, NULL);
+                                           local->ia_nlink, -1, NULL);
         }
 
         newloc.inode = inode_ref (oplocal->loc.inode);

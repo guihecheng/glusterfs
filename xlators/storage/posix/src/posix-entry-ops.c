@@ -142,6 +142,30 @@ out:
         return res;
 }
 
+dict_t*
+posix_dict_set_ugid (dict_t *req, dict_t *res, uint32_t uid, uint32_t gid)
+{
+        int      ret  =  -1;
+        uint64_t ugid =   0;
+
+        if (req == NULL || !dict_get (req, GF_REQUEST_UGID_XDATA))
+                goto out;
+
+        if (res == NULL)
+                res = dict_new ();
+        if (res == NULL)
+                goto out;
+
+        ugid = (uid << 32) | gid;
+
+        ret = dict_set_uint64 (res, GF_RESPONSE_UGID_XDATA, ugid);
+        if (ret == -1)
+                gf_msg ("posix", GF_LOG_WARNING, 0, P_MSG_SET_XDATA_FAIL,
+                        "Failed to set GF_RESPONSE_UGID_XDATA");
+out:
+        return res;
+}
+
 /* Regular fops */
 
 int32_t
@@ -1237,6 +1261,8 @@ posix_unlink (call_frame_t *frame, xlator_t *this,
                                 &postparent);
 
         unwind_dict = posix_dict_set_nlink (xdata, unwind_dict, stbuf.ia_nlink);
+        unwind_dict = posix_dict_set_ugid (xdata, unwind_dict, stbuf.ia_uid,
+                                           stbuf.ia_gid);
         op_ret = 0;
 out:
         SET_TO_OLD_FS_ID ();

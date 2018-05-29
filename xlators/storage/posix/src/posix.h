@@ -663,4 +663,7 @@ posix_cs_maintenance (xlator_t *this, fd_t *fd, loc_t *loc, int *pfd,
                    struct iatt *buf, const char *realpath, dict_t *xattr_req,
                    dict_t **xattr_rsp, gf_boolean_t ignore_failure);
 
+dict_t *posix_get_ugquota_gfid (xlator_t *this, int32_t *op_ret,
+                                int32_t *op_errno, dict_t *xdata);
+
 #endif /* _POSIX_H */

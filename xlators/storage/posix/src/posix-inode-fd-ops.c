@@ -5176,9 +5176,11 @@ int32_t
 posix_readdirp (call_frame_t *frame, xlator_t *this,
                 fd_t *fd, size_t size, off_t off, dict_t *dict)
 {
-        gf_dirent_t entries;
-        int32_t     op_ret = -1, op_errno = 0;
-        gf_dirent_t     *entry     = NULL;
+        gf_dirent_t      entries;
+        int32_t          op_ret       = -1;
+        int32_t          op_errno     = 0;
+        gf_dirent_t     *entry        = NULL;
+        dict_t          *xattr        = NULL;
 
 
         if ((dict != NULL) && (dict_get (dict, GET_ANCESTRY_DENTRY_KEY))) {
@@ -5198,6 +5200,19 @@ posix_readdirp (call_frame_t *frame, xlator_t *this,
                 STACK_UNWIND_STRICT (readdir, frame, op_ret, op_errno, &entries,
                                      NULL);
 
+                gf_dirent_free (&entries);
+                return 0;
+        }
+
+        if ((dict != NULL) && (dict_get (dict, GET_UGQUOTA_GFID))) {
+                INIT_LIST_HEAD (&entries.list);
+
+                xattr = posix_get_ugquota_gfid (this, &op_ret, &op_errno,
+                                                dict);
+                STACK_UNWIND_STRICT (readdir, frame, op_ret, op_errno,
+                                     &entries, xattr);
+                if (xattr)
+                        dict_unref (xattr);
                 gf_dirent_free (&entries);
                 return 0;
         }
