@@ -298,6 +298,7 @@ struct dht_local {
         xlator_t                *mds_subvol; /* This is use for dir only */
         char                     need_selfheal;
         char                     need_xattr_heal;
+        char                     need_attrheal;
         int                      file_count;
         int                      dir_count;
         call_frame_t            *main_frame;
@@ -1491,4 +1492,6 @@ int
 dht_selfheal_dir_setattr (call_frame_t *frame, loc_t *loc, struct iatt *stbuf,
                           int32_t valid, dht_layout_t *layout);
 
+int
+is_permission_different (ia_prot_t *prot1, ia_prot_t *prot2);
 #endif/* _DHT_H */
