@@ -839,3 +839,23 @@ print_quota_list_empty (char *path, int type)
                          "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A");
 }
 
+void
+print_quota_ug_list_header (int type)
+{
+        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
+                cli_out ("                  UID/GID                   Hard-limit "
+                         " Soft-limit      Used  Available  Soft-limit "
+                         "exceeded? Hard-limit exceeded?");
+                cli_out ("-----------------------------------------------------"
+                         "-----------------------------------------------------"
+                         "---------------------");
+        }
+}
+
+void
+print_quota_ug_list_empty (char *ugid, int type)
+{
+        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER)
+                cli_out ("%-40s %7s %9s %10s %7s %15s %20s", ugid,
+                         "N/A", "N/A", "N/A", "N/A", "N/A", "N/A");
+}

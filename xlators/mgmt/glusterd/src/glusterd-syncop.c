@@ -1116,7 +1116,8 @@ _gd_syncop_commit_op_cbk (struct rpc_req *req, struct iovec *iov,
                 }
         }
 
-        if ((rsp.op != GD_OP_QUOTA) || (type == GF_QUOTA_OPTION_TYPE_LIST)) {
+        if ((rsp.op != GD_OP_QUOTA) || (type == GF_QUOTA_OPTION_TYPE_LIST) ||
+                                       (type == GF_QUOTA_OPTION_TYPE_LIST_USER)) {
                 pthread_mutex_lock (&args->lock_dict);
                 {
                         ret = glusterd_syncop_aggr_rsp_dict (rsp.op, args->dict,
@@ -1440,7 +1441,8 @@ gd_commit_op_phase (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
         }
 
         if (((op == GD_OP_QUOTA) && ((type == GF_QUOTA_OPTION_TYPE_LIST) ||
-             (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS))) ||
+             (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS) ||
+             (type == GF_QUOTA_OPTION_TYPE_LIST_USER))) ||
             ((op != GD_OP_SYNC_VOLUME) && (op != GD_OP_QUOTA))) {
 
                 ret =  glusterd_syncop_aggr_rsp_dict (op, op_ctx,

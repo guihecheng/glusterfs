@@ -3590,7 +3590,8 @@ print_quota_list_output (cli_local_t *local, char *path, char *default_sl,
                 }
         }
 
-        if (type == GF_QUOTA_OPTION_TYPE_LIST)
+        if (type == GF_QUOTA_OPTION_TYPE_LIST ||
+            type == GF_QUOTA_OPTION_TYPE_LIST_USER)
                 ret = print_quota_list_usage_output (local, path, avail,
                                                      sl_final, limits,
                                                      used_space, sl, hl,
@@ -3703,12 +3704,150 @@ out:
         return ret;
 }
 
+static int
+print_quota_ug_list_from_mountdir (cli_local_t *local, char *mountdir,
+                                   char *ugid, int type)
+{
+        int             ret              = -1;
+        ssize_t         xattr_size       = 0;
+        quota_limits_t  limits           = {0,};
+        quota_meta_t    used_space       = {0,};
+        char           *key              = NULL;
+        gf_boolean_t    limit_set        = _gf_true;
+        char            path[PATH_MAX]   = {0,};
+        char           *default_sl       = NULL;
+
+        GF_ASSERT (local);
+        GF_ASSERT (mountdir);
+        GF_ASSERT (ugid);
+
+        ret = dict_get_str (local->dict, "default-soft-limit",
+                            &default_sl);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR,
+                        "failed to get default soft limit");
+                goto out;
+        }
+
+        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
+                snprintf (path, sizeof (path), "%s%s/%s",
+                                mountdir, GF_QUOTA_U_DIR, ugid);
+                key = QUOTA_LIMIT_KEY;
+        }
+
+
+        ret = sys_lgetxattr (path, key, (void *)&limits, sizeof (limits));
+        if (ret < 0) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get the xattr %s "
+                        "on %s. Reason : %s", key, path, strerror (errno));
+
+                switch (errno) {
+#if defined(ENODATA)
+                case ENODATA:
+#endif
+#if defined(ENOATTR) && (ENOATTR != ENODATA)
+                case ENOATTR:
+#endif
+                        /* If it's an ENOATTR, quota/inode-quota is
+                         * configured(limit is set atleast for one directory).
+                         * The user is trying to issue 'list/list-objects'
+                         * command for a directory on which quota limit is
+                         * not set and we are showing the used-space in case
+                         * of list-usage and showing (dir_count, file_count)
+                         * in case of list-objects. Other labels are
+                         * shown "N/A".
+                         */
+
+                        limit_set = _gf_false;
+                        goto enoattr;
+                        break;
+
+                default:
+                        cli_err ("%-10s %s", ugid, strerror (errno));
+                        break;
+                }
+
+                goto out;
+        }
+
+        limits.hl = ntoh64 (limits.hl);
+        limits.sl = ntoh64 (limits.sl);
+
+enoattr:
+        xattr_size = sys_lgetxattr (path, QUOTA_SIZE_KEY, NULL, 0);
+        if (xattr_size > 0) {
+                ret = sys_lgetxattr (path, QUOTA_SIZE_KEY,
+                                     &used_space, sizeof (used_space));
+        } else {
+                ret = -1;
+        }
+
+        if (ret < 0) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get quota size "
+                        "on path %s: %s", path, strerror (errno));
+                print_quota_ug_list_empty (ugid, type);
+                goto out;
+        }
+
+        used_space.size = ntoh64 (used_space.size);
+        used_space.file_count = ntoh64 (used_space.file_count);
+        used_space.dir_count = ntoh64 (used_space.dir_count);
+
+        ret = print_quota_list_output (local, ugid, default_sl, &limits,
+                                       &used_space, type, limit_set);
+out:
+        return ret;
+}
+
+static int
+print_quota_ug_list_from_mountdir_all (cli_local_t *local, char *mountdir,
+                                       int type)
+{
+        int                 ret              = -1;
+        char                ugid[PATH_MAX]   = {0,};
+        char                path[PATH_MAX]   = {0,};
+        DIR                *filterdir        = NULL;
+        struct dirent      *entry            = NULL;
+        struct dirent       scratch[2]       = {{0,},};
+
+        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
+                snprintf (path, sizeof (path), "%s%s/", mountdir, GF_QUOTA_U_DIR);
+        }
+
+        filterdir = sys_opendir (path);
+        if (!filterdir) {
+                gf_log("cli", GF_LOG_ERROR, "opendir on %s failed, "
+                        "reason : %s", path, strerror (errno));
+                goto out;
+        }
+
+        for (;;) {
+                errno = 0;
+                entry = sys_readdir (filterdir, scratch);
+                if (!entry || errno != 0)
+                        break;
+                if (strcmp (entry->d_name, ".")  == 0 ||
+                    strcmp (entry->d_name, "..") == 0)
+                        continue;
+                (void) snprintf (ugid, sizeof(ugid), "%s", entry->d_name);
+                ret = print_quota_ug_list_from_mountdir (local, mountdir,
+                                                         ugid, type);
+        }
+
+        (void) sys_closedir (filterdir);
+
+        ret = 0;
+
+out:
+        return ret;
+}
+
 int
 gluster_remove_auxiliary_mount (char *volname)
 {
-        int       ret                = -1;
-        char      mountdir[PATH_MAX] = {0,};
-        xlator_t  *this               = NULL;
+        int       ret                   = -1;
+        char      mountdir[PATH_MAX]    = {0,};
+        xlator_t  *this                 = NULL;
 
         this = THIS;
         GF_ASSERT (this);
@@ -3718,6 +3857,26 @@ gluster_remove_auxiliary_mount (char *volname)
         if (ret) {
                 gf_log("cli", GF_LOG_ERROR, "umount on %s failed, "
                         "reason : %s", mountdir, strerror (errno));
+        }
+
+        return ret;
+}
+
+int
+gluster_remove_auxiliary_mount_ug (char *volname)
+{
+        int       ret                   = -1;
+        char      mountdir_ug[PATH_MAX] = {0,};
+        xlator_t  *this                 = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        GLUSTERD_GET_QUOTA_UG_RD_MOUNT_PATH (mountdir_ug, volname, "/");
+        ret = gf_umount_lazy (this->name, mountdir_ug, 1);
+        if (ret) {
+                gf_log("cli", GF_LOG_ERROR, "umount on %s failed, "
+                        "reason : %s", mountdir_ug, strerror (errno));
         }
 
         return ret;
@@ -3772,6 +3931,53 @@ gf_cli_print_limit_list_from_dict (cli_local_t *local, char *volname,
                 GLUSTERD_GET_QUOTA_LIST_MOUNT_PATH (mountdir, volname, path);
                 ret = print_quota_list_from_mountdir (local, mountdir,
                                                       default_sl, path, type);
+        }
+
+out:
+        return ret;
+}
+
+int
+gf_cli_print_limit_ug_list (cli_local_t *local, char *volname,
+                            int op_ret, int op_errno, char *op_errstr)
+{
+        int             ret                     = -1;
+        int             i                       = 0;
+        char            key[1024]               = {0,};
+        char            mountdir[PATH_MAX]      = {0,};
+        char            *ugid                   = NULL;
+        int             type                    = -1;
+        int             count                   = 0;
+
+        ret = dict_get_int32 (local->dict, "type", &type);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get quota type");
+                goto out;
+        }
+
+        GLUSTERD_GET_QUOTA_UG_RD_MOUNT_PATH (mountdir, volname, "/");
+
+        print_quota_ug_list_header (type);
+
+        ret = dict_get_int32 (local->dict, "count", &count);
+        if (ret || count == 0) {
+                ret = print_quota_ug_list_from_mountdir_all (local, mountdir,
+                                                             type);
+                goto out;
+        }
+
+        while (count--) {
+                snprintf (key, sizeof (key), "ugid%d", i++);
+
+                ret = dict_get_str (local->dict, key, &ugid);
+                if (ret < 0) {
+                        gf_log ("cli", GF_LOG_DEBUG, "Path not present in limit"
+                                " list");
+                        continue;
+                }
+
+                ret = print_quota_ug_list_from_mountdir (local, mountdir,
+                                                         ugid, type);
         }
 
 out:
@@ -4125,6 +4331,21 @@ out:
         return;
 }
 
+void
+gf_cli_quota_ug_list (cli_local_t *local, char *volname,
+                      int op_ret, int op_errno, char *op_errstr)
+{
+        GF_VALIDATE_OR_GOTO ("cli", volname, out);
+
+        if (!connected)
+                goto out;
+
+        gf_cli_print_limit_ug_list (local, volname,
+                                    op_ret, op_errno, op_errstr);
+out:
+        return;
+}
+
 int
 gf_cli_quota_cbk (struct rpc_req *req, struct iovec *iov,
                      int count, void *myframe)
@@ -4246,6 +4467,12 @@ gf_cli_quota_cbk (struct rpc_req *req, struct iovec *iov,
                 }
         }
 
+        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
+                gf_cli_quota_ug_list (local, volname, rsp.op_ret,
+                                      rsp.op_errno, rsp.op_errstr);
+
+        }
+
 xml_output:
 
         if (global_state->mode & GLUSTER_MODE_XML) {
@@ -4264,9 +4491,13 @@ xml_output:
         ret = rsp.op_ret;
 out:
 
-        if ((type == GF_QUOTA_OPTION_TYPE_LIST)
-            || (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS)) {
+        if ((type == GF_QUOTA_OPTION_TYPE_LIST) ||
+            (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS)) {
                 gluster_remove_auxiliary_mount (volname);
+        }
+
+        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
+                gluster_remove_auxiliary_mount_ug (volname);
         }
 
         cli_cmd_broadcast_response (ret);

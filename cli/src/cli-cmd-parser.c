@@ -1425,7 +1425,7 @@ cli_cmd_quota_parse (const char **words, int wordcount, dict_t **options)
 
                 i = 4;
                 while (i < wordcount) {
-                        snprintf (key, 20, "uid%d", i - 4);
+                        snprintf (key, 20, "ugid%d", i - 4);
 
                         ret = dict_set_str (dict, key, (char *) words [i++]);
                         if (ret < 0)

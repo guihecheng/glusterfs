@@ -68,6 +68,11 @@ typedef enum {
                   DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_list%s", volname, path);\
         } while (0)
 
+#define GLUSTERD_GET_QUOTA_UG_RD_MOUNT_PATH(abspath, volname, path) do {       \
+        snprintf (abspath, sizeof (abspath)-1,                                 \
+                  DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_ug_rd%s", volname, path);\
+        } while (0)
+
 struct cli_state;
 struct cli_cmd_word;
 struct cli_cmd_tree;
@@ -488,7 +493,13 @@ void
 print_quota_list_header (int type);
 
 void
-print_quota_list_empty (char *path, int type);
+print_quota_list_empty (char *ugid, int type);
+
+void
+print_quota_ug_list_header (int type);
+
+void
+print_quota_ug_list_empty (char *path, int type);
 
 int
 gf_gsync_status_t_comparator (const void *p, const void *q);

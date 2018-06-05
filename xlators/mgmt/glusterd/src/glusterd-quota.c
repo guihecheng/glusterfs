@@ -2338,6 +2338,10 @@ glusterd_op_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
                         ret = glusterd_quota_remove_usage_user (volinfo, dict,
                                                                 op_errstr);
                         goto out;
+                case GF_QUOTA_OPTION_TYPE_LIST_USER:
+                        ret = glusterd_quota_get_default_soft_limit (volinfo,
+                                                               rsp_dict);
+                        goto out;
 
                 case GF_QUOTA_OPTION_TYPE_SOFT_TIMEOUT:
                         ret = glusterd_set_quota_option (volinfo, dict,
