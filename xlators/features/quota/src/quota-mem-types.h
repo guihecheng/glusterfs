@@ -24,6 +24,7 @@ enum gf_quota_mem_types_ {
         gf_quota_mt_quota_limits_level_t,
         gf_quota_mt_qd_vols_conf_t,
         gf_quota_mt_aggregator_state_t,
+        gf_quota_mt_ug_contribution_t,
         gf_quota_mt_end
 };
 #endif

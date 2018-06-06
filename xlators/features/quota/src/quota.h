@@ -156,20 +156,30 @@ struct quota_dentry {
 };
 typedef struct quota_dentry quota_dentry_t;
 
-struct quota_inode_ctx {
-        int64_t          size;
-        int64_t          hard_lim;
-        int64_t          soft_lim;
-        int64_t          file_count;
-        int64_t          dir_count;
-        int64_t          object_hard_lim;
-        int64_t          object_soft_lim;
-        struct iatt      buf;
-        struct list_head parents;
-        struct timeval   tv;
-        struct timeval   prev_log;
-        gf_boolean_t     ancestry_built;
+struct ug_contribution {
+        int64_t          contribution;
+        int32_t          ugid;
         gf_lock_t        lock;
+        GF_REF_DECL;
+};
+typedef struct ug_contribution ug_contribution_t;
+
+struct quota_inode_ctx {
+        int64_t                size;
+        int64_t                hard_lim;
+        int64_t                soft_lim;
+        int64_t                file_count;
+        int64_t                dir_count;
+        int64_t                object_hard_lim;
+        int64_t                object_soft_lim;
+        struct iatt            buf;
+        struct list_head       parents;
+        struct timeval         tv;
+        struct timeval         prev_log;
+        gf_boolean_t           ancestry_built;
+        gf_lock_t              lock;
+        ug_contribution_t     *contri_u;
+        ug_contribution_t     *contri_g;
 };
 typedef struct quota_inode_ctx quota_inode_ctx_t;
 

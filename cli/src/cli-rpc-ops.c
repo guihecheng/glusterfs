@@ -4485,7 +4485,8 @@ xml_output:
         }
 
         if (!rsp.op_ret && type != GF_QUOTA_OPTION_TYPE_LIST
-                        && type != GF_QUOTA_OPTION_TYPE_LIST_OBJECTS)
+                        && type != GF_QUOTA_OPTION_TYPE_LIST_OBJECTS
+                        && type != GF_QUOTA_OPTION_TYPE_LIST_USER)
                 cli_out ("volume quota : success");
 
         ret = rsp.op_ret;
