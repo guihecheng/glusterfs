@@ -571,8 +571,8 @@ int
 glusterd_generate_and_set_task_id (dict_t *dict, char *key);
 
 int
-glusterd_validate_and_set_gfid (dict_t *op_ctx, dict_t *req_dict,
-                                char **op_errstr);
+glusterd_validate_and_set_gfid (glusterd_op_t op, dict_t *op_ctx,
+                                dict_t *req_dict, char **op_errstr);
 
 int
 glusterd_copy_uuid_to_dict (uuid_t uuid, dict_t *dict, char *key);

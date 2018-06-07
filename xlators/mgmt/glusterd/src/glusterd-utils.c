@@ -12472,8 +12472,8 @@ glusterd_is_bitrot_enabled (glusterd_volinfo_t *volinfo)
 }
 
 int
-glusterd_validate_and_set_gfid (dict_t *op_ctx, dict_t *req_dict,
-                                char **op_errstr)
+glusterd_validate_and_set_gfid (glusterd_op_t op, dict_t *op_ctx,
+                                dict_t *req_dict, char **op_errstr)
 {
         int        ret           = -1;
         int        count         = 0;
@@ -12499,10 +12499,16 @@ glusterd_validate_and_set_gfid (dict_t *op_ctx, dict_t *req_dict,
                 goto out;
         }
 
-        if ((op_code != GF_QUOTA_OPTION_TYPE_LIMIT_USAGE) &&
+        if ((op == GD_OP_QUOTA) &&
+            (op_code != GF_QUOTA_OPTION_TYPE_LIMIT_USAGE) &&
             (op_code != GF_QUOTA_OPTION_TYPE_LIMIT_OBJECTS) &&
             (op_code != GF_QUOTA_OPTION_TYPE_REMOVE) &&
-            (op_code != GF_QUOTA_OPTION_TYPE_REMOVE_OBJECTS) &&
+            (op_code != GF_QUOTA_OPTION_TYPE_REMOVE_OBJECTS)) {
+                ret = 0;
+                goto out;
+        }
+
+        if ((op == GD_OP_WORM) &&
             (op_code != GF_WORM_OPTION_TYPE_SET) &&
             (op_code != GF_WORM_OPTION_TYPE_CLEAR)) {
                 ret = 0;

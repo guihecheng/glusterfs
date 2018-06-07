@@ -1406,8 +1406,8 @@ stage_done:
         ret = args.op_ret;
 
 out:
-        if ((ret == 0) && ((op == GD_OP_QUOTA) || (op == GD_OP_WORM))) {
-                ret = glusterd_validate_and_set_gfid (op_ctx, req_dict,
+        if ((ret == 0) && ((op == GD_OP_QUOTA) || (op == GD_OP_QUOTA))) {
+                ret = glusterd_validate_and_set_gfid (op, op_ctx, req_dict,
                                                       op_errstr);
                 if (ret)
                         gf_msg (this->name, GF_LOG_ERROR, 0,
