@@ -205,6 +205,10 @@ nfs_program_register_portmap_all (struct nfs_state *nfs)
                 if (nfs->override_portnum)
                         prog->progport = nfs->override_portnum;
                 (void) rpcsvc_program_register_portmap (prog, prog->progport);
+#ifdef GNFS_IPV6
+                (void) rpcsvc_program_register_rpcbind6 (prog, prog->progport);
+#endif
+
         }
 
         return (0);
@@ -340,6 +344,17 @@ nfs_init_versions (struct nfs_state *nfs, xlator_t *this)
                                 if (version->required)
                                         goto err;
                         }
+#ifdef GNFS_IPV6
+                        ret = rpcsvc_program_register_rpcbind6 (prog,
+                                                                prog->progport);
+                        if (ret == -1) {
+                                gf_msg (GF_NFS, GF_LOG_ERROR, 0,
+                                        NFS_MSG_PGM_REG_FAIL,
+                                        "Program (ipv6) %s registration failed",
+                                        prog->progname);
+                                goto err;
+                        }
+#endif
                 }
 
         }
@@ -903,6 +918,14 @@ nfs_init_state (xlator_t *this)
         }
 
 
+#ifdef GNFS_IPV6
+        ret = dict_set_str (this->options, "transport.address-family",
+                            "inet6");
+        if (ret == -1) {
+                gf_log (GF_NFS, GF_LOG_ERROR, "dict_set_str error");
+                goto free_foppool;
+        }
+#endif
         /* Right only socket support exists between nfs client and
          * gluster nfs, so we can set default value as socket
          */

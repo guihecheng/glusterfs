@@ -47,6 +47,10 @@
 %global _without_georeplication --disable-georeplication
 %endif
 
+# if you wish to compile an rpm with the legacy gNFS ipv4/ipv6 server xlator
+# rpmbuild -ta @PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz --with gnfs-ipv6
+%{?_with_gnfs_ipv6:%global _with_gnfs_ipv6 --enable-gnfs-ipv6}
+
 # if you wish to compile an rpm without the OCF resource agents...
 # rpmbuild -ta @PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz --without ocf
 %{?_without_ocf:%global _without_ocf --without-ocf}
@@ -230,6 +234,9 @@ BuildRequires:    libaio-devel libacl-devel
 BuildRequires:    python2-devel
 %if ( 0%{?fedora} && 0%{?fedora} < 26 ) || ( 0%{?rhel} )
 BuildRequires:    python-ctypes
+%endif
+%if ( 0%{?_with_gnfs_ipv6:1} )
+BuildRequires:    libtirpc libtirpc-devel
 %endif
 BuildRequires:    userspace-rcu-devel >= 0.7
 %if ( 0%{?rhel} && 0%{?rhel} <= 6 )
@@ -745,6 +752,7 @@ export LDFLAGS
         %{?_without_rdma} \
         %{?_without_syslog} \
         %{?_without_tiering} \
+        %{?_with_gnfs_ipv6} \
         %{?_without_events}
 
 # fix hardening and remove rpath in shlibs

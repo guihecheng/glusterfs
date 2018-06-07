@@ -18,7 +18,7 @@ autogen:
 	cd ../.. && \
 	rm -rf autom4te.cache && \
 	./autogen.sh && \
-	./configure --with-previous-options
+	./configure --enable-gnfs-ipv6 --with-previous-options
 
 prep:
 	$(MAKE) -C ../.. dist;
@@ -32,11 +32,11 @@ prep:
 	cp ../../glusterfs.spec ./rpmbuild/SPECS
 
 srcrpm:
-	rpmbuild --define '_topdir $(shell pwd)/rpmbuild' -bs rpmbuild/SPECS/glusterfs.spec
+	rpmbuild --define '_topdir $(shell pwd)/rpmbuild' --with gnfs-ipv6 -bs rpmbuild/SPECS/glusterfs.spec
 	mv rpmbuild/SRPMS/* .
 
 rpms:
-	rpmbuild --define '_topdir $(shell pwd)/rpmbuild' -bb rpmbuild/SPECS/glusterfs.spec
+	rpmbuild --define '_topdir $(shell pwd)/rpmbuild' --with gnfs-ipv6 -bb rpmbuild/SPECS/glusterfs.spec
 	mv rpmbuild/RPMS/*/* .
 
 # EPEL-5 does not like new versions of rpmbuild and requires some

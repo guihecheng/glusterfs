@@ -1330,6 +1330,44 @@ if test "x$enable_glupy" = "xyes"; then
 fi
 dnl end glupy section
 
+dnl gnfs_ipv6 section
+BUILD_GNFS_IPV6="no"
+AC_ARG_ENABLE([gnfs-ipv6],
+              AC_HELP_STRING([--enable-gnfs-ipv6],
+                             [Enable gnfs ipv6 support.]))
+if test "x$enable_gnfs_ipv6" = "xyes"; then
+    BUILD_GNFS_IPV6="yes"
+fi
+AM_CONDITIONAL([BUILD_GNFS_IPV6], [test x$BUILD_GNFS_IPV6 = xyes])
+dnl end gnfs_ipv6 section
+
+dnl check libtirpc
+if test "x${enable_gnfs_ipv6}" = "xyes" ; then
+    PKG_CHECK_MODULES([TIRPC], [libtirpc],
+       [enable_gnfs_ipv6="yes"; GF_CFLAGS="$GF_CFLAGS $TIRPC_CFLAGS"; GF_LDFLAGS="$GF_LDFLAGS $TIRPC_LIBS";],
+       [enable_gnfs_ipv6="no"])
+
+    if test "x${enable_gnfs_ipv6}" = "xno" ; then
+        BUILD_GNFS_IPV6="no"
+        BUILD_GNFS="yes"
+        AC_CHECK_HEADERS([rpc/rpc.h],[
+            AC_MSG_WARN([
+                ---------------------------------------------------------------------------------
+                gnfs ipv6 was enabled but libtirpc-devel is not installed.
+                ---------------------------------------------------------------------------------])],[
+            AC_MSG_ERROR([
+                ---------------------------------------------------------------------------------
+                gnfs ipv6 was enabled but libtirpc-devel is not installed.
+                and there were no legacy glibc rpc headers and library to fall back to.
+                ---------------------------------------------------------------------------------])])
+    fi
+
+fi
+
+if test "x$enable_gnfs_ipv6" = "xyes" ; then
+   GF_CFLAGS="$GF_CFLAGS -DGNFS_IPV6"
+fi
+
 dnl Check for userspace-rcu
 PKG_CHECK_MODULES([URCU], [liburcu-bp], [],
   [AC_CHECK_HEADERS([urcu-bp.h],
@@ -1563,4 +1601,5 @@ echo "Events               : $BUILD_EVENTS"
 echo "EC dynamic support   : $EC_DYNAMIC_SUPPORT"
 echo "Use memory pools     : $USE_MEMPOOL"
 echo "Nanosecond m/atimes  : $BUILD_NANOSECOND_TIMESTAMPS"
+echo "gNFS IPV6 support    : $BUILD_GNFS_IPV6"
 echo
