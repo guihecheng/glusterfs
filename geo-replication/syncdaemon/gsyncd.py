@@ -775,6 +775,7 @@ def main_i():
     elif remote:
         # master
         gconf.label = gconf.local_path
+        gconf.worker = True
     else:
         gconf.label = 'slave'
     startup(go_daemon=go_daemon, log_file=log_file, label=gconf.label)

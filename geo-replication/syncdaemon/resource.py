@@ -40,6 +40,7 @@ from gsyncdstatus import GeorepStatus
 from syncdutils import get_master_and_slave_data_from_args
 from syncdutils import lf, Popen, sup, Volinfo
 from syncdutils import Xattr, matching_disk_gfid, get_gfid_from_mnt
+from syncdutils import unshare_propagation_supported
 
 UrlRX = re.compile('\A(\w+)://([^ *?[]*)\Z')
 HostRX = re.compile('[a-zA-Z\d](?:[a-zA-Z\d.-]*[a-zA-Z\d])?', re.I)
@@ -1302,15 +1303,29 @@ class GLUSTER(AbstractUrl, SlaveLocal, SlaveRemote):
                         assert(mntdata[-1] == '\0')
                         mntpt = mntdata[:-1]
                         assert(mntpt)
-                        if mounted and gconf.label == 'slave' \
+
+                        umount_master = False
+                        umount_slave = False
+                        master_access_mount = getattr(gconf, 'access_mount',
+                                                      False)
+                        worker = getattr(gconf, 'worker', None)
+
+                        if worker \
+                           and not unshare_propagation_supported() \
+                           and not boolify(master_access_mount):
+                            umount_master = True
+                        if gconf.label == 'slave' \
                            and not boolify(gconf.slave_access_mount):
+                            umount_slave = True
+
+                        if mounted and (umount_master or umount_slave):
                             po = self.umount_l(mntpt)
                             po.terminate_geterr(fail_on_err=False)
                             if po.returncode != 0:
                                 po.errlog()
                                 rv = po.returncode
-                        if gconf.label == 'slave' \
-                           and not boolify(gconf.slave_access_mount):
+                            logging.debug("Lazy umount done: %s" % mntpt)
+                        if umount_master or umount_slave:
                             self.cleanup_mntpt(mntpt)
                 except:
                     logging.exception('mount cleanup failure:')
