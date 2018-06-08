@@ -1524,46 +1524,33 @@ out:
         return ret;
 }
 
-int32_t
-quota_ug_check_limit (call_frame_t *frame, inode_t *inode, xlator_t *this)
+static int32_t
+_quota_ug_check_limit (call_frame_t *frame, xlator_t *this,
+                       inode_t *child_inode, quota_inode_ctx_t *ctx,
+                       char *ugid, gf_boolean_t is_grp)
 {
         int32_t            ret                 = -1;
-        quota_inode_ctx_t *ctx                 = NULL;
         quota_local_t     *local               = NULL;
-        uint64_t           value               = 0;
-        char               ugid[PATH_MAX]      = {0,};
         gf_boolean_t       locked              = _gf_false;
+        inode_t           *_inode              = NULL;
 
         local = frame->local;
 
         GF_VALIDATE_OR_GOTO ("quota", this, err);
         GF_VALIDATE_OR_GOTO (this->name, frame, err);
-        GF_VALIDATE_OR_GOTO (this->name, inode, err);
+        GF_VALIDATE_OR_GOTO (this->name, child_inode, err);
+        GF_VALIDATE_OR_GOTO (this->name, ctx, err);
+        GF_VALIDATE_OR_GOTO (this->name, local, err);
         GF_VALIDATE_OR_GOTO (this->name, local->stub, err);
 
-        /* Allow all the trusted clients
-         * Don't block the gluster internal processes like rebalance, gsyncd,
-         * self heal etc from the disk quotas.
-         *
-         * Method: Allow all the clients with PID negative. This is by the
-         * assumption that any kernel assigned pid doesn't have the negative
-         * number.
-         */
-        if (0 > frame->root->pid)
-                goto done;
-
-        inode_ctx_get (inode, this, &value);
-        ctx = (quota_inode_ctx_t *)(unsigned long)value;
-
-        snprintf (ugid, sizeof (ugid), "%d", ctx->contri_u->ugid);
-
         loc_wipe (&local->validate_loc);
+        _inode = inode_ref (child_inode);
 
         LOCK (&local->lock);
         {
                 locked = _gf_true;
                 local->link_count++;
-                ret = _quota_lookup_ug (this, inode, ugid, _gf_false,
+                ret = _quota_lookup_ug (this, _inode, ugid, is_grp,
                                         &local->validate_loc);
                 if (ret) {
                         if (ret == 1)
@@ -1591,6 +1578,56 @@ err:
         if (locked)
                 UNLOCK (&local->lock);
 
+        if (_inode) {
+                inode_unref (_inode);
+                _inode = NULL;
+        }
+
+        return ret;
+}
+
+int32_t
+quota_ug_check_limit (call_frame_t *frame, inode_t *inode, xlator_t *this)
+{
+        int32_t            ret                 = -1;
+        quota_inode_ctx_t *ctx                 = NULL;
+        uint64_t           value               = 0;
+        char               ugid[PATH_MAX]      = {0,};
+
+        GF_VALIDATE_OR_GOTO ("quota", this, err);
+        GF_VALIDATE_OR_GOTO (this->name, frame, err);
+        GF_VALIDATE_OR_GOTO (this->name, inode, err);
+
+        /* Allow all the trusted clients
+         * Don't block the gluster internal processes like rebalance, gsyncd,
+         * self heal etc from the disk quotas.
+         *
+         * Method: Allow all the clients with PID negative. This is by the
+         * assumption that any kernel assigned pid doesn't have the negative
+         * number.
+         */
+        if (0 > frame->root->pid)
+                goto done;
+
+        inode_ctx_get (inode, this, &value);
+        ctx = (quota_inode_ctx_t *)(unsigned long)value;
+
+        snprintf (ugid, sizeof (ugid), "%d", ctx->contri_u->ugid);
+
+        ret = _quota_ug_check_limit (frame, this, inode, ctx, ugid, _gf_false);
+        if (ret < 0) {
+                goto err;
+        }
+
+        snprintf (ugid, sizeof (ugid), "%d", ctx->contri_g->ugid);
+
+        ret = _quota_ug_check_limit (frame, this, inode, ctx, ugid, _gf_true);
+        if (ret < 0) {
+                goto err;
+        }
+done:
+        ret = 0;
+err:
         return ret;
 }
 
