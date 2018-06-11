@@ -3572,7 +3572,9 @@ print_quota_list_output (cli_local_t *local, char *path, char *default_sl,
                                         limits->sl);
                         sl_final = percent_str;
                 }
-                if (type == GF_QUOTA_OPTION_TYPE_LIST)
+                if (type == GF_QUOTA_OPTION_TYPE_LIST ||
+                    type == GF_QUOTA_OPTION_TYPE_LIST_USER ||
+                    type == GF_QUOTA_OPTION_TYPE_LIST_GROUP)
                         used_size = used_space->size;
                 else
                         used_size = used_space->file_count + used_space->dir_count;
@@ -3591,7 +3593,8 @@ print_quota_list_output (cli_local_t *local, char *path, char *default_sl,
         }
 
         if (type == GF_QUOTA_OPTION_TYPE_LIST ||
-            type == GF_QUOTA_OPTION_TYPE_LIST_USER)
+            type == GF_QUOTA_OPTION_TYPE_LIST_USER ||
+            type == GF_QUOTA_OPTION_TYPE_LIST_GROUP)
                 ret = print_quota_list_usage_output (local, path, avail,
                                                      sl_final, limits,
                                                      used_space, sl, hl,
@@ -3733,6 +3736,10 @@ print_quota_ug_list_from_mountdir (cli_local_t *local, char *mountdir,
                 snprintf (path, sizeof (path), "%s%s/%s",
                                 mountdir, GF_QUOTA_U_DIR, ugid);
                 key = QUOTA_LIMIT_KEY;
+        } else {
+                snprintf (path, sizeof (path), "%s%s/%s",
+                                mountdir, GF_QUOTA_G_DIR, ugid);
+                key = QUOTA_LIMIT_KEY;
         }
 
 
@@ -3812,6 +3819,8 @@ print_quota_ug_list_from_mountdir_all (cli_local_t *local, char *mountdir,
 
         if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
                 snprintf (path, sizeof (path), "%s%s/", mountdir, GF_QUOTA_U_DIR);
+        } else {
+                snprintf (path, sizeof (path), "%s%s/", mountdir, GF_QUOTA_G_DIR);
         }
 
         filterdir = sys_opendir (path);
@@ -4467,7 +4476,8 @@ gf_cli_quota_cbk (struct rpc_req *req, struct iovec *iov,
                 }
         }
 
-        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
+        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER ||
+            type == GF_QUOTA_OPTION_TYPE_LIST_GROUP) {
                 gf_cli_quota_ug_list (local, volname, rsp.op_ret,
                                       rsp.op_errno, rsp.op_errstr);
 
@@ -4486,7 +4496,8 @@ xml_output:
 
         if (!rsp.op_ret && type != GF_QUOTA_OPTION_TYPE_LIST
                         && type != GF_QUOTA_OPTION_TYPE_LIST_OBJECTS
-                        && type != GF_QUOTA_OPTION_TYPE_LIST_USER)
+                        && type != GF_QUOTA_OPTION_TYPE_LIST_USER
+                        && type != GF_QUOTA_OPTION_TYPE_LIST_GROUP)
                 cli_out ("volume quota : success");
 
         ret = rsp.op_ret;
@@ -4497,7 +4508,8 @@ out:
                 gluster_remove_auxiliary_mount (volname);
         }
 
-        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
+        if (type == GF_QUOTA_OPTION_TYPE_LIST_USER ||
+            type == GF_QUOTA_OPTION_TYPE_LIST_GROUP) {
                 gluster_remove_auxiliary_mount_ug (volname);
         }
 

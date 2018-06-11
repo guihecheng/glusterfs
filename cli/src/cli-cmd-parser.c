@@ -1087,7 +1087,10 @@ cli_cmd_quota_parse (const char **words, int wordcount, dict_t **options)
                                       "list-objects", "remove-objects",
                                       "enable-user", "disable-user",
                                       "limit-usage-user", "remove-usage-user",
-                                      "list-user", NULL};
+                                      "list-user",
+                                      "enable-group", "disable-group",
+                                      "limit-usage-group", "remove-usage-group",
+                                      "list-group", NULL};
         char            *w       = NULL;
         uint32_t         time    = 0;
         double           percent = 0;
@@ -1422,6 +1425,122 @@ cli_cmd_quota_parse (const char **words, int wordcount, dict_t **options)
         if (strcmp (w, "list-user") == 0) {
 
                 type = GF_QUOTA_OPTION_TYPE_LIST_USER;
+
+                i = 4;
+                while (i < wordcount) {
+                        snprintf (key, 20, "ugid%d", i - 4);
+
+                        ret = dict_set_str (dict, key, (char *) words [i++]);
+                        if (ret < 0)
+                                goto out;
+                }
+
+                ret = dict_set_int32 (dict, "count", i - 4);
+                if (ret < 0)
+                        goto out;
+
+                goto set_type;
+        }
+
+        if (strcmp (w, "enable-group") == 0) {
+                if (wordcount == 4) {
+                        type = GF_QUOTA_OPTION_TYPE_ENABLE_GROUP;
+                        ret = 0;
+                        goto set_type;
+                } else {
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        if (strcmp (w, "disable-group") == 0) {
+                if (wordcount == 4) {
+                        type = GF_QUOTA_OPTION_TYPE_DISABLE_GROUP;
+                        ret = 0;
+                        goto set_type;
+                } else {
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        if (strcmp (w, "limit-usage-group") == 0) {
+                type = GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP;
+        }
+
+        if (type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP) {
+
+                if (wordcount < 6 || wordcount > 7) {
+                        ret = -1;
+                        goto out;
+                }
+
+                ret = dict_set_str (dict, "gid", (char *) words[4]);
+                if (ret)
+                        goto out;
+
+                if (!words[5]) {
+                        cli_err ("Please enter the limit value to be set");
+                        ret = -1;
+                        goto out;
+                }
+
+                if (type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP) {
+                        ret = gf_string2bytesize_int64 (words[5], &value);
+                        if (ret != 0 || value <= 0) {
+                                if (errno == ERANGE || value <= 0) {
+                                        ret = -1;
+                                        cli_err ("Please enter an integer "
+                                                 "value in the range of "
+                                                 "(1 - %"PRId64 ")",
+                                                 INT64_MAX);
+                                } else
+                                        cli_err ("Please enter a correct "
+                                                 "value");
+                                goto out;
+                        }
+                }
+
+                ret  = dict_set_str (dict, "hard-limit", (char *) words[5]);
+                if (ret < 0)
+                        goto out;
+
+                if (wordcount == 7) {
+
+                        ret = gf_string2percent (words[6], &percent);
+                        if (ret != 0 || percent > 100) {
+                                ret = -1;
+                                cli_err ("Please enter a correct value "
+                                         "in the range of 0 to 100");
+                                goto out;
+                        }
+
+                        ret = dict_set_str (dict, "soft-limit",
+                                            (char *) words[6]);
+                        if (ret < 0)
+                                goto out;
+                }
+
+                goto set_type;
+        }
+
+        if (strcmp (w, "remove-usage-group") == 0) {
+                if (wordcount != 5) {
+                        ret = -1;
+                        goto out;
+                }
+
+                type = GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_GROUP;
+
+                ret = dict_set_str (dict, "gid", (char *) words[4]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        }
+
+        if (strcmp (w, "list-group") == 0) {
+
+                type = GF_QUOTA_OPTION_TYPE_LIST_GROUP;
 
                 i = 4;
                 while (i < wordcount) {

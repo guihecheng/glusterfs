@@ -1910,6 +1910,7 @@ cli_cmd_quota_cbk (struct cli_state *state, struct cli_cmd_word *word,
         switch (type) {
         case GF_QUOTA_OPTION_TYPE_DISABLE:
         case GF_QUOTA_OPTION_TYPE_DISABLE_USER:
+        case GF_QUOTA_OPTION_TYPE_DISABLE_GROUP:
                 answer = cli_cmd_get_confirmation (state, question);
                 if (answer == GF_ANSWER_NO)
                         goto out;
@@ -2007,6 +2008,21 @@ out:
                 case GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER:
                         gf_event (EVENT_QUOTA_REMOVE_USAGE_LIMIT_USER, "volume=%s;"
                                   "uid=%s", volname, words[4]);
+                        break;
+                case GF_QUOTA_OPTION_TYPE_ENABLE_GROUP:
+                        gf_event (EVENT_QUOTA_ENABLE_GROUP, "volume=%s", volname);
+                        break;
+                case GF_QUOTA_OPTION_TYPE_DISABLE_GROUP:
+                        gf_event (EVENT_QUOTA_DISABLE_GROUP, "volume=%s", volname);
+                        break;
+                case GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP:
+                        gf_event (EVENT_QUOTA_SET_USAGE_LIMIT_GROUP, "volume=%s;"
+                                  "gid=%s;limit=%s", volname, words[4],
+                                  words[5]);
+                        break;
+                case GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_GROUP:
+                        gf_event (EVENT_QUOTA_REMOVE_USAGE_LIMIT_GROUP, "volume=%s;"
+                                  "gid=%s", volname, words[4]);
                         break;
                 }
         }
@@ -3328,15 +3344,39 @@ struct cli_cmd quota_cmds[] = {
          "List maximum size limit for all users for <VOLNAME>"
         },
 
+        { "volume quota <VOLNAME> {enable-group|disable-group}",
+          cli_cmd_quota_cbk,
+          "Enable/disable group quota for <VOLNAME>"
+        },
+
+        {"volume quota <VOLNAME> {limit-usage-group <gid> <size> [<percent>]}",
+         cli_cmd_quota_cbk,
+         "Set maximum size for group with gid:<gid> for <VOLNAME>"
+        },
+
+        {"volume quota <VOLNAME> {remove-usage-group <gid>}",
+         cli_cmd_quota_cbk,
+         "Clear maximum size limit for group with gid:<gid> for <VOLNAME>"
+        },
+
+        {"volume quota <VOLNAME> {list-group}",
+         cli_cmd_quota_cbk,
+         "List maximum size limit for all groups for <VOLNAME>"
+        },
+
         { "volume quota <VOLNAME> {enable|disable|list [<path> ...]| "
           "list-objects [<path> ...] | remove <path>| remove-objects <path> | "
           "enable-user|disable-user|list-user [<uid> ...]|"
           "limit-usage-user <uid> <size> [<percent>]|"
           "remove-usage-user <uid>|"
+          "enable-group|disable-group|list-group [<gid> ...]|"
+          "limit-usage-group <gid> <size> [<percent>]|"
+          "remove-usage-group <gid>|"
           "default-soft-limit <percent>}\n"
           "volume quota <VOLNAME> {limit-usage <path> <size> [<percent>]}\n"
           "volume quota <VOLNAME> {limit-objects <path> <number> [<percent>]}\n"
           "volume quota <VOLNAME> {limit-usage-user <uid> <size> [<percent>]}\n"
+          "volume quota <VOLNAME> {limit-usage-group <gid> <size> [<percent>]}\n"
           "volume quota <VOLNAME> {alert-time|soft-timeout|hard-timeout} {<time>}",
           cli_cmd_quota_cbk,
           NULL
