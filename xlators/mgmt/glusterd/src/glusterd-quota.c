@@ -62,6 +62,11 @@ const char *gd_quota_op_list[GF_QUOTA_OPTION_TYPE_MAX + 1] = {
         [GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER]   = "limit-usage-user",
         [GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER]  = "remove-usage-user",
         [GF_QUOTA_OPTION_TYPE_LIST_USER]          = "list-user",
+        [GF_QUOTA_OPTION_TYPE_ENABLE_GROUP]       = "enable-group",
+        [GF_QUOTA_OPTION_TYPE_DISABLE_GROUP]      = "disable-group",
+        [GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP]  = "limit-usage-group",
+        [GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_GROUP] = "remove-usage-group",
+        [GF_QUOTA_OPTION_TYPE_LIST_GROUP]         = "list-group",
         [GF_QUOTA_OPTION_TYPE_MAX]                = NULL
 };
 
@@ -1700,8 +1705,8 @@ out:
 }
 
 static int
-glusterd_remove_quota_ug_limit_user (char *volname, char *ugid,
-                                     gf_boolean_t is_grp, char **op_errstr)
+glusterd_remove_quota_ug_limit (char *volname, char *ugid,
+                                gf_boolean_t is_grp, char **op_errstr)
 {
         int               ret                  = -1;
         xlator_t         *this                 = NULL;
@@ -2141,8 +2146,8 @@ glusterd_quota_remove_usage_user (glusterd_volinfo_t *volinfo, dict_t *dict,
         }
 
         if (is_origin_glusterd (dict)) {
-                ret = glusterd_remove_quota_ug_limit_user (volinfo->volname, ugid,
-                                                           _gf_false, op_errstr);
+                ret = glusterd_remove_quota_ug_limit (volinfo->volname, ugid,
+                                                      _gf_false, op_errstr);
                 if (ret)
                         goto out;
         }
@@ -2153,6 +2158,173 @@ glusterd_quota_remove_usage_user (glusterd_volinfo_t *volinfo, dict_t *dict,
         if (ret)
                 goto out;
 
+
+        ret = 0;
+
+out:
+        return ret;
+}
+
+int32_t
+glusterd_quota_enable_group (glusterd_volinfo_t *volinfo, char **op_errstr)
+{
+        int32_t         ret     = -1;
+        xlator_t        *this   = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
+        GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        if (glusterd_is_volume_started (volinfo) == 0) {
+                *op_errstr = gf_strdup ("Volume is stopped, start volume "
+                                        "to enable quota.");
+                ret = -1;
+                goto out;
+        }
+
+        ret = glusterd_quota_ug_meta_mkdir (volinfo->volname, _gf_true);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, errno,
+                        GD_MSG_QUOTA_META_MKDIR_FAIL, "mkdir for ugquota"
+                        " meta failed");
+                goto out;
+        }
+
+        ret = 0;
+out:
+        if (ret && op_errstr && !*op_errstr)
+                gf_asprintf (op_errstr, "Enabling group quota on volume %s"
+                             " has been unsuccessful", volinfo->volname);
+        return ret;
+}
+
+int32_t
+glusterd_quota_disable_group (glusterd_volinfo_t *volinfo, char **op_errstr)
+{
+        int32_t    ret            = -1;
+        xlator_t  *this           = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
+        GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        (void) glusterd_quota_ug_meta_cleanup (volinfo->volname, _gf_true);
+
+        ret = 0;
+out:
+        if (ret && op_errstr && !*op_errstr)
+                gf_asprintf (op_errstr, "Disabling group quota on volume %s"
+                             "has been unsuccessful", volinfo->volname);
+        return ret;
+}
+
+int32_t
+glusterd_quota_limit_usage_group (glusterd_volinfo_t *volinfo, dict_t *dict,
+                                  char **op_errstr)
+{
+        int32_t          ret                = -1;
+        char            *hard_limit         = NULL;
+        char            *soft_limit         = NULL;
+        char            *ugid               = NULL;
+        xlator_t        *this               = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        GF_VALIDATE_OR_GOTO (this->name, dict, out);
+        GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
+        GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        ret = glusterd_check_if_quota_trans_enabled (volinfo);
+        if (ret == -1) {
+                *op_errstr = gf_strdup ("Quota is disabled, please enable "
+                                        "quota");
+                goto out;
+        }
+
+        ret = dict_get_str (dict, "gid", &ugid);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED, "Unable to fetch ugid");
+                goto out;
+        }
+
+        ret = dict_get_str (dict, "hard-limit", &hard_limit);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED, "Unable to fetch hard limit");
+                goto out;
+        }
+
+        if (dict_get (dict, "soft-limit")) {
+                ret = dict_get_str (dict, "soft-limit", &soft_limit);
+                if (ret) {
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_DICT_GET_FAILED, "Unable to fetch "
+                                "soft limit");
+                        goto out;
+                }
+        }
+
+        if (is_origin_glusterd (dict)) {
+                ret = glusterd_set_quota_ug_limit (volinfo->volname, ugid,
+                                                   _gf_true, hard_limit,
+                                                   soft_limit,
+                                                   QUOTA_LIMIT_KEY,
+                                                   op_errstr);
+                if (ret)
+                        goto out;
+        }
+
+        ret = 0;
+out:
+
+        if (ret && op_errstr && !*op_errstr)
+                gf_asprintf (op_errstr, "Failed to set hard limit on group"
+                             " with gid %s for volume %s",
+                             ugid, volinfo->volname);
+        return ret;
+}
+
+int32_t
+glusterd_quota_remove_usage_group (glusterd_volinfo_t *volinfo, dict_t *dict,
+                                   char **op_errstr)
+{
+        int32_t         ret                   = -1;
+        char            *ugid                 = NULL;
+        xlator_t        *this                 = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        GF_VALIDATE_OR_GOTO (this->name, dict, out);
+        GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
+        GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        ret = glusterd_check_if_quota_trans_enabled (volinfo);
+        if (ret == -1) {
+                *op_errstr = gf_strdup ("Quota is disabled, please enable "
+                                        "quota");
+                goto out;
+        }
+
+        ret = dict_get_str (dict, "gid", &ugid);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED, "Unable to fetch ugid");
+                goto out;
+        }
+
+        if (is_origin_glusterd (dict)) {
+                ret = glusterd_remove_quota_ug_limit (volinfo->volname, ugid,
+                                                      _gf_true, op_errstr);
+                if (ret)
+                        goto out;
+        }
 
         ret = 0;
 
@@ -2338,9 +2510,37 @@ glusterd_op_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
                         ret = glusterd_quota_remove_usage_user (volinfo, dict,
                                                                 op_errstr);
                         goto out;
+
                 case GF_QUOTA_OPTION_TYPE_LIST_USER:
                         ret = glusterd_quota_get_default_soft_limit (volinfo,
                                                                rsp_dict);
+                        goto out;
+
+                case GF_QUOTA_OPTION_TYPE_ENABLE_GROUP:
+                        ret = glusterd_quota_enable_group (volinfo, op_errstr);
+                        if (ret < 0)
+                                goto out;
+                        break;
+
+                case GF_QUOTA_OPTION_TYPE_DISABLE_GROUP:
+                        ret = glusterd_quota_disable_group (volinfo, op_errstr);
+                        if (ret < 0)
+                                goto out;
+                        break;
+
+                case GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP:
+                        ret = glusterd_quota_limit_usage_group (volinfo, dict,
+                                                                op_errstr);
+                        goto out;
+
+                case GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_GROUP:
+                        ret = glusterd_quota_remove_usage_group (volinfo, dict,
+                                                                 op_errstr);
+                        goto out;
+
+                case GF_QUOTA_OPTION_TYPE_LIST_GROUP:
+                        ret = glusterd_quota_get_default_soft_limit (volinfo,
+                                                                   rsp_dict);
                         goto out;
 
                 case GF_QUOTA_OPTION_TYPE_SOFT_TIMEOUT:
@@ -2432,7 +2632,11 @@ out:
             type == GF_QUOTA_OPTION_TYPE_ENABLE_USER ||
             type == GF_QUOTA_OPTION_TYPE_DISABLE_USER ||
             type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER ||
-            type == GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER) {
+            type == GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER ||
+            type == GF_QUOTA_OPTION_TYPE_ENABLE_GROUP ||
+            type == GF_QUOTA_OPTION_TYPE_DISABLE_GROUP ||
+            type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP ||
+            type == GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_GROUP) {
                 /* During a list operation we need the aux mount to be
                  * accessible until the listing is done at the cli
                  */
@@ -2626,10 +2830,15 @@ glusterd_create_quota_auxiliary_mount (xlator_t *this, char *volname, int type)
         } else if (type == GF_QUOTA_OPTION_TYPE_ENABLE_USER ||
                    type == GF_QUOTA_OPTION_TYPE_DISABLE_USER ||
                    type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER ||
-                   type == GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER) {
+                   type == GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER ||
+                   type == GF_QUOTA_OPTION_TYPE_ENABLE_GROUP ||
+                   type == GF_QUOTA_OPTION_TYPE_DISABLE_GROUP ||
+                   type == GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP ||
+                   type == GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_GROUP) {
                 GLUSTERFS_GET_QUOTA_UG_WR_MOUNT_PIDFILE (pidfile_path, volname);
                 GLUSTERD_GET_QUOTA_UG_WR_MOUNT_PATH (mountdir, volname, "/");
-        } else if (type == GF_QUOTA_OPTION_TYPE_LIST_USER) {
+        } else if (type == GF_QUOTA_OPTION_TYPE_LIST_USER ||
+                   type == GF_QUOTA_OPTION_TYPE_LIST_GROUP) {
                 GLUSTERFS_GET_QUOTA_UG_RD_MOUNT_PIDFILE (pidfile_path, volname);
                 GLUSTERD_GET_QUOTA_UG_RD_MOUNT_PATH (mountdir, volname, "/");
         }
@@ -2794,6 +3003,11 @@ glusterd_op_stage_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
         case GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER:
         case GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER:
         case GF_QUOTA_OPTION_TYPE_LIST_USER:
+        case GF_QUOTA_OPTION_TYPE_ENABLE_GROUP:
+        case GF_QUOTA_OPTION_TYPE_DISABLE_GROUP:
+        case GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_GROUP:
+        case GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_GROUP:
+        case GF_QUOTA_OPTION_TYPE_LIST_GROUP:
                 /* Quota auxiliary mount is needed by CLI
                  * for list command and need by glusterd for
                  * setting/removing limit
