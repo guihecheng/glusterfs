@@ -720,27 +720,39 @@ quota_ug_validate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
         int32_t            ret               = 0;
         quota_meta_t       size              = {0,};
         quota_limits_t    *limit             = NULL;
+        inode_t           *child_inode       = NULL;
+        quota_inode_ctx_t *ctx               = NULL;
+        uint64_t           value             = 0;
         int64_t            hard_lim          = 0;
         int64_t            soft_lim          = 0;
         int64_t            soft_lim_percent  = 0;
         int64_t           *ptr               = NULL;
-        int64_t            delta             = 0;
-        int64_t            wouldbe_size      =  0;
-
-
-        local = frame->local;
-        priv = this->private;
-        delta = local->delta;
 
         if (op_ret < 0)
                 goto unwind;
 
-        GF_ASSERT (local);
         GF_ASSERT (frame);
+        GF_ASSERT (frame->local);
         GF_VALIDATE_OR_GOTO_WITH_ERROR ("quota", this, unwind, op_errno,
                                         EINVAL);
         GF_VALIDATE_OR_GOTO_WITH_ERROR (this->name, xdata, unwind, op_errno,
                                         EINVAL);
+
+        local = frame->local;
+        priv = this->private;
+        child_inode = inode_ref (local->loc.inode);
+
+        ret = inode_ctx_get (child_inode, this, &value);
+
+        ctx = (quota_inode_ctx_t *)(unsigned long)value;
+        if ((ret == -1) || (ctx == NULL)) {
+                gf_msg (this->name, GF_LOG_WARNING, EINVAL,
+			Q_MSG_INODE_CTX_GET_FAILED, "quota context is"
+			" not present in inode (gfid:%s)",
+                        uuid_utoa (local->loc.inode->gfid));
+                op_errno = EINVAL;
+                goto unwind;
+        }
 
         ret = quota_dict_get_meta (xdata, QUOTA_SIZE_KEY, &size);
         if (ret == -1) {
@@ -748,6 +760,7 @@ quota_ug_validate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 			Q_MSG_SIZE_KEY_MISSING, "quota size key not present "
                         "in dict");
                 op_errno = EINVAL;
+                goto unwind;
         }
 
         ret = dict_get_bin (xdata, QUOTA_LIMIT_KEY, (void **)&ptr);
@@ -756,7 +769,13 @@ quota_ug_validate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 			Q_MSG_SIZE_KEY_MISSING, "quota limit key not present "
                         "in dict");
                 op_errno = EINVAL;
+                goto unwind;
         }
+
+        local->just_validated = 1; /* so that we don't go into infinite
+                                    * loop of validation and checking
+                                    * limit when timeout is zero.
+                                    */
 
         limit = (quota_limits_t *)ptr;
 
@@ -773,19 +792,30 @@ quota_ug_validate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 soft_lim = (soft_lim_percent * hard_lim)/100;
         }
 
-        wouldbe_size = size.size + delta;
-
-        if (wouldbe_size > hard_lim) {
-                local->op_ret = -1;
-                local->op_errno = EDQUOT;
-        } else if (wouldbe_size > soft_lim) {
-                local->op_ret = 0;
-                local->op_errno = 0;
-                /* log usage here */
+        LOCK (&ctx->lock);
+        {
+                if (local->is_grp) {
+                        ctx->size_g = size.size;
+                        ctx->hard_lim_g = hard_lim;
+                        ctx->hard_lim_g = soft_lim;
+                } else {
+                        ctx->size_u = size.size;
+                        ctx->hard_lim_u = hard_lim;
+                        ctx->hard_lim_u = soft_lim;
+                }
+                gettimeofday (&ctx->tv, NULL);
         }
+        UNLOCK (&ctx->lock);
+
+        quota_ug_check_limit (frame, child_inode, this, local->is_grp);
+        quota_link_count_decrement (frame);
+        goto out;
 
 unwind:
-        quota_handle_validate_error (frame, op_ret, op_errno);
+        quota_handle_validate_error (frame, -1, op_errno);
+out:
+        if (child_inode)
+                inode_unref (child_inode);
         return 0;
 }
 
@@ -1161,60 +1191,6 @@ err:
         return ret;
 }
 
-int
-quota_ug_validate (call_frame_t *frame, xlator_t *this,
-                   fop_lookup_cbk_t cbk_fn)
-{
-        int                ret   = 0;
-        dict_t            *xdata = NULL;
-        quota_priv_t      *priv  = NULL;
-
-        priv = this->private;
-
-        xdata = dict_new ();
-        if (xdata == NULL) {
-                ret = -ENOMEM;
-                goto err;
-        }
-
-        ret = dict_set_int8 (xdata, QUOTA_SIZE_KEY, 1);
-        if (ret < 0) {
-                gf_msg (this->name, GF_LOG_WARNING, ENOMEM,
-			Q_MSG_ENOMEM, "dict set failed");
-                ret = -ENOMEM;
-                goto err;
-        }
-
-        ret = dict_set_int8 (xdata, QUOTA_LIMIT_KEY, 1);
-        if (ret < 0) {
-                gf_msg (this->name, GF_LOG_WARNING, ENOMEM,
-			Q_MSG_ENOMEM, "dict set failed");
-                ret = -ENOMEM;
-                goto err;
-        }
-
-        ret = dict_set_str (xdata, "volume-uuid", priv->volume_uuid);
-        if (ret < 0) {
-                gf_msg (this->name, GF_LOG_WARNING, ENOMEM,
-			Q_MSG_ENOMEM, "dict set failed");
-                ret = -ENOMEM;
-                goto err;
-        }
-
-        ret = quota_enforcer_lookup (frame, this, xdata, cbk_fn);
-        if (ret < 0) {
-                ret = -ENOTCONN;
-                goto err;
-        }
-
-        ret = 0;
-err:
-        if (xdata)
-                dict_unref (xdata);
-
-        return ret;
-}
-
 void
 quota_check_limit_continuation (struct list_head *parents, inode_t *inode,
                                 int32_t op_ret, int32_t op_errno, void *data)
@@ -1525,31 +1501,35 @@ out:
 }
 
 static int32_t
-_quota_ug_check_limit (call_frame_t *frame, xlator_t *this,
-                       inode_t *child_inode, quota_inode_ctx_t *ctx,
-                       char *ugid, gf_boolean_t is_grp)
+quota_ug_validate (call_frame_t *frame, inode_t *child_inode,
+                   xlator_t *this, quota_inode_ctx_t *ctx,
+                   char *ugid, gf_boolean_t is_grp,
+                   fop_lookup_cbk_t cbk_fn)
 {
         int32_t            ret                 = -1;
+        quota_priv_t      *priv                = NULL;
         quota_local_t     *local               = NULL;
         gf_boolean_t       locked              = _gf_false;
         inode_t           *_inode              = NULL;
-
-        local = frame->local;
+        dict_t            *xdata               = NULL;
 
         GF_VALIDATE_OR_GOTO ("quota", this, err);
         GF_VALIDATE_OR_GOTO (this->name, frame, err);
         GF_VALIDATE_OR_GOTO (this->name, child_inode, err);
         GF_VALIDATE_OR_GOTO (this->name, ctx, err);
-        GF_VALIDATE_OR_GOTO (this->name, local, err);
-        GF_VALIDATE_OR_GOTO (this->name, local->stub, err);
+        GF_VALIDATE_OR_GOTO (this->name, frame->local, err);
+        GF_VALIDATE_OR_GOTO (this->name, cbk_fn, err);
 
-        loc_wipe (&local->validate_loc);
+        priv = this->private;
+        local = frame->local;
         _inode = inode_ref (child_inode);
 
         LOCK (&local->lock);
         {
                 locked = _gf_true;
-                local->link_count++;
+
+                loc_wipe (&local->validate_loc);
+
                 ret = _quota_lookup_ug (this, _inode, ugid, is_grp,
                                         &local->validate_loc);
                 if (ret) {
@@ -1559,16 +1539,43 @@ _quota_ug_check_limit (call_frame_t *frame, xlator_t *this,
                                 "lookup failed for ugid %s", ugid);
                         goto err;
                 }
+                local->link_count++;
         }
         UNLOCK (&local->lock);
 
-        ret = quota_ug_validate (frame, this, quota_ug_validate_cbk);
-        if (ret < 0) {
+        xdata = dict_new ();
+        if (xdata == NULL) {
+                ret = -ENOMEM;
                 goto err;
         }
 
-        if (local->op_ret < 0) {
-                ret = local->op_ret;
+        ret = dict_set_int8 (xdata, QUOTA_SIZE_KEY, 1);
+        if (ret < 0) {
+                gf_msg (this->name, GF_LOG_WARNING, ENOMEM,
+			Q_MSG_ENOMEM, "dict set failed");
+                ret = -ENOMEM;
+                goto err;
+        }
+
+        ret = dict_set_int8 (xdata, QUOTA_LIMIT_KEY, 1);
+        if (ret < 0) {
+                gf_msg (this->name, GF_LOG_WARNING, ENOMEM,
+			Q_MSG_ENOMEM, "dict set failed");
+                ret = -ENOMEM;
+                goto err;
+        }
+
+        ret = dict_set_str (xdata, "volume-uuid", priv->volume_uuid);
+        if (ret < 0) {
+                gf_msg (this->name, GF_LOG_WARNING, ENOMEM,
+			Q_MSG_ENOMEM, "dict set failed");
+                ret = -ENOMEM;
+                goto err;
+        }
+
+        ret = quota_enforcer_lookup (frame, this, xdata, cbk_fn);
+        if (ret < 0) {
+                ret = -ENOTCONN;
                 goto err;
         }
 
@@ -1587,16 +1594,94 @@ err:
 }
 
 int32_t
-quota_ug_check_limit (call_frame_t *frame, inode_t *inode, xlator_t *this)
+quota_ug_check_size_limit (call_frame_t *frame, quota_inode_ctx_t *ctx,
+                           inode_t *_inode, xlator_t *this, char *ugid,
+                           int32_t *op_errno, int just_validated,
+                           gf_boolean_t is_grp)
+{
+        int32_t         ret                     = -1;
+        char            need_validate           =  0;
+        gf_boolean_t    hard_limit_exceeded     =  0;
+        int64_t         wouldbe_size            =  0;
+        int64_t         hard_lim                =  0;
+        int64_t         soft_lim                =  0;
+        int64_t         size                    =  0;
+        int64_t         delta                   =  0;
+        quota_local_t  *local                   = NULL;
+
+        GF_ASSERT (frame);
+        GF_ASSERT (_inode);
+        GF_ASSERT (this);
+        GF_ASSERT (this->private);
+        GF_ASSERT (frame->local);
+        GF_ASSERT (ctx);
+        GF_ASSERT (ugid);
+
+        local = frame->local;
+        delta = local->delta;
+
+        if (is_grp) {
+                size = ctx->size_g;
+                hard_lim = ctx->hard_lim_g;
+                soft_lim = ctx->soft_lim_g;
+        } else {
+                size = ctx->size_u;
+                hard_lim = ctx->hard_lim_u;
+                soft_lim = ctx->soft_lim_u;
+        }
+
+        wouldbe_size = size + delta;
+
+        LOCK (&ctx->lock);
+        {
+                if (!just_validated) {
+                        need_validate = 1;
+                } else if (wouldbe_size >= hard_lim) {
+                        hard_limit_exceeded = 1;
+                }
+        }
+        UNLOCK (&ctx->lock);
+
+        if (need_validate) {
+                ret = quota_ug_validate (frame, _inode, this,
+                                         ctx, ugid, is_grp,
+                                         quota_ug_validate_cbk);
+                if (ret < 0) {
+                        *op_errno = -ret;
+                }
+                goto out;
+        }
+
+        if (hard_limit_exceeded) {
+                ret = -1;
+                local->op_ret = -1;
+                local->op_errno = EDQUOT;
+                *op_errno = EDQUOT;
+                goto out;
+        }
+
+        ret = 0;
+out:
+        return ret;
+}
+
+int32_t
+quota_ug_check_limit (call_frame_t *frame, inode_t *inode, xlator_t *this,
+                      gf_boolean_t is_grp)
 {
         int32_t            ret                 = -1;
         quota_inode_ctx_t *ctx                 = NULL;
+        inode_t           *_inode              = NULL;
         uint64_t           value               = 0;
         char               ugid[PATH_MAX]      = {0,};
+        int32_t            op_errno            = EINVAL;
+        char               just_validated      = 0;
+        quota_local_t     *local               = NULL;
 
         GF_VALIDATE_OR_GOTO ("quota", this, err);
         GF_VALIDATE_OR_GOTO (this->name, frame, err);
         GF_VALIDATE_OR_GOTO (this->name, inode, err);
+        GF_VALIDATE_OR_GOTO (this->name, frame->local, err);
 
         /* Allow all the trusted clients
          * Don't block the gluster internal processes like rebalance, gsyncd,
@@ -1609,26 +1694,61 @@ quota_ug_check_limit (call_frame_t *frame, inode_t *inode, xlator_t *this)
         if (0 > frame->root->pid)
                 goto done;
 
+        local = frame->local;
+
         inode_ctx_get (inode, this, &value);
         ctx = (quota_inode_ctx_t *)(unsigned long)value;
 
-        snprintf (ugid, sizeof (ugid), "%d", ctx->contri_u->ugid);
+        _inode = inode_ref (inode);
 
-        ret = _quota_ug_check_limit (frame, this, inode, ctx, ugid, _gf_false);
-        if (ret < 0) {
+        LOCK (&local->lock);
+        {
+                just_validated = local->just_validated;
+                local->just_validated = 0;
+                local->is_grp = is_grp;
+                local->link_count++;
+        }
+        UNLOCK (&local->lock);
+
+        snprintf (ugid, sizeof (ugid), "%d", is_grp ? ctx->contri_g->ugid
+                                                    : ctx->contri_u->ugid);
+
+        ret = quota_ug_check_size_limit (frame, ctx, _inode, this, ugid,
+                                         &op_errno, just_validated,
+                                         is_grp);
+        if (ret) {
+                if (op_errno != EDQUOT)
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                Q_MSG_ENFORCEMENT_FAILED, "Failed to "
+                                "check quota_ug limit");
                 goto err;
         }
 
-        snprintf (ugid, sizeof (ugid), "%d", ctx->contri_g->ugid);
-
-        ret = _quota_ug_check_limit (frame, this, inode, ctx, ugid, _gf_true);
-        if (ret < 0) {
-                goto err;
-        }
 done:
-        ret = 0;
+        if (_inode != NULL) {
+                inode_unref (_inode);
+                _inode = NULL;
+        }
+        quota_link_count_decrement (frame);
+        return 0;
+
 err:
-        return ret;
+        quota_handle_validate_error (frame, -1, op_errno);
+
+        inode_unref (_inode);
+        return 0;
+}
+
+int32_t
+quota_ug_check_limit_user (call_frame_t *frame, inode_t *inode, xlator_t *this)
+{
+        return quota_ug_check_limit (frame, inode, this, _gf_false);
+}
+
+int32_t
+quota_ug_check_limit_group (call_frame_t *frame, inode_t *inode, xlator_t *this)
+{
+        return quota_ug_check_limit (frame, inode, this, _gf_true);
 }
 
 int32_t
@@ -2311,7 +2431,13 @@ quota_writev (call_frame_t *frame, xlator_t *this, fd_t *fd,
         }
         UNLOCK (&local->lock);
 
-        ret = quota_ug_check_limit (frame, fd->inode, this);
+        ret = quota_ug_check_limit_user (frame, fd->inode, this);
+        if (ret < 0) {
+                op_errno = local->op_errno;
+                goto unwind;
+        }
+
+        ret = quota_ug_check_limit_group (frame, fd->inode, this);
         if (ret < 0) {
                 op_errno = local->op_errno;
                 goto unwind;
@@ -5327,12 +5453,6 @@ quota_fallocate(call_frame_t *frame, xlator_t *this, fd_t *fd, int32_t mode,
         priv = this->private;
         GF_VALIDATE_OR_GOTO (this->name, priv, unwind);
 
-        ret = quota_ug_check_limit (frame, fd->inode, this);
-        if (ret < 0) {
-                op_errno = local->op_errno;
-                goto unwind;
-        }
-
         parents = quota_add_parents_from_ctx (ctx, &head);
 
 	/*
@@ -5344,6 +5464,18 @@ quota_fallocate(call_frame_t *frame, xlator_t *this, fd_t *fd, int32_t mode,
         local->object_delta = 0;
         local->stub = stub;
         local->link_count = parents;
+
+        ret = quota_ug_check_limit_user (frame, fd->inode, this);
+        if (ret < 0) {
+                op_errno = local->op_errno;
+                goto unwind;
+        }
+
+        ret = quota_ug_check_limit_group (frame, fd->inode, this);
+        if (ret < 0) {
+                op_errno = local->op_errno;
+                goto unwind;
+        }
 
         if (parents == 0) {
                 local->link_count = 1;

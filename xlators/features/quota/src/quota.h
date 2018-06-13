@@ -172,6 +172,12 @@ struct quota_inode_ctx {
         int64_t                dir_count;
         int64_t                object_hard_lim;
         int64_t                object_soft_lim;
+        int64_t                size_u;
+        int64_t                hard_lim_u;
+        int64_t                soft_lim_u;
+        int64_t                size_g;
+        int64_t                hard_lim_g;
+        int64_t                soft_lim_g;
         struct iatt            buf;
         struct list_head       parents;
         struct timeval         tv;
@@ -203,6 +209,7 @@ struct quota_local {
         int32_t                 op_errno;
         int64_t                 size;
         char                    just_validated;
+        gf_boolean_t            is_grp;
         fop_lookup_cbk_t        validate_cbk;
         quota_fop_continue_t    fop_continue_cbk;
         inode_t                *inode;
@@ -283,4 +290,15 @@ quota_check_object_limit (call_frame_t *frame, quota_inode_ctx_t *ctx,
                           quota_priv_t *priv, inode_t *_inode, xlator_t *this,
                           int32_t *op_errno, int just_validated,
                           quota_local_t *local, gf_boolean_t *skip_check);
+
+int32_t
+quota_ug_check_limit (call_frame_t *frame, inode_t *inode, xlator_t *this,
+                      gf_boolean_t is_grp);
+
+int32_t
+quota_ug_check_limit_user (call_frame_t *frame, inode_t *inode, xlator_t *this);
+
+int32_t
+quota_ug_check_limit_group (call_frame_t *frame, inode_t *inode, xlator_t *this);
+
 #endif
