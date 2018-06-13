@@ -41,6 +41,8 @@
 #define UUID_CANONICAL_FORM_LEN 36
 #endif
 
+#define IS_GRP_KEY "is_grp"
+
 #define WIND_IF_QUOTAOFF(is_quota_on, label)     \
         if (!is_quota_on)                       \
                 goto label;
@@ -203,13 +205,14 @@ struct quota_local {
         loc_t                   oldloc;
         loc_t                   newloc;
         loc_t                   validate_loc;
+        loc_t                   validate_loc_u;
+        loc_t                   validate_loc_g;
         int64_t                 delta;
         int8_t                  object_delta;
         int32_t                 op_ret;
         int32_t                 op_errno;
         int64_t                 size;
         char                    just_validated;
-        gf_boolean_t            is_grp;
         fop_lookup_cbk_t        validate_cbk;
         quota_fop_continue_t    fop_continue_cbk;
         inode_t                *inode;

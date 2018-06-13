@@ -229,6 +229,8 @@ quota_local_cleanup (quota_local_t *local)
         loc_wipe (&local->newloc);
         loc_wipe (&local->oldloc);
         loc_wipe (&local->validate_loc);
+        loc_wipe (&local->validate_loc_u);
+        loc_wipe (&local->validate_loc_g);
 
         inode_unref (local->inode);
 
@@ -727,6 +729,7 @@ quota_ug_validate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
         int64_t            soft_lim          = 0;
         int64_t            soft_lim_percent  = 0;
         int64_t           *ptr               = NULL;
+        int8_t             is_grp            = 0;
 
         if (op_ret < 0)
                 goto unwind;
@@ -772,6 +775,15 @@ quota_ug_validate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 goto unwind;
         }
 
+        ret = dict_get_int8 (xdata, IS_GRP_KEY, &is_grp);
+        if (ret == -1) {
+                gf_msg (this->name, GF_LOG_WARNING, EINVAL,
+			Q_MSG_SIZE_KEY_MISSING, "is_grp key not present "
+                        "in dict");
+                op_errno = EINVAL;
+                goto unwind;
+        }
+
         local->just_validated = 1; /* so that we don't go into infinite
                                     * loop of validation and checking
                                     * limit when timeout is zero.
@@ -794,20 +806,19 @@ quota_ug_validate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 
         LOCK (&ctx->lock);
         {
-                if (local->is_grp) {
+                if (is_grp) {
                         ctx->size_g = size.size;
                         ctx->hard_lim_g = hard_lim;
-                        ctx->hard_lim_g = soft_lim;
+                        ctx->soft_lim_g = soft_lim;
                 } else {
                         ctx->size_u = size.size;
                         ctx->hard_lim_u = hard_lim;
-                        ctx->hard_lim_u = soft_lim;
+                        ctx->soft_lim_u = soft_lim;
                 }
-                gettimeofday (&ctx->tv, NULL);
         }
         UNLOCK (&ctx->lock);
 
-        quota_ug_check_limit (frame, child_inode, this, local->is_grp);
+        quota_ug_check_limit (frame, child_inode, this, is_grp);
         quota_link_count_decrement (frame);
         goto out;
 
@@ -1512,6 +1523,7 @@ quota_ug_validate (call_frame_t *frame, inode_t *child_inode,
         gf_boolean_t       locked              = _gf_false;
         inode_t           *_inode              = NULL;
         dict_t            *xdata               = NULL;
+        loc_t             *validate_loc        = NULL;
 
         GF_VALIDATE_OR_GOTO ("quota", this, err);
         GF_VALIDATE_OR_GOTO (this->name, frame, err);
@@ -1523,15 +1535,17 @@ quota_ug_validate (call_frame_t *frame, inode_t *child_inode,
         priv = this->private;
         local = frame->local;
         _inode = inode_ref (child_inode);
+        validate_loc = is_grp ? &local->validate_loc_g:
+                                &local->validate_loc_u;
 
         LOCK (&local->lock);
         {
                 locked = _gf_true;
 
-                loc_wipe (&local->validate_loc);
+                loc_wipe (validate_loc);
 
                 ret = _quota_lookup_ug (this, _inode, ugid, is_grp,
-                                        &local->validate_loc);
+                                        validate_loc);
                 if (ret) {
                         if (ret == 1)
                                 goto done;
@@ -1545,6 +1559,14 @@ quota_ug_validate (call_frame_t *frame, inode_t *child_inode,
 
         xdata = dict_new ();
         if (xdata == NULL) {
+                ret = -ENOMEM;
+                goto err;
+        }
+
+        ret = dict_set_int8 (xdata, IS_GRP_KEY, is_grp ? 1 : 0);
+        if (ret < 0) {
+                gf_msg (this->name, GF_LOG_WARNING, ENOMEM,
+			Q_MSG_ENOMEM, "dict set failed");
                 ret = -ENOMEM;
                 goto err;
         }
@@ -1705,7 +1727,6 @@ quota_ug_check_limit (call_frame_t *frame, inode_t *inode, xlator_t *this,
         {
                 just_validated = local->just_validated;
                 local->just_validated = 0;
-                local->is_grp = is_grp;
                 local->link_count++;
         }
         UNLOCK (&local->lock);

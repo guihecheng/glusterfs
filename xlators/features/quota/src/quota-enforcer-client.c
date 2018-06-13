@@ -166,6 +166,12 @@ quota_enforcer_lookup_cbk (struct rpc_req *req, struct iovec *iov,
                                       (rsp.xdata.xdata_len), rsp.op_ret,
                                       op_errno, out);
 
+        if (inode == NULL) {
+                /* special handle for ugquota */
+                rsp.op_ret = 0;
+                goto out;
+        }
+
         if ((!gf_uuid_is_null (inode->gfid))
             && (gf_uuid_compare (stbuf.ia_gfid, inode->gfid) != 0)) {
                 gf_msg_debug (frame->this->name, ESTALE,
@@ -261,12 +267,20 @@ _quota_enforcer_lookup (void *data)
         call_frame_t           *frame      = NULL;
         loc_t                  *loc        = NULL;
         xlator_t               *this       = NULL;
-        char                   *dir_path       = NULL;
+        char                   *dir_path   = NULL;
+        int8_t                  is_grp     = 0;
 
         frame = data;
         local = frame->local;
         this  = local->this;
-        loc   = &local->validate_loc;
+
+        ret = dict_get_int8 (local->validate_xdata, IS_GRP_KEY, &is_grp);
+        if (ret == 0) {
+                loc = is_grp ? &local->validate_loc_g
+                             : &local->validate_loc_u;
+        } else {
+                loc = &local->validate_loc;
+        }
 
         priv = this->private;
 
