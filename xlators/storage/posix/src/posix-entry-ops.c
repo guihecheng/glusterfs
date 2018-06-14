@@ -156,7 +156,9 @@ posix_dict_set_ugid (dict_t *req, dict_t *res, uint32_t uid, uint32_t gid)
         if (res == NULL)
                 goto out;
 
-        ugid = (uid << 32) | gid;
+        ugid |= uid;
+        ugid <<= 32;
+        ugid |= gid;
 
         ret = dict_set_uint64 (res, GF_RESPONSE_UGID_XDATA, ugid);
         if (ret == -1)
@@ -271,6 +273,11 @@ posix_lookup (call_frame_t *frame, xlator_t *this,
                                         "removexattr failed. key %s path %s",
                                         GF_PROTECT_FROM_EXTERNAL_WRITES,
                                         loc->path);
+                }
+
+                if (__is_root_gfid (loc->pargfid) && loc->name
+                    && (strcmp (loc->name, GF_QUOTA_UG_HIDDEN_PATH) == 0)) {
+                        (void) dict_set_int8 (xattr, VIRTUAL_HIDDEN_KEY, 1);
                 }
         }
 

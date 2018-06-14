@@ -261,6 +261,8 @@ static struct argp_option gf_options[] = {
         {"attr-times-granularity", ARGP_ATTR_TIMES_GRANULARITY_KEY, "NS",
          OPTION_ARG_OPTIONAL, "declare supported granularity of file attribute"
          " times in nanoseconds"},
+        {"hidden", ARGP_HIDDEN_KEY, 0, OPTION_HIDDEN,
+         "Hide \".quota_ug\" directory which stores user/group quota meta"},
         {0, 0, 0, 0, "Miscellaneous Options:"},
         {0, }
 };
@@ -660,6 +662,14 @@ set_fuse_mount_options (glusterfs_ctx_t *ctx, dict_t *options)
                 }
         }
 
+        if (cmd_args->hidden) {
+                ret = dict_set_static_ptr (options, "hidden", "on");
+                if (ret < 0) {
+                        gf_msg ("glusterfsd", GF_LOG_ERROR, 0, glusterfsd_msg_4,
+                                "failed to set dict value for key hidden");
+                        goto err;
+                }
+        }
 
         ret = 0;
 err:
@@ -1453,7 +1463,9 @@ no_oom_api:
                 }
 
                 break;
-
+        case ARGP_HIDDEN_KEY:
+                cmd_args->hidden = 1;
+                break;
 	}
         return 0;
 }

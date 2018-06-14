@@ -600,9 +600,12 @@ fuse_lookup_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
         fuse_state_t            *state = NULL;
         call_frame_t            *prev = NULL;
         inode_table_t           *itable = NULL;
+        fuse_private_t          *priv = NULL;
+        int8_t                   hidden = 0;
 
         state = frame->root->state;
         prev  = cookie;
+        priv  = this->private;
 
         if (op_ret == -1 && state->is_revalidate == 1) {
                 itable = state->itable;
@@ -624,6 +627,11 @@ fuse_lookup_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                             prev->this, prev->this->fops->lookup,
                             &state->loc, state->xdata);
                 return 0;
+        }
+
+        if (!priv->hidden && !dict_get_int8 (dict, VIRTUAL_HIDDEN_KEY, &hidden)) {
+                op_ret = -1;
+                op_errno = EPERM;
         }
 
         fuse_entry_cbk (frame, cookie, this, op_ret, op_errno, inode, stat,
@@ -2889,6 +2897,9 @@ fuse_readdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 frame->root->unique, op_ret, state->size, state->off);
 
         list_for_each_entry (entry, &entries->list, list) {
+                if (!priv->hidden && !strcmp (entry->d_name, GF_QUOTA_UG_HIDDEN_PATH))
+                        continue;
+
                 size_t fde_size = FUSE_DIRENT_ALIGN (FUSE_NAME_OFFSET +
                                                      strlen (entry->d_name));
                 max_size += fde_size;
@@ -2916,6 +2927,9 @@ fuse_readdir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 
         size = 0;
         list_for_each_entry (entry, &entries->list, list) {
+                if (!priv->hidden && !strcmp (entry->d_name, GF_QUOTA_UG_HIDDEN_PATH))
+                        continue;
+
                 fde = (struct fuse_dirent *)(buf + size);
                 gf_fuse_fill_dirent (entry, fde, priv->enable_ino32);
                 size += FUSE_DIRENT_SIZE (fde);
@@ -3002,6 +3016,9 @@ fuse_readdirp_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 		frame->root->unique, op_ret, state->size, state->off);
 
 	list_for_each_entry (entry, &entries->list, list) {
+                if (!priv->hidden && !strcmp (entry->d_name, GF_QUOTA_UG_HIDDEN_PATH))
+                        continue;
+
                 size_t fdes = FUSE_DIRENT_ALIGN (FUSE_NAME_OFFSET_DIRENTPLUS +
                                                  strlen (entry->d_name));
                 max_size += fdes;
@@ -3029,6 +3046,9 @@ fuse_readdirp_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
 
 	size = 0;
 	list_for_each_entry (entry, &entries->list, list) {
+                if (!priv->hidden && !strcmp (entry->d_name, GF_QUOTA_UG_HIDDEN_PATH))
+                        continue;
+
 		inode_t *linked_inode;
 
 		fde = (struct fuse_direntplus *)(buf + size);
@@ -5745,6 +5765,8 @@ init (xlator_t *this_xl)
 
         GF_OPTION_INIT ("use-readdirp", priv->use_readdirp, bool, cleanup_exit);
 
+        GF_OPTION_INIT ("hidden", priv->hidden, bool, cleanup_exit);
+
         priv->fuse_dump_fd = -1;
         ret = dict_get_str (options, "dump-fuse", &value_string);
         if (ret == 0) {
@@ -6154,6 +6176,10 @@ struct volume_options options[] = {
           .min = 0,
           .max = 1000000000,
           .description = "Supported granularity of file attribute times.",
+        },
+        { .key = {"hidden"},
+          .type = GF_OPTION_TYPE_BOOL,
+          .default_value = "false"
         },
         { .key = {NULL} },
 };

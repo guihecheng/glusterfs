@@ -454,6 +454,8 @@ union gf_sock_union {
 #define GF_UNLINK_PATH GF_HIDDEN_PATH"/unlink"
 #define GF_LANDFILL_PATH GF_HIDDEN_PATH"/landfill"
 
+#define GF_QUOTA_UG_HIDDEN_PATH ".quota_ug"
+
 #define IOV_MIN(n) min(IOV_MAX,n)
 
 #define GF_SKIP_IRRELEVANT_ENTRIES(entry, dir, scr) \

@@ -228,6 +228,7 @@ enum gf_internal_fop_indicator {
 #define QUOTA_LIMIT_OBJECTS_KEY "trusted.glusterfs.quota.limit-objects"
 #define VIRTUAL_QUOTA_XATTR_CLEANUP_KEY "glusterfs.quota-xattr-cleanup"
 #define QUOTA_READ_ONLY_KEY "trusted.glusterfs.quota.read-only"
+#define VIRTUAL_HIDDEN_KEY "trusted.glusterfs.quota.hidden"
 
 /* afr related */
 #define AFR_XATTR_PREFIX "trusted.afr"
@@ -542,6 +543,7 @@ struct _cmd_args {
         /* FUSE writeback cache support */
         int                kernel_writeback_cache;
         uint32_t           attr_times_granularity;
+        int                hidden;
 };
 typedef struct _cmd_args cmd_args_t;
 

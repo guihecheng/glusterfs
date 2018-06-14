@@ -2873,6 +2873,7 @@ glusterd_create_quota_auxiliary_mount (xlator_t *this, char *volname, int type)
                       "-l", logfile,
                       "-p", pidfile_path,
                       "--client-pid", qpid,
+                      "--hidden",
                       mountdir,
                       NULL);
         if (ret == 0) {

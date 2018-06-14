@@ -12,6 +12,7 @@
 #define _QUOTA_COMMON_UTILS_H
 
 #include "iatt.h"
+#include "common-utils.h"
 
 #define GF_QUOTA_CONF_VERSION 1.2
 #define QUOTA_CONF_HEADER                           \
@@ -19,7 +20,6 @@
 #define QUOTA_CONF_HEADER_1_1                       \
         "GlusterFS Quota conf | version: v1.1\n"
 
-#define GF_QUOTA_UG_HIDDEN_PATH ".quota_ug"
 #define GF_QUOTA_U_DIR GF_QUOTA_UG_HIDDEN_PATH"/user"
 #define GF_QUOTA_G_DIR GF_QUOTA_UG_HIDDEN_PATH"/group"
 

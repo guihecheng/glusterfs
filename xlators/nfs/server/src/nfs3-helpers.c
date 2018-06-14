@@ -833,6 +833,9 @@ nfs3_fill_readdir3res (readdir3res *res, nfsstat3 stat, struct nfs3_fh *dirfh,
                     (strcmp (entries->d_name, "..") == 0))
                         goto nextentry;
                         */
+                if (strcmp (entries->d_name, GF_QUOTA_UG_HIDDEN_PATH) == 0)
+                        goto nextentry;
+
                 ent = nfs3_fill_entry3 (entries, dirfh);
                 if (!ent)
                         break;
@@ -847,7 +850,7 @@ nfs3_fill_readdir3res (readdir3res *res, nfsstat3 stat, struct nfs3_fh *dirfh,
                         preventry = ent;
 
                 filled += NFS3_ENTRY3_FIXED_SIZE + strlen (ent->name);
-//nextentry:
+nextentry:
                 entries = entries->next;
         }
 
@@ -895,6 +898,9 @@ nfs3_fill_readdirp3res (readdirp3res *res, nfsstat3 stat,
                     (strcmp (entries->d_name, "..") == 0))
                         goto nextentry;
                         */
+                if (strcmp (entries->d_name, GF_QUOTA_UG_HIDDEN_PATH) == 0)
+                        goto nextentry;
+
                 ent = nfs3_fill_entryp3 (entries, dirfh, deviceid);
                 if (!ent)
                         break;
@@ -910,7 +916,7 @@ nfs3_fill_readdirp3res (readdirp3res *res, nfsstat3 stat,
 
                 fhlen = ent->name_handle.post_op_fh3_u.handle.data.data_len;
                 filled += NFS3_ENTRYP3_FIXED_SIZE + fhlen + strlen (ent->name);
-//nextentry:
+nextentry:
                 entries = entries->next;
         }
 
