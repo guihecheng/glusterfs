@@ -1347,234 +1347,6 @@ out:
        return ret;
 }
 
-int
-glusterd_store_quota_ug_config (glusterd_volinfo_t *volinfo,
-                                char *ugid, gf_boolean_t is_grp,
-                                int opcode, char **op_errstr)
-{
-        int                ret                   = -1;
-        int                fd                    = -1;
-        int                conf_fd               = -1;
-        ssize_t            bytes_read            = 0;
-        size_t             bytes_to_write        = 0;
-        xlator_t          *this                  = NULL;
-        gf_boolean_t       found                 = _gf_false;
-        gf_boolean_t       modified              = _gf_false;
-        gf_boolean_t       is_file_empty         = _gf_false;
-        gf_boolean_t       is_first_read         = _gf_true;
-        glusterd_conf_t   *conf                  = NULL;
-        gf_store_handle_t *conf_handle           = NULL;
-//        char               type                  = 0;
-        int                quota_ug_conf_line_sz = 10;       // unit32_t max : 4294967295
-        unsigned char      *buf                  = 0;
-        int                buf_sz                = 0;
-
-        this = THIS;
-        GF_ASSERT (this);
-        conf = this->private;
-        GF_ASSERT (conf);
-
-        glusterd_store_create_quota_ug_conf_sh_on_absence (volinfo, is_grp);
-
-        conf_handle = is_grp ? volinfo->quota_g_conf_shandle
-                             : volinfo->quota_u_conf_shandle;
-
-        GF_ASSERT (conf_handle);
-
-        conf_fd = open (conf_handle->path, O_RDONLY);
-        if (conf_fd == -1) {
-                ret = -1;
-                goto out;
-        }
-
-        buf_sz = quota_ug_conf_line_sz * 1000;
-
-        buf = GF_CALLOC(buf_sz, 1, gf_common_mt_char);
-        if (!buf) {
-                ret = -1;
-                goto out;
-        }
-
-        fd = gf_store_mkstemp (conf_handle);
-        if (fd < 0) {
-                ret = -1;
-                goto out;
-        }
-
-        /* Just create empty quota.conf file if create */
-        if (GF_QUOTA_OPTION_TYPE_ENABLE_USER == opcode) {
-                modified = _gf_true;
-                goto out;
-        }
-
-        /* Check if ugid is given for opts other than ENABLE */
-        if (!ugid) {
-                ret = -1;
-                goto out;
-        }
-
-//        type = GF_QUOTA_CONF_TYPE_USAGE;
-
-        for (;;) {
-                bytes_read = sys_read (conf_fd, buf, buf_sz);
-                if (bytes_read <= 0) {
-                        /*The flag @is_first_read is TRUE when the loop is
-                         * entered, and is set to false if the first read
-                         * reads non-zero bytes of data. The flag is used to
-                         * detect if quota.conf is an empty file, but for the
-                         * header. This is done to log appropriate error message
-                         * when 'quota remove' is attempted when there are no
-                         * limits set on the given volume.
-                         */
-                        if (is_first_read)
-                                is_file_empty = _gf_true;
-                        break;
-                }
-                if ((bytes_read % quota_ug_conf_line_sz) != 0) {
-                        gf_msg (this->name, GF_LOG_ERROR, 0,
-                                GD_MSG_QUOTA_CONF_CORRUPT, "quota.conf "
-                                "corrupted");
-                        ret = -1;
-                        goto out;
-                }
-                found = glusterd_find_ugid_match (ugid, buf, bytes_read,
-                                                  opcode, &bytes_to_write);
-
-                ret = sys_write (fd, (void *) buf, bytes_to_write);
-                if (ret == -1) {
-                        gf_msg (this->name, GF_LOG_ERROR, errno,
-                                GD_MSG_QUOTA_CONF_WRITE_FAIL,
-                                "write into ugquota config file failed.");
-                        goto out;
-                }
-
-                /*If the match is found in this iteration, copy the rest of
-                 * quota.conf into quota.conf.tmp and break.
-                 * Else continue with the search.
-                 */
-                if (found) {
-                        ret = glusterd_copy_to_tmp_file (conf_fd, fd,
-                                                         quota_ug_conf_line_sz);
-                        if (ret)
-                                goto out;
-                        break;
-                }
-                is_first_read = _gf_false;
-        }
-
-        switch (opcode) {
-        case GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER:
-                if (!found) {
-                        ret = glusterd_quota_conf_write_ugid (fd, ugid,
-                                                     GF_QUOTA_CONF_TYPE_USAGE);
-                        if (ret == -1) {
-                                gf_msg (this->name, GF_LOG_ERROR, errno,
-                                        GD_MSG_QUOTA_CONF_WRITE_FAIL,
-                                        "write into ugquota config file failed. ");
-                                goto out;
-                        }
-                        modified = _gf_true;
-                }
-                break;
-        case GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER:
-                if (is_file_empty) {
-                        gf_asprintf (op_errstr, "Cannot remove limit on"
-                                     " %s. The ugquota configuration file"
-                                     " for volume %s is empty.", ugid,
-                                     volinfo->volname);
-                        ret = -1;
-                        goto out;
-                } else {
-                        if (!found) {
-                                gf_asprintf (op_errstr, "Error. ugid %s"
-                                             " not found in store", ugid);
-                                ret = -1;
-                                goto out;
-                        } else {
-                                modified = _gf_true;
-                        }
-                }
-                break;
-
-        default:
-                ret = 0;
-                break;
-        }
-
-        if (modified)
-                glusterd_update_quota_ug_conf_version (volinfo, is_grp);
-
-        ret = 0;
-out:
-        if (conf_fd != -1) {
-                sys_close (conf_fd);
-        }
-
-        if (buf)
-                GF_FREE(buf);
-
-        if (ret && (fd > 0)) {
-                gf_store_unlink_tmppath (conf_handle);
-        } else {
-                ret = gf_store_rename_tmppath (conf_handle);
-/*
-                if (modified) {
-                        ret = glusterd_compute_cksum (volinfo, _gf_true);
-                        if (ret) {
-                                gf_msg (this->name, GF_LOG_ERROR, 0,
-                                        GD_MSG_CKSUM_COMPUTE_FAIL, "Failed to "
-                                        "compute cksum for quota conf file");
-                                return ret;
-                        }
-
-                        ret = glusterd_store_save_quota_version_and_cksum
-                                                                      (volinfo);
-                        if (ret)
-                                gf_msg (this->name, GF_LOG_ERROR, 0,
-                                        GD_MSG_VERS_CKSUM_STORE_FAIL,
-                                        "Failed to "
-                                        "store quota version and cksum");
-                }
-*/
-        }
-       return ret;
-}
-
-void
-glusterd_clean_up_quota_ug_store (glusterd_volinfo_t *volinfo,
-                                  gf_boolean_t is_grp)
-{
-        char                voldir[PATH_MAX]         = {0,};
-        char                confpath[PATH_MAX]       = {0,};
-        xlator_t           *this                     = NULL;
-        glusterd_conf_t    *conf                     = NULL;
-        gf_store_handle_t **conf_handle              = NULL;
-        uint32_t           *conf_version             = NULL;
-
-        this = THIS;
-        GF_ASSERT (this);
-        conf = this->private;
-        GF_ASSERT (conf);
-
-        GLUSTERD_GET_VOLUME_DIR (voldir, volinfo, conf);
-
-        snprintf (confpath, sizeof (confpath), "%s/%s", voldir,
-                  is_grp ? GLUSTERD_VOLUME_QUOTA_G_CONFIG
-                         : GLUSTERD_VOLUME_QUOTA_U_CONFIG);
-
-        sys_unlink (confpath);
-
-        conf_handle = is_grp ? &volinfo->quota_g_conf_shandle :
-                               &volinfo->quota_u_conf_shandle;
-        gf_store_handle_destroy (*conf_handle);
-        *conf_handle = NULL;
-
-        conf_version = is_grp ? &volinfo->quota_g_conf_version :
-                                &volinfo->quota_u_conf_version;
-        *conf_version = 0;
-
-}
-
 int32_t
 glusterd_quota_ug_meta_mkdir (char *volname, gf_boolean_t is_grp)
 {
@@ -2006,10 +1778,6 @@ glusterd_quota_enable_user (glusterd_volinfo_t *volinfo, char **op_errstr)
                 goto out;
         }
 
-        ret = glusterd_store_quota_ug_config (volinfo, NULL, _gf_false,
-                                           GF_QUOTA_OPTION_TYPE_ENABLE_USER,
-                                           op_errstr);
-
         ret = 0;
 out:
         if (ret && op_errstr && !*op_errstr)
@@ -2031,8 +1799,6 @@ glusterd_quota_disable_user (glusterd_volinfo_t *volinfo, char **op_errstr)
         GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
 
         (void) glusterd_quota_ug_meta_cleanup (volinfo->volname, _gf_false);
-
-        (void) glusterd_clean_up_quota_ug_store (volinfo, _gf_false);
 
         ret = 0;
 out:
@@ -2100,12 +1866,6 @@ glusterd_quota_limit_usage_user (glusterd_volinfo_t *volinfo, dict_t *dict,
                         goto out;
         }
 
-        ret = glusterd_store_quota_ug_config (volinfo, ugid, _gf_false,
-                                          GF_QUOTA_OPTION_TYPE_LIMIT_USAGE_USER,
-                                          op_errstr);
-        if (ret)
-                goto out;
-
         ret = 0;
 out:
 
@@ -2151,13 +1911,6 @@ glusterd_quota_remove_usage_user (glusterd_volinfo_t *volinfo, dict_t *dict,
                 if (ret)
                         goto out;
         }
-
-        ret = glusterd_store_quota_ug_config (volinfo, ugid, _gf_false,
-                                          GF_QUOTA_OPTION_TYPE_REMOVE_USAGE_USER,
-                                          op_errstr);
-        if (ret)
-                goto out;
-
 
         ret = 0;
 

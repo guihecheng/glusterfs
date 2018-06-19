@@ -13,9 +13,4 @@
 int
 glusterd_store_quota_config (glusterd_volinfo_t *volinfo, char *path,
                              char *gfid_str, int opcode, char **op_errstr);
-int
-glusterd_store_quota_ug_config (glusterd_volinfo_t *volinfo,
-                                char *ugid, gf_boolean_t is_grp,
-                                int opcode, char **op_errstr);
-
 #endif
