@@ -1183,32 +1183,40 @@ mq_update_ug_size (xlator_t *this, loc_t *child_loc, quota_meta_t *delta,
         int32_t              ret                = -1;
         char                 uid_str[PATH_MAX]  = {0,};
         char                 gid_str[PATH_MAX]  = {0,};
+        marker_conf_t       *priv               = NULL;
 
+        GF_VALIDATE_OR_GOTO ("marker", this, out);
         GF_VALIDATE_OR_GOTO ("marker", delta, out);
         GF_VALIDATE_OR_GOTO ("marker", child_ctx, out);
+
+        priv = this->private;
 
         if (quota_meta_is_null (delta)) {
                 ret = 0;
                 goto out;
         }
 
-        snprintf (uid_str, sizeof (uid_str), "%"PRId32,
-                  child_ctx->contri_u->ugid);
-        snprintf (gid_str, sizeof (gid_str), "%"PRId32,
-                  child_ctx->contri_g->ugid);
-
-        ret = _mq_update_ug_size (this, child_loc, delta,
-                                  uid_str, _gf_false);
-        if (ret < 0) {
-                goto out;
+        if (priv->feature_enabled & GF_QUOTA_U) {
+                snprintf (uid_str, sizeof (uid_str), "%"PRId32,
+                          child_ctx->contri_u->ugid);
+                ret = _mq_update_ug_size (this, child_loc, delta,
+                                          uid_str, _gf_false);
+                if (ret < 0) {
+                        goto out;
+                }
         }
 
-        ret = _mq_update_ug_size (this, child_loc, delta,
-                                  gid_str, _gf_true);
-        if (ret < 0) {
-                goto out;
+        if (priv->feature_enabled & GF_QUOTA_G) {
+                snprintf (gid_str, sizeof (gid_str), "%"PRId32,
+                          child_ctx->contri_g->ugid);
+                ret = _mq_update_ug_size (this, child_loc, delta,
+                                          gid_str, _gf_true);
+                if (ret < 0) {
+                        goto out;
+                }
         }
 
+        ret = 0;
 out:
         return ret;
 }

@@ -1742,33 +1742,14 @@ glusterd_quota_enable_user (glusterd_volinfo_t *volinfo, char **op_errstr)
                 ret = -1;
                 goto out;
         }
-
-        ret = dict_set_dynstr_with_alloc (volinfo->dict, VKEY_FEATURES_QUOTA,
-                                          "on");
-        if (ret) {
-                gf_msg (this->name, GF_LOG_ERROR, errno,
-                        GD_MSG_DICT_SET_FAILED, "dict set failed");
-                goto out;
-        }
-
-        ret = dict_set_dynstr_with_alloc (volinfo->dict,
-                                          VKEY_FEATURES_INODE_QUOTA, "on");
-        if (ret) {
-                gf_msg (this->name, GF_LOG_ERROR, 0,
-                        GD_MSG_DICT_SET_FAILED, "dict set failed");
-                goto out;
-        }
-
-        ret = dict_set_dynstr_with_alloc (volinfo->dict,
-                                          "features.quota-deem-statfs",
-                                          "on");
-        if (ret) {
-                gf_msg (this->name, GF_LOG_ERROR, errno,
-                        GD_MSG_DICT_SET_FAILED, "setting quota-deem-statfs"
-                        "in volinfo failed");
-                goto out;
-        }
 */
+        ret = dict_set_dynstr_with_alloc (volinfo->dict, VKEY_FEATURES_QUOTA_U,
+                                          "on");
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, errno,
+                        GD_MSG_DICT_SET_FAILED, "dict set failed");
+                goto out;
+        }
 
         ret = glusterd_quota_ug_meta_mkdir (volinfo->volname, _gf_false);
         if (ret) {
@@ -1797,6 +1778,14 @@ glusterd_quota_disable_user (glusterd_volinfo_t *volinfo, char **op_errstr)
 
         GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
         GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        ret = dict_set_dynstr_with_alloc (volinfo->dict, VKEY_FEATURES_QUOTA_U,
+                                          "off");
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, errno,
+                        GD_MSG_DICT_SET_FAILED, "dict set failed");
+                goto out;
+        }
 
         (void) glusterd_quota_ug_meta_cleanup (volinfo->volname, _gf_false);
 
@@ -1937,6 +1926,14 @@ glusterd_quota_enable_group (glusterd_volinfo_t *volinfo, char **op_errstr)
                 goto out;
         }
 
+        ret = dict_set_dynstr_with_alloc (volinfo->dict, VKEY_FEATURES_QUOTA_G,
+                                          "on");
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, errno,
+                        GD_MSG_DICT_SET_FAILED, "dict set failed");
+                goto out;
+        }
+
         ret = glusterd_quota_ug_meta_mkdir (volinfo->volname, _gf_true);
         if (ret) {
                 gf_msg (this->name, GF_LOG_ERROR, errno,
@@ -1964,6 +1961,14 @@ glusterd_quota_disable_group (glusterd_volinfo_t *volinfo, char **op_errstr)
 
         GF_VALIDATE_OR_GOTO (this->name, volinfo, out);
         GF_VALIDATE_OR_GOTO (this->name, op_errstr, out);
+
+        ret = dict_set_dynstr_with_alloc (volinfo->dict, VKEY_FEATURES_QUOTA_G,
+                                          "off");
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, errno,
+                        GD_MSG_DICT_SET_FAILED, "dict set failed");
+                goto out;
+        }
 
         (void) glusterd_quota_ug_meta_cleanup (volinfo->volname, _gf_true);
 

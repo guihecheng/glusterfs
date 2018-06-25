@@ -28,6 +28,8 @@
 #define VKEY_MARKER_XTIME_FORCE   GEOREP".ignore-pid-check"
 #define VKEY_CHANGELOG            "changelog.changelog"
 #define VKEY_FEATURES_QUOTA       "features.quota"
+#define VKEY_FEATURES_QUOTA_U     "features.quota.user"
+#define VKEY_FEATURES_QUOTA_G     "features.quota.group"
 #define VKEY_FEATURES_INODE_QUOTA "features.inode-quota"
 #define VKEY_FEATURES_TRASH       "features.trash"
 #define VKEY_FEATURES_BITROT      "features.bitrot"

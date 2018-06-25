@@ -2551,6 +2551,22 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .flags       = VOLOPT_FLAG_NEVER_RESET,
           .op_version  = 1
         },
+        { .key         = VKEY_FEATURES_QUOTA_U,
+          .voltype     = "features/marker",
+          .option      = "quota-user",
+          .value       = "off",
+          .type        = NO_DOC,
+          .flags       = OPT_FLAG_NEVER_RESET,
+          .op_version  = 1
+        },
+        { .key         = VKEY_FEATURES_QUOTA_G,
+          .voltype     = "features/marker",
+          .option      = "quota-group",
+          .value       = "off",
+          .type        = NO_DOC,
+          .flags       = OPT_FLAG_NEVER_RESET,
+          .op_version  = 1
+        },
         { .key         = VKEY_FEATURES_INODE_QUOTA,
           .voltype     = "features/marker",
           .option      = "inode-quota",

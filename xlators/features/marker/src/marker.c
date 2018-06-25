@@ -1080,12 +1080,15 @@ marker_unlink_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                                         "dict get failed %s ",
                                         strerror (-ret));
                         }
-                        ret = dict_get_uint64 (xdata,
-                                GF_RESPONSE_UGID_XDATA, &ugid);
-                        if (ret) {
-                                gf_log (this->name, GF_LOG_TRACE,
-                                        "dict get failed %s ",
-                                        strerror (-ret));
+                        if (priv->feature_enabled & GF_QUOTA_U ||
+                            priv->feature_enabled & GF_QUOTA_G) {
+                                ret = dict_get_uint64 (xdata,
+                                        GF_RESPONSE_UGID_XDATA, &ugid);
+                                if (ret) {
+                                        gf_log (this->name, GF_LOG_TRACE,
+                                                "dict get failed %s ",
+                                                strerror (-ret));
+                                }
                         }
                 }
 
@@ -1160,9 +1163,13 @@ marker_unlink (call_frame_t *frame, xlator_t *this, loc_t *loc, int xflag,
         if (ret < 0)
                 goto err;
 
-        ret = dict_set_int32 (xdata, GF_REQUEST_UGID_XDATA, 1);
-        if (ret < 0)
-                goto err;
+
+        if (priv->feature_enabled & GF_QUOTA_U ||
+            priv->feature_enabled & GF_QUOTA_G) {
+                ret = dict_set_int32 (xdata, GF_REQUEST_UGID_XDATA, 1);
+                if (ret < 0)
+                        goto err;
+        }
 
 unlink_wind:
         STACK_WIND (frame, marker_unlink_cbk, FIRST_CHILD(this),
@@ -3346,6 +3353,20 @@ reconfigure (xlator_t *this, dict_t *options)
                         priv->feature_enabled |= GF_QUOTA;
         }
 
+        data = dict_get (options, "quota-user");
+        if (data) {
+                ret = gf_string2boolean (data->data, &flag);
+                if (ret == 0 && flag == _gf_true)
+                        priv->feature_enabled |= GF_QUOTA_U;
+        }
+
+        data = dict_get (options, "quota-group");
+        if (data) {
+                ret = gf_string2boolean (data->data, &flag);
+                if (ret == 0 && flag == _gf_true)
+                        priv->feature_enabled |= GF_QUOTA_G;
+        }
+
         data = dict_get (options, "inode-quota");
         if (data) {
                 ret = gf_string2boolean (data->data, &flag);
@@ -3429,6 +3450,20 @@ init (xlator_t *this)
                 ret = gf_string2boolean (data->data, &flag);
                 if (ret == 0 && flag == _gf_true)
                         priv->feature_enabled |= GF_QUOTA;
+        }
+
+        data = dict_get (options, "quota-user");
+        if (data) {
+                ret = gf_string2boolean (data->data, &flag);
+                if (ret == 0 && flag == _gf_true)
+                        priv->feature_enabled |= GF_QUOTA_U;
+        }
+
+        data = dict_get (options, "quota-group");
+        if (data) {
+                ret = gf_string2boolean (data->data, &flag);
+                if (ret == 0 && flag == _gf_true)
+                        priv->feature_enabled |= GF_QUOTA_G;
         }
 
         data = dict_get (options, "inode-quota");
