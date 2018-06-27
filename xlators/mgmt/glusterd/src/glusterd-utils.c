@@ -12665,8 +12665,8 @@ glusterd_clean_up_worm_store (glusterd_volinfo_t *volinfo)
 
         sys_unlink (worm_confpath);
 
-        gf_store_handle_destroy (volinfo->quota_conf_shandle);
-        volinfo->quota_conf_shandle = NULL;
+        gf_store_handle_destroy (volinfo->worm_conf_shandle);
+        volinfo->worm_conf_shandle = NULL;
 }
 
 int
