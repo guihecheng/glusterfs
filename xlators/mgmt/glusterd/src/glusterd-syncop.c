@@ -802,7 +802,7 @@ _gd_syncop_stage_op_cbk (struct rpc_req *req, struct iovec *iov,
         gf_uuid_copy (args->uuid, rsp.uuid);
         if (rsp.op == GD_OP_REPLACE_BRICK || rsp.op == GD_OP_QUOTA ||
             rsp.op == GD_OP_CREATE_VOLUME || rsp.op == GD_OP_ADD_BRICK ||
-            rsp.op == GD_OP_START_VOLUME) {
+            rsp.op == GD_OP_START_VOLUME || rsp.op == GD_OP_WORM) {
                 pthread_mutex_lock (&args->lock_dict);
                 {
                         ret = glusterd_syncop_aggr_rsp_dict (rsp.op, args->dict,
