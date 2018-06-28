@@ -1513,6 +1513,7 @@ exit 0
             %attr(0644,-,-) %{_sharedstatedir}/glusterd/groups/virt
             %attr(0644,-,-) %{_sharedstatedir}/glusterd/groups/metadata-cache
             %attr(0644,-,-) %{_sharedstatedir}/glusterd/groups/gluster-block
+            %attr(0644,-,-) %{_sharedstatedir}/glusterd/groups/db-workload
             %attr(0644,-,-) %{_sharedstatedir}/glusterd/groups/nl-cache
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/glusterfind
        %dir %attr(0755,-,-) %{_sharedstatedir}/glusterd/glusterfind/.keys
@@ -2160,6 +2161,9 @@ fi
 %endif
 
 %changelog
+* Fri Jul 6 2018 Atin Mukherjee <amukherj@redhat.com>
+- Added db group profile (#1597506)
+
 * Mon Apr 23 2018 Milind Changire <mchangir@redhat.com>
 - make RHGS release number available in /usr/share/glusterfs/release (#1570514)
 

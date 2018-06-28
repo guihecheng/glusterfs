@@ -33,6 +33,7 @@ extras/command-completion/README
 extras/create_new_xlator/README.md
 extras/glusterfs.vim
 extras/group-gluster-block
+extras/group-db-workload
 extras/group-metadata-cache
 extras/group-nl-cache
 extras/group-virt.example
