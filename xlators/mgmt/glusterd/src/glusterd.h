@@ -56,6 +56,7 @@
 #define GLUSTERD_BRICK_MULTIPLEX_KEY    "cluster.brick-multiplex"
 #define GLUSTERD_BRICKMUX_LIMIT_KEY     "cluster.max-bricks-per-process"
 #define GLUSTERD_LOCALTIME_LOGGING_KEY  "cluster.localtime-logging"
+#define GLUSTERD_DAEMON_LOG_LEVEL_KEY   "cluster.daemon-log-level"
 
 #define GANESHA_HA_CONF  CONFDIR "/ganesha-ha.conf"
 #define GANESHA_EXPORT_DIRECTORY        CONFDIR"/exports"

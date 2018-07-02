@@ -41,7 +41,7 @@
 
 #define GLUSTERD_COMP_BASE      GLFS_MSGID_GLUSTERD
 
-#define GLFS_NUM_MESSAGES       614
+#define GLFS_NUM_MESSAGES       615
 
 #define GLFS_MSGID_END          (GLUSTERD_COMP_BASE + GLFS_NUM_MESSAGES + 1)
 /* Messaged with message IDs */
@@ -4983,6 +4983,14 @@
  *
  */
 #define GD_MSG_MANAGER_FUNCTION_FAILED  (GLUSTERD_COMP_BASE + 614)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_DAEMON_LOG_LEVEL_VOL_OPT_VALIDATE_FAIL (GLUSTERD_COMP_BASE + 615)
 
 /*------------*/
 

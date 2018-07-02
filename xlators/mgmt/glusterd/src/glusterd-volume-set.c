@@ -3573,6 +3573,12 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .op_version  = GD_OP_VERSION_3_12_0,
           .validate_fn = validate_boolean
         },*/
+        { .key         = GLUSTERD_DAEMON_LOG_LEVEL_KEY,
+          .voltype     = "mgmt/glusterd",
+          .type        = GLOBAL_NO_DOC,
+          .value       = "INFO",
+          .op_version  = GD_OP_VERSION_3_11_2
+        },
         { .key        = "disperse.parallel-writes",
           .voltype    = "cluster/disperse",
           .type       = NO_DOC,
