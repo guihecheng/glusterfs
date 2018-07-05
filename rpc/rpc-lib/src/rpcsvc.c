@@ -447,7 +447,7 @@ rpcsvc_request_create (rpcsvc_t *svc, rpc_transport_t *trans,
         size_t                  msglen  = 0;
         int                     ret     = -1;
 
-        if (!svc || !trans)
+        if (!svc || !trans || !svc->rxpool)
                 return NULL;
 
         /* We need to allocate the request before actually calling
@@ -1473,6 +1473,7 @@ rpcsvc_get_listener (rpcsvc_t *svc, uint16_t port, rpc_transport_t *trans)
 {
         rpcsvc_listener_t  *listener      = NULL;
         char                found         = 0;
+        rpcsvc_listener_t  *next          = NULL;
         uint32_t            listener_port = 0;
 
         if (!svc) {
@@ -1481,7 +1482,7 @@ rpcsvc_get_listener (rpcsvc_t *svc, uint16_t port, rpc_transport_t *trans)
 
         pthread_mutex_lock (&svc->rpclock);
         {
-                list_for_each_entry (listener, &svc->listeners, list) {
+                list_for_each_entry_safe (listener, next, &svc->listeners, list) {
                         if (listener && trans) {
                                 if (listener->trans == trans) {
                                         found = 1;
