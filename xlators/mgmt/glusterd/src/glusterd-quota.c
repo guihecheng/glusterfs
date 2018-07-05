@@ -1361,6 +1361,11 @@ glusterd_quota_ug_meta_mkdir (char *volname, gf_boolean_t is_grp)
         snprintf (meta_dir, sizeof (meta_dir), "%s%s",
                   mount_dir, is_grp ? GF_QUOTA_G_DIR : GF_QUOTA_U_DIR);
 
+        ret = sys_mkdir (mount_dir, 0700);
+        if (ret && errno != EEXIST) {
+                goto out;
+        }
+
         ret = sys_mkdir (meta_root_dir, 0700);
         if (ret && errno != EEXIST) {
                 goto out;
