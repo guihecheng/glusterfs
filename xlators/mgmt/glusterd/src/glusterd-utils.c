@@ -1282,7 +1282,8 @@ glusterd_brickinfo_new_from_brick (char *brick,
                                         GD_MSG_BRICKINFO_CREATE_FAIL, "realpath"
                                         " () failed for brick %s. The "
                                         "underlying filesystem may be in bad "
-                                        "state", new_brickinfo->path);
+                                        "state. Error - %s",
+                                        new_brickinfo->path, strerror(errno));
                                 ret = -1;
                                 goto out;
                         }
@@ -1367,6 +1368,12 @@ glusterd_is_brickpath_available (uuid_t uuid, char *path)
         /* path may not yet exist */
         if (!realpath (path, tmp_path)) {
                 if (errno != ENOENT) {
+                        gf_msg (THIS->name, GF_LOG_CRITICAL, errno,
+                                        GD_MSG_BRICKINFO_CREATE_FAIL, "realpath"
+                                        " () failed for brick %s. The "
+                                        "underlying filesystem may be in bad "
+                                        "state. Error - %s",
+                                        path, strerror(errno));
                         goto out;
                 }
                 /* When realpath(3) fails, tmp_path is undefined. */
@@ -1378,8 +1385,14 @@ glusterd_is_brickpath_available (uuid_t uuid, char *path)
                                          brick_list) {
                         if (gf_uuid_compare (uuid, brickinfo->uuid))
                                 continue;
-                        if (_is_prefix (brickinfo->real_path, tmp_path))
+                        if (_is_prefix (brickinfo->real_path, tmp_path)) {
+                                gf_msg (THIS->name, GF_LOG_CRITICAL, 0,
+                                        GD_MSG_BRICKINFO_CREATE_FAIL,
+                                        "_is_prefix call failed for brick %s "
+                                        "against brick %s", tmp_path,
+                                        brickinfo->real_path);
                                 goto out;
+                        }
                 }
         }
         available = _gf_true;
