@@ -1699,7 +1699,7 @@ glusterd_volinfo_find_by_volume_id (uuid_t volume_id, glusterd_volinfo_t **volin
 }
 
 int32_t
-glusterd_volinfo_find (char *volname, glusterd_volinfo_t **volinfo)
+glusterd_volinfo_find (const char *volname, glusterd_volinfo_t **volinfo)
 {
         glusterd_volinfo_t      *tmp_volinfo = NULL;
         int32_t                 ret = -1;
@@ -2952,6 +2952,11 @@ glusterd_add_volume_to_dict (glusterd_volinfo_t *volinfo,
         if (ret)
                 goto out;
 
+        snprintf (key, sizeof (key), "%s%d.stage_deleted", prefix, count);
+        ret = dict_set_uint32 (dict, key, (uint32_t)volinfo->stage_deleted);
+        if (ret)
+                goto out;
+
          /* tiering related variables */
 
         memset (key, 0, sizeof (key));
@@ -3355,6 +3360,7 @@ glusterd_compare_friend_volume (dict_t *peer_data, int32_t count,
         uint32_t                cksum = 0;
         uint32_t                quota_cksum = 0;
         uint32_t                quota_version = 0;
+        uint32_t                stage_deleted = 0;
         int32_t                 version = 0;
         xlator_t                *this = NULL;
 
@@ -3370,9 +3376,15 @@ glusterd_compare_friend_volume (dict_t *peer_data, int32_t count,
                 goto out;
 
         ret = glusterd_volinfo_find (volname, &volinfo);
-
         if (ret) {
-                *status = GLUSTERD_VOL_COMP_UPDATE_REQ;
+                snprintf (key, sizeof (key), "volume%d.stage_deleted", count);
+                ret = dict_get_uint32 (peer_data, key, &stage_deleted);
+                /* stage_deleted = 1 means the volume is still in the process of
+                 * deleting a volume, so we shouldn't be trying to create a
+                 * fresh volume here which would lead to a stale entry
+                 */
+                if (stage_deleted == 0)
+                        *status = GLUSTERD_VOL_COMP_UPDATE_REQ;
                 ret = 0;
                 goto out;
         }
@@ -3929,6 +3941,7 @@ glusterd_import_volinfo (dict_t *peer_data, int count,
         char               *rebalance_id_str = NULL;
         int                op_version        = 0;
         int                client_op_version = 0;
+        uint32_t           stage_deleted     = 0;
 
         GF_ASSERT (peer_data);
         GF_ASSERT (volinfo);
@@ -3938,6 +3951,17 @@ glusterd_import_volinfo (dict_t *peer_data, int count,
         ret = dict_get_str (peer_data, key, &volname);
         if (ret) {
                 snprintf (msg, sizeof (msg), "%s missing in payload", key);
+                goto out;
+        }
+
+        snprintf (key, sizeof (key), "%s%d.stage_deleted", prefix, count);
+        ret = dict_get_uint32 (peer_data, key, &stage_deleted);
+        /* stage_deleted = 1 means the volume is still in the process of
+         * deleting a volume, so we shouldn't be trying to create a
+         * fresh volume here which would lead to a stale entry
+        */
+        if (stage_deleted) {
+                ret = 0;
                 goto out;
         }
 
