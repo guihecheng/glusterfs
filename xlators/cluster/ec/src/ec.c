@@ -1434,9 +1434,13 @@ struct volume_options options[] =
                      "disabled, lock will be released as soon as fop "
                      "completes."
     },
+    /* Keeping this option OFF by default. Once we take lock
+     * contention notification feature (upstream patch #14736) in for
+     * downstream we can revert this to ON.
+     */
     { .key = {"other-eager-lock"},
       .type = GF_OPTION_TYPE_BOOL,
-      .default_value = "on",
+      .default_value = "off",
       .description = "It's equivalent to the eager-lock option but for non "
                      "regular files."
     },
