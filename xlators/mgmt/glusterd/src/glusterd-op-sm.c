@@ -78,7 +78,7 @@ glusterd_all_vol_opts valid_all_vol_opts[] = {
          * TBD: add a dynamic handler to set the appropriate value
          */
         { GLUSTERD_MAX_OP_VERSION_KEY,          "BUG_NO_MAX_OP_VERSION"},
-        { GLUSTERD_BRICK_MULTIPLEX_KEY,         "enable"},
+        { GLUSTERD_BRICK_MULTIPLEX_KEY,         "disable"},
         /* Set this value to 0 by default implying brick-multiplexing
          * behaviour with no limit set on the number of brick instances that
          * can be attached per process.

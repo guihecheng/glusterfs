@@ -111,7 +111,7 @@ is_brick_mx_enabled (void)
         if (!ret)
                 ret = gf_string2boolean (value, &enabled);
 
-        return ret ? _gf_true : enabled;
+        return ret ? _gf_false : enabled;
 }
 
 int

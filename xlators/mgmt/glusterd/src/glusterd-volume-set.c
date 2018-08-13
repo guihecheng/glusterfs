@@ -3506,7 +3506,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         /* Brick multiplexing options */
         { .key         = GLUSTERD_BRICK_MULTIPLEX_KEY,
           .voltype     = "mgmt/glusterd",
-          .value       = "on",
+          .value       = "off",
           .op_version  = GD_OP_VERSION_3_10_0,
           .validate_fn = validate_boolean,
           .type        = GLOBAL_DOC,
