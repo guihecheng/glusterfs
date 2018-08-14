@@ -4680,7 +4680,6 @@ posix_getxattr (call_frame_t *frame, xlator_t *this,
         char                 *value                 = NULL;
         char                 *real_path             = NULL;
         dict_t               *dict                  = NULL;
-        char                 *file_contents         = NULL;
         int                   ret                   = -1;
         char                 *path                  = NULL;
         char                 *rpath                 = NULL;
