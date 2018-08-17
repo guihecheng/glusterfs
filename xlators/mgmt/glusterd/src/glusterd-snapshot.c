@@ -2518,6 +2518,7 @@ glusterd_snapshot_create_prevalidate (dict_t *dict, char **op_errstr,
         int64_t                effective_max_limit = 0;
         int                    flags             = 0;
         uint64_t               opt_hard_max      = GLUSTERD_SNAPS_MAX_HARD_LIMIT;
+        char                  *description       = NULL;
 
         this = THIS;
         GF_ASSERT (op_errstr);
@@ -2541,6 +2542,15 @@ glusterd_snapshot_create_prevalidate (dict_t *dict, char **op_errstr,
         ret = dict_get_str (dict, "snapname", &snapname);
         if (ret) {
                 snprintf (err_str, sizeof (err_str), "Failed to get snapname");
+                goto out;
+        }
+
+        ret = dict_get_str (dict, "description", &description);
+        if (description && !(*description)) {
+                /* description should have a non-null value */
+                ret = -1;
+                snprintf (err_str, sizeof (err_str), "Snapshot cannot be "
+                          "created with empty description");
                 goto out;
         }
 
