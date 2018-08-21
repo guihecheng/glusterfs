@@ -5871,6 +5871,9 @@ server3_3_lookup (rpcsvc_request_t *req)
         ret = 0;
         resolve_and_resume (frame, server_lookup_resume);
 
+        free (args.bname);
+        free (args.xdata.xdata_val);
+
         return ret;
 out:
         free (args.bname);
