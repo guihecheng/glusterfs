@@ -243,6 +243,9 @@ static struct argp_option gf_options[] = {
          OPTION_ARG_OPTIONAL, "disable/enable fuse event-history"},
         {"reader-thread-count", ARGP_READER_THREAD_COUNT_KEY, "INTEGER",
          OPTION_ARG_OPTIONAL, "set fuse reader thread count"},
+        {"fuse-flush-handle-interrupt", ARGP_FUSE_FLUSH_HANDLE_INTERRUPT_KEY,
+         "BOOL", OPTION_ARG_OPTIONAL | OPTION_HIDDEN,
+         "handle interrupt in fuse FLUSH handler"},
         {0, 0, 0, 0, "Miscellaneous Options:"},
         {0, }
 };
@@ -580,6 +583,38 @@ set_fuse_mount_options (glusterfs_ctx_t *ctx, dict_t *options)
                                 "reader-thread-count");
                         goto err;
                 }
+        }
+        switch (cmd_args->fuse_flush_handle_interrupt) {
+                case GF_OPTION_ENABLE:
+                        ret = dict_set_static_ptr (options,
+                                                   "flush-handle-interrupt",
+                                                   "on");
+                        if (ret < 0) {
+                                gf_msg ("glusterfsd", GF_LOG_ERROR, 0,
+                                        glusterfsd_msg_4,
+                                        "failed to set dict value for key "
+                                        "flush-handle-interrupt");
+                                goto err;
+                        }
+                        break;
+                case GF_OPTION_DISABLE:
+                        ret = dict_set_static_ptr (options,
+                                                   "flush-handle-interrupt",
+                                                   "off");
+                        if (ret < 0) {
+                                gf_msg ("glusterfsd", GF_LOG_ERROR, 0,
+                                        glusterfsd_msg_4,
+                                        "failed to set dict value for key "
+                                         "flush-handle-interrupt");
+                                goto err;
+                        }
+                        break;
+                case GF_OPTION_DEFERRED: /* default */
+                default:
+                        gf_msg_debug ("glusterfsd", 0,
+                                      "fuse-flush-handle-interrupt mode %d",
+                                      cmd_args->fuse_flush_handle_interrupt);
+                        break;
         }
 
         ret = 0;
@@ -1352,7 +1387,22 @@ no_oom_api:
                 }
 
                 break;
-	}
+        case ARGP_FUSE_FLUSH_HANDLE_INTERRUPT_KEY:
+                if (!arg)
+                        arg = "yes";
+
+                if (gf_string2boolean(arg, &b) == 0) {
+                        cmd_args->fuse_flush_handle_interrupt = b;
+
+                        break;
+                }
+
+                argp_failure(state, -1, 0,
+                             "unknown fuse flush handle interrupt "
+                             "setting \"%s\"",
+                             arg);
+                break;
+        }
 
         return 0;
 }
@@ -1648,6 +1698,7 @@ glusterfs_ctx_defaults_init (glusterfs_ctx_t *ctx)
         cmd_args->fuse_attribute_timeout = -1;
         cmd_args->fuse_entry_timeout = -1;
 	cmd_args->fopen_keep_cache = GF_OPTION_DEFERRED;
+        cmd_args->fuse_flush_handle_interrupt = GF_OPTION_DEFERRED;
 
         if (ctx->mem_acct_enable)
                 cmd_args->mem_acct = 1;

@@ -448,6 +448,8 @@ struct _cmd_args {
 
         char              *event_history;
         uint32_t           reader_thread_count;
+
+        int fuse_flush_handle_interrupt;
 };
 typedef struct _cmd_args cmd_args_t;
 
