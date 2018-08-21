@@ -772,6 +772,15 @@ gf_changelog_extract_min_max (const char *dname, const char *htime_dir,
         return ret;
 }
 
+/* gf_history_changelog returns actual_end and spawns threads to
+ * parse historical changelogs. The return values are as follows.
+ *     0 : On success
+ *     1 : Successful, but partial historical changelogs available,
+ *         end time falls into different htime file or future time
+ *    -2 : Error, requested historical changelog not available, not
+ *         even partial
+ *    -1 : On any error
+ */
 int
 gf_history_changelog (char* changelog_dir, unsigned long start,
                       unsigned long end, int n_parallel,
@@ -799,6 +808,7 @@ gf_history_changelog (char* changelog_dir, unsigned long start,
         pthread_t                       consume_th              = 0;
         char                            htime_dir[PATH_MAX]     = {0,};
         char                            buffer[PATH_MAX]        = {0,};
+        gf_boolean_t                    partial_history         = _gf_false;
 
         pthread_attr_t attr;
 
@@ -827,6 +837,11 @@ gf_history_changelog (char* changelog_dir, unsigned long start,
                 ret = -1;
                 goto out;
         }
+
+        gf_smsg (this->name, GF_LOG_INFO, 0,
+                 CHANGELOG_LIB_MSG_TOTAL_LOG_INFO,
+                 "Requesting historical changelogs",
+                 "start=%lu", start, "end=%lu", end, NULL);
 
         /* basic sanity check */
         if (start > end || n_parallel <= 0) {
@@ -860,8 +875,14 @@ gf_history_changelog (char* changelog_dir, unsigned long start,
 
                 entry = sys_readdir (dirp, scratch);
 
-                if (!entry || errno != 0)
+                if (!entry || errno != 0) {
+                        gf_smsg (this->name, GF_LOG_ERROR, errno,
+                                 CHANGELOG_LIB_MSG_HIST_FAILED,
+                                 "Requested changelog range is not availbale",
+                                 "start=%lu", start, "end=%lu", end, NULL);
+                        ret = -2;
                         break;
+                }
 
                 ret = gf_changelog_extract_min_max (entry->d_name, htime_dir,
                                                     &fd, &total_changelog,
@@ -905,6 +926,23 @@ gf_history_changelog (char* changelog_dir, unsigned long start,
                         }
 
                         end2 = (end <= max_ts) ? end : max_ts;
+
+                        /* Check if end falls out of same HTIME file. The end
+                         * falling to a different htime file or changelog
+                         * disable-enable is detected only after 20 seconds.
+                         * This is required because, applications generally
+                         * asks historical changelogs till current time and
+                         * it is possible changelog is not rolled over yet.
+                         * So, buffer time of default rollover time plus 5
+                         * seconds is subtracted.  If the application requests
+                         * the end time with in half a minute of changelog
+                         * disable, it's not detected as changelog disable and
+                         * it's application's responsibility to retry after
+                         * 20 seconds before confirming it as partial history.
+                         */
+                        if ((end - 20) > max_ts) {
+                                partial_history = _gf_true;
+                        }
 
                         /**
                          * search @end2 in htime file returning it's index (@to)
@@ -972,12 +1010,15 @@ gf_history_changelog (char* changelog_dir, unsigned long start,
                         goto out;
 
                 } else {/* end of range check */
-                        gf_msg (this->name, GF_LOG_ERROR, errno,
-                        CHANGELOG_LIB_MSG_HIST_FAILED, "Requested changelog "
-                        "range is not available. START - %lu CHLOG_MIN - %lu "
-                        "CHLOG_MAX - %lu", start, min_ts, max_ts);
-                        ret = -2;
-                        goto out;
+                        gf_smsg (this->name, GF_LOG_ERROR, errno,
+                                 CHANGELOG_LIB_MSG_HIST_FAILED,
+                                 "Requested changelog range is not "
+                                 "available. Retrying next HTIME",
+                                 "start=%lu", start,
+                                 "end=%lu", end,
+                                 "chlog_min=%lu", min_ts,
+                                 "chlog_max=%lu", max_ts,
+                                 NULL);
                 }
         } /* end of readdir() */
 
@@ -999,6 +1040,10 @@ out:
 
         hist_jnl->hist_done = 1;
         *actual_end = ts2;
+
+        if (partial_history) {
+                ret = 1;
+        }
 
         return ret;
 }
