@@ -3014,7 +3014,7 @@ conditional_dump (dict_t *dict, char *key, data_t *value, void *data)
         char                 *filename = NULL;
         FILE                 *logfp = NULL;
         struct ios_dump_args args = {0};
-        int                   pid, namelen;
+        int                   pid, namelen, dirlen;
         char                  dump_key[100];
         char                 *slash_ptr = NULL;
         char                 *path_in_value = NULL;
@@ -3039,16 +3039,17 @@ conditional_dump (dict_t *dict, char *key, data_t *value, void *data)
                         "%s: no \"../\" allowed in path", path_in_value);
                 return -1;
         }
-        namelen = (strlen (IOS_STATS_DUMP_DIR) + value->len +
-                   strlen (this->name) + 2);         /* '.' and '\0' */
+        dirlen = strlen (IOS_STATS_DUMP_DIR);
+        namelen = (dirlen + value->len + strlen (this->name) + 3);
+        /* +3 for '/', '.' and '\0' added in snprintf below*/
 
         filename = alloca0 (namelen);
 
-        snprintf (filename, namelen, "%s%s.%s", IOS_STATS_DUMP_DIR,
+        snprintf (filename, namelen, "%s/%s.%s", IOS_STATS_DUMP_DIR,
                   path_in_value, this->name);
 
         /* convert any slashes to '-' so that fopen works correctly */
-        slash_ptr = strchr (filename + value->len + 1, '/');
+        slash_ptr = strchr (filename + dirlen + 1, '/');
         while (slash_ptr) {
                 *slash_ptr = '-';
                 slash_ptr = strchr (slash_ptr, '/');
