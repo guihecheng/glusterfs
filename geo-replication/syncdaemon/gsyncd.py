@@ -323,6 +323,8 @@ def main_i():
     op.add_option('--changelog-archive-format', metavar='N',
                   type=str, default="%Y%m")
     op.add_option('--use-meta-volume', default=False, action='store_true')
+    op.add_option('--gfid-conflict-resolution', default=True,
+                  action='store_true')
     op.add_option('--meta-volume-mnt', metavar='N',
                   type=str, default="/var/run/gluster/shared_storage")
     op.add_option(
