@@ -1225,4 +1225,7 @@ afr_set_inode_local (xlator_t *this, afr_local_t *local, inode_t *inode);
 
 gf_boolean_t
 afr_is_symmetric_error (call_frame_t *frame, xlator_t *this);
+
+gf_boolean_t
+afr_is_pending_set (xlator_t *this, dict_t *xdata, int type);
 #endif /* __AFR_H__ */
