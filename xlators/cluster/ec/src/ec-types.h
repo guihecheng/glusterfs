@@ -347,6 +347,8 @@ struct _ec_fop_data {
     struct iovec      *vector;
     struct iobref     *buffers;
     gf_seek_what_t     seek;
+    char              *errstr;    /*String of fop name, path and gfid
+                                   to be used in gf_msg. */
 };
 
 struct _ec_cbk_data {
