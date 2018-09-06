@@ -2241,9 +2241,6 @@ __need_previous_lock_unlocked (afr_local_t *local)
 {
         afr_lock_t      *lock = NULL;
 
-        if (!local->transaction.eager_lock_on)
-                return _gf_true;
-
         lock = &local->inode_ctx->lock[local->transaction.type];
         if (!lock->acquired)
                 return _gf_false;
@@ -2260,10 +2257,8 @@ __afr_eager_lock_handle (afr_local_t *local, gf_boolean_t *take_lock,
         afr_local_t     *owner_local = NULL;
         xlator_t        *this = local->transaction.frame->this;
 
-        if (local->fd && !afr_are_multiple_fds_opened (local, this)) {
-                local->transaction.eager_lock_on = _gf_true;
-                afr_set_lk_owner (local->transaction.frame, this, local->inode);
-        }
+        local->transaction.eager_lock_on = _gf_true;
+        afr_set_lk_owner (local->transaction.frame, this, local->inode);
 
         lock = &local->inode_ctx->lock[local->transaction.type];
         if (__need_previous_lock_unlocked (local)) {
@@ -2282,8 +2277,6 @@ __afr_eager_lock_handle (afr_local_t *local, gf_boolean_t *take_lock,
                                 lock->delay_timer = NULL;
                         }
                 }
-                if (!local->transaction.eager_lock_on)
-                        goto out;
         }
 
         if (lock->release) {
