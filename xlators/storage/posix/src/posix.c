@@ -1453,23 +1453,6 @@ posix_mknod (call_frame_t *frame, xlator_t *this,
         }
 
 
-        if (((mode & S_IFMT) == S_IFBLK) || ((mode & S_IFMT) == S_IFCHR)) {
-                /* Man page 'man 2 mknod':
-                    EPERM  mode  requested  creation  of something other than
-                    a regular file, FIFO (named pipe), or UNIX domain socket,
-                    and the caller is not privileged (Linux: does not have the
-                    CAP_MKNOD capability); also returned  if  the  filesystem
-                    containing pathname does not support the type of node
-                    requested.
-                */
-                op_ret = -1;
-                op_errno = EPERM;
-                gf_msg (this->name, GF_LOG_ERROR, op_errno, P_MSG_MKNOD_FAILED,
-                        "%s: mknod failed as Block and Character devices "
-                        "are not supported on GlusterFS", real_path);
-                goto out;
-        }
-
         op_ret = posix_pstat (this, loc->pargfid, par_path, &preparent);
         if (op_ret == -1) {
                 op_errno = errno;
