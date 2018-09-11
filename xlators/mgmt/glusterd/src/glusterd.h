@@ -478,6 +478,9 @@ struct glusterd_volinfo_ {
         gf_boolean_t              stage_deleted; /* volume has passed staging
                                                   * for delete operation
                                                   */
+        pthread_mutex_t store_volinfo_lock; /* acquire lock for
+                                             * updating the volinfo
+                                             */
 };
 
 typedef enum gd_snap_status_ {
