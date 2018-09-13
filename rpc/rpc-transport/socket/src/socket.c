@@ -3854,7 +3854,7 @@ reconfigure (rpc_transport_t *this, dict_t *options)
         int               ret           = 0;
         uint32_t          backlog       = 0;
         uint64_t          windowsize    = 0;
-        uint32_t          timeout       = 0;
+        uint32_t          timeout       = 42;
         int               keepaliveidle  = GF_KEEPALIVE_TIME;
         int               keepaliveintvl = GF_KEEPALIVE_INTERVAL;
         int               keepalivecnt   = GF_KEEPALIVE_COUNT;
@@ -4083,7 +4083,7 @@ socket_init (rpc_transport_t *this)
         gf_boolean_t      tmp_bool = 0;
         uint64_t          windowsize = GF_DEFAULT_SOCKET_WINDOW_SIZE;
         char             *optstr = NULL;
-        uint32_t          timeout = 0;
+        uint32_t          timeout = 42;
         int               keepaliveidle  = GF_KEEPALIVE_TIME;
         int               keepaliveintvl = GF_KEEPALIVE_INTERVAL;
         int               keepalivecnt   = GF_KEEPALIVE_COUNT;
@@ -4623,7 +4623,7 @@ struct volume_options options[] = {
         },
         { .key   = {"transport.tcp-user-timeout"},
           .type  = GF_OPTION_TYPE_INT,
-          .default_value = "0"
+          .default_value = "42"
         },
         { .key   = {"transport.socket.nodelay"},
           .type  = GF_OPTION_TYPE_BOOL,
