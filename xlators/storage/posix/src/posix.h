@@ -227,6 +227,8 @@ struct posix_private {
         /* Option to handle the cases of multiple bricks exported from
            same backend. Very much usable in brick-splitting feature. */
         int32_t shared_brick_count;
+
+        gf_boolean_t fips_mode_rchecksum;
 };
 
 typedef struct {
