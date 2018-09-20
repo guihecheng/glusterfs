@@ -2872,7 +2872,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .key         = "storage.fips-mode-rchecksum",
           .type        = NO_DOC,
           .voltype     = "storage/posix",
-          .op_version  = GD_OP_VERSION_4_0_0,
+          .op_version  = GD_OP_VERSION_3_13_3,
         },
         { .key         = "storage.bd-aio",
           .voltype     = "storage/bd",

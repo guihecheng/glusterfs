@@ -109,10 +109,10 @@
 
 #define GD_OP_VERSION_3_13_2   31302 /* Op-version for GlusterFS 3.13.2 */
 
-#define GD_OP_VERSION_4_0_0 40000 /* Op-version for GlusterFS 4.0.0 */
 
 /* Downstream only change */
 #define GD_OP_VERSION_3_11_2   31102 /* Op-version for RHGS 3.3.1-async */
+#define GD_OP_VERSION_3_13_3   31303 /* Op-version for RHGS-3.4-Batch Update-1*/
 
 #include "xlator.h"
 
