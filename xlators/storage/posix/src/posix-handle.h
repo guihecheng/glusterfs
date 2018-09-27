@@ -223,9 +223,10 @@
                 break;                                                  \
         }                                                               \
                                                                         \
-        if (strstr (loc->name, "../")) {                                \
+        if (strchr (loc->name, '/')) {                                  \
                 gf_msg (this->name, GF_LOG_ERROR, 0, P_MSG_ENTRY_HANDLE_CREATE, \
-                        "'../' in name not allowed: (%s)", loc->name); \
+                        "'/' in name not allowed: (%s)", loc->name);    \
+                op_ret = -1;                                            \
                 break;                                                  \
         }                                                               \
         if (LOC_HAS_ABSPATH (loc)) {                                    \

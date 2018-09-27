@@ -307,21 +307,34 @@ resolve_entry_simple (call_frame_t *frame)
                 ret = 1;
                 goto out;
         }
+        if (parent->ia_type != IA_IFDIR) {
+                /* Parent type should be 'directory', and nothing else */
+                gf_msg (this->name, GF_LOG_ERROR, EPERM,
+                        PS_MSG_GFID_RESOLVE_FAILED,
+                        "%s: parent type not directory (%d)",
+                        uuid_utoa (parent->gfid), parent->ia_type);
+                resolve->op_ret   = -1;
+                resolve->op_errno = EPERM;
+                ret = 1;
+                goto out;
+        }
 
         /* expected @parent was found from the inode cache */
         gf_uuid_copy (state->loc_now->pargfid, resolve->pargfid);
         state->loc_now->parent = inode_ref (parent);
 
-        if (strstr (resolve->bname, "../")) {
-                /* Resolving outside the parent's tree is not allowed */
-                gf_msg (this->name, GF_LOG_ERROR, EPERM,
-                        PS_MSG_GFID_RESOLVE_FAILED,
-                        "%s: path sent by client not allowed",
-                        resolve->bname);
-                resolve->op_ret   = -1;
-                resolve->op_errno = EPERM;
-                ret = 1;
-                goto out;
+        if (strchr (resolve->bname, '/')) {
+               /* basename should be a string (without '/') in a directory,
+                  it can't span multiple levels. This can also lead to
+                  resolving outside the parent's tree, which is not allowed */
+               gf_msg (this->name, GF_LOG_ERROR, EPERM,
+                       PS_MSG_GFID_RESOLVE_FAILED,
+                       "%s: basename sent by client not allowed",
+                       resolve->bname);
+               resolve->op_ret   = -1;
+               resolve->op_errno = EPERM;
+               ret = 1;
+               goto out;
         }
         state->loc_now->name = resolve->bname;
 
