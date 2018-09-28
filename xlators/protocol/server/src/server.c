@@ -1797,9 +1797,6 @@ struct volume_options options[] = {
           .description = "Specifies the limit on the number of inodes "
           "in the lru list of the inode cache."
         },
-        { .key   = {"verify-volfile-checksum"},
-          .type  = GF_OPTION_TYPE_BOOL
-        },
         { .key   = {"trace"},
           .type  = GF_OPTION_TYPE_BOOL
         },
