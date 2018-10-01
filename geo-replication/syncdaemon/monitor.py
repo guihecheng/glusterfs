@@ -384,7 +384,7 @@ class Monitor(object):
         # It will also cause fd leaks.
 
         self.lock.acquire()
-        set_monitor_status(gconf.get("state-file"), self.ST_STARTED)
+        set_monitor_status(gconf.state_file, self.ST_STARTED)
         self.lock.release()
         for t in ta:
             t.join()
