@@ -8515,6 +8515,7 @@ cont:
         ret = rsp.op_ret;
 
 out:
+        FREE(rsp.dict.dict_val);
         if (dict)
                 dict_unref (dict);
         GF_FREE (status.brick);
