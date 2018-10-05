@@ -651,7 +651,8 @@ out:
 
 inode_t *
 __shard_update_shards_inode_list (inode_t *linked_inode, xlator_t *this,
-                                  inode_t *base_inode, int block_num)
+                                  inode_t *base_inode, int block_num,
+                                  uuid_t gfid)
 {
         char                block_bname[256]     = {0,};
         inode_t            *lru_inode            = NULL;
@@ -679,10 +680,13 @@ __shard_update_shards_inode_list (inode_t *linked_inode, xlator_t *this,
                         inode_ref (linked_inode);
                         if (base_inode)
                                 gf_uuid_copy (ctx->base_gfid, base_inode->gfid);
+                        else
+                                gf_uuid_copy(ctx->base_gfid, gfid);
                         ctx->block_num = block_num;
                         list_add_tail (&ctx->ilist, &priv->ilist_head);
                         priv->inode_count++;
-                        ctx->base_inode = base_inode;
+                        if (base_inode)
+                                ctx->base_inode = inode_ref (base_inode);
                 } else {
                 /*If on the other hand there is no available slot for this inode
                  * in the list, delete the lru inode from the head of the list,
@@ -701,6 +705,8 @@ __shard_update_shards_inode_list (inode_t *linked_inode, xlator_t *this,
                          * deleted from fsync list and fsync'd in a new frame,
                          * and then unlinked in memory and forgotten.
                          */
+                        if (!lru_base_inode)
+                                goto after_fsync_check;
                         LOCK (&lru_base_inode->lock);
                         LOCK (&lru_inode->lock);
                         {
@@ -715,6 +721,7 @@ __shard_update_shards_inode_list (inode_t *linked_inode, xlator_t *this,
                         UNLOCK (&lru_inode->lock);
                         UNLOCK (&lru_base_inode->lock);
 
+after_fsync_check:
                         if (!do_fsync) {
                                 shard_make_block_bname (lru_inode_ctx->block_num,
                                                         lru_inode_ctx->base_gfid,
@@ -729,20 +736,31 @@ __shard_update_shards_inode_list (inode_t *linked_inode, xlator_t *this,
                                 inode_forget (lru_inode, 0);
                         } else {
                                 fsync_inode = lru_inode;
-                                inode_unref (lru_base_inode);
+                                if (lru_base_inode)
+                                        inode_unref (lru_base_inode);
                         }
                         /* The following unref corresponds to the ref
                          * held by inode_find() above.
                          */
                         inode_unref (lru_inode);
+
+                        /* The following unref corresponds to the ref held on
+                         * the base shard at the time of adding shard inode to
+                         * lru list
+                        */
+                        if (lru_base_inode)
+                                inode_unref (lru_base_inode);
                         /* For as long as an inode is in lru list, we try to
                          * keep it alive by holding a ref on it.
                          */
                         inode_ref (linked_inode);
                         if (base_inode)
                                 gf_uuid_copy (ctx->base_gfid, base_inode->gfid);
+                        else
+                                gf_uuid_copy (ctx->base_gfid, gfid);
                         ctx->block_num = block_num;
-                        ctx->base_inode = base_inode;
+                        if (base_inode)
+                                ctx->base_inode = inode_ref (base_inode);
                         list_add_tail (&ctx->ilist, &priv->ilist_head);
                 }
         } else {
@@ -1027,7 +1045,7 @@ shard_common_resolve_shards (call_frame_t *frame, xlator_t *this,
                                 fsync_inode = __shard_update_shards_inode_list (inode,
                                                                   this,
                                                                   res_inode,
-                                                                shard_idx_iter);
+                                                                shard_idx_iter, gfid);
                         }
                         UNLOCK(&priv->lock);
                         shard_idx_iter++;
@@ -2173,7 +2191,8 @@ shard_link_block_inode (shard_local_t *local, int block_num, inode_t *inode,
                 fsync_inode = __shard_update_shards_inode_list (linked_inode,
                                                                 this,
                                                                 local->loc.inode,
-                                                                block_num);
+                                                                block_num,
+                                                                gfid);
         }
         UNLOCK(&priv->lock);
         if (fsync_inode)
@@ -2881,6 +2900,7 @@ void
 shard_unlink_block_inode (shard_local_t *local, int shard_block_num)
 {
         char                  block_bname[256]  = {0,};
+        int                   unref_base_inode  = 0;
         uuid_t                gfid              = {0,};
         inode_t              *inode             = NULL;
         inode_t              *base_inode        = NULL;
@@ -2894,11 +2914,12 @@ shard_unlink_block_inode (shard_local_t *local, int shard_block_num)
         priv = this->private;
 
         inode = local->inode_list[shard_block_num - local->first_block];
-        base_inode = local->resolver_base_inode;
+        shard_inode_ctx_get (inode, this, &ctx);
+        base_inode = ctx->base_inode;
         if (base_inode)
                 gf_uuid_copy (gfid, base_inode->gfid);
         else
-                gf_uuid_copy (gfid, local->base_gfid);
+                gf_uuid_copy (gfid, ctx->base_gfid);
 
         shard_make_block_bname (shard_block_num, gfid,
                                 block_bname, sizeof (block_bname));
@@ -2912,17 +2933,16 @@ shard_unlink_block_inode (shard_local_t *local, int shard_block_num)
                 if (!list_empty (&ctx->ilist)) {
                         list_del_init (&ctx->ilist);
                         priv->inode_count--;
+                        unref_base_inode++;
                         GF_ASSERT (priv->inode_count >= 0);
                         unlink_unref_forget = _gf_true;
                 }
                 if (ctx->fsync_needed) {
-                        if (base_inode)
-                                inode_unref (base_inode);
+                        unref_base_inode++;
                         list_del_init (&ctx->to_fsync_list);
-                        if (base_inode) {
+                        if (base_inode)
                                 __shard_inode_ctx_get (base_inode, this, &base_ictx);
-                                base_ictx->fsync_count--;
-                        }
+                        base_ictx->fsync_count--;
                 }
         }
         UNLOCK(&inode->lock);
@@ -2933,6 +2953,8 @@ shard_unlink_block_inode (shard_local_t *local, int shard_block_num)
                 inode_unref (inode);
                 inode_forget (inode, 0);
         }
+        if (base_inode && unref_base_inode)
+                inode_ref_reduce_by_n (base_inode, unref_base_inode);
         UNLOCK(&priv->lock);
 }
 
