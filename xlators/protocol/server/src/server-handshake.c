@@ -576,6 +576,7 @@ server_setvolume (rpcsvc_request_t *req)
                 goto fail;
         }
 
+        pthread_mutex_lock(&conf->mutex);
         list_for_each_entry (tmp, &conf->child_status->status_list,
                                                                   status_list) {
                 if (strcmp (tmp->name, name) == 0)
@@ -583,7 +584,7 @@ server_setvolume (rpcsvc_request_t *req)
         }
 
         if (!tmp->name) {
-                gf_msg (this->name, GF_LOG_ERROR, 0,
+                gf_msg (this->name, GF_LOG_INFO, 0,
                         PS_MSG_CHILD_STATUS_FAILED,
                         "No xlator %s is found in "
                         "child status list", name);
@@ -594,7 +595,21 @@ server_setvolume (rpcsvc_request_t *req)
                                 PS_MSG_DICT_GET_FAILED,
                                 "Failed to set 'child_up' for xlator %s "
                                 "in the reply dict", tmp->name);
+                if (!tmp->child_up) {
+                        ret = dict_set_str(reply, "ERROR",
+                                           "Not received child_up for this xlator");
+                        if (ret < 0)
+                                gf_msg_debug(this->name, 0, "failed to set error msg");
+
+                        gf_msg(this->name, GF_LOG_ERROR, 0, PS_MSG_CHILD_STATUS_FAILED,
+                               "Not received child_up for this xlator %s", name);
+                        op_ret = -1;
+                        op_errno = EAGAIN;
+                        pthread_mutex_unlock(&conf->mutex);
+                        goto fail;
+                }
         }
+        pthread_mutex_unlock(&conf->mutex);
 
         ret = dict_get_str (params, "process-uuid", &client_uid);
         if (ret < 0) {
@@ -666,7 +681,7 @@ server_setvolume (rpcsvc_request_t *req)
         if (serv_ctx->lk_version != 0 &&
             serv_ctx->lk_version != lk_version) {
                 (void) server_connection_cleanup (this, client,
-                                                  INTERNAL_LOCKS | POSIX_LOCKS);
+                                                  INTERNAL_LOCKS | POSIX_LOCKS, NULL);
         }
 
         pthread_mutex_lock (&conf->mutex);
@@ -812,9 +827,9 @@ server_setvolume (rpcsvc_request_t *req)
                 req->trans->clnt_options = dict_ref(params);
 
                 gf_msg (this->name, GF_LOG_INFO, 0, PS_MSG_CLIENT_ACCEPTED,
-                        "accepted client from %s (version: %s)",
+                        "accepted client from %s (version: %s) with subvol %s",
                         client->client_uid,
-                        (clnt_version) ? clnt_version : "old");
+                        (clnt_version) ? clnt_version : "old", name);
 
                 gf_event (EVENT_CLIENT_CONNECT, "client_uid=%s;"
                           "client_identifier=%s;server_identifier=%s;"

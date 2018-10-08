@@ -78,7 +78,6 @@ struct _child_status {
         struct list_head status_list;
         char *name;
         gf_boolean_t child_up;
-        gf_atomic_t  xprtrefcnt;
 };
 struct server_conf {
         rpcsvc_t               *rpc;
@@ -222,6 +221,10 @@ typedef struct _server_ctx {
         uint32_t             lk_version;
 } server_ctx_t;
 
+typedef struct server_cleanup_xprt_arg {
+    xlator_t *this;
+    char *victim_name;
+} server_cleanup_xprt_arg_t;
 
 int
 server_submit_reply (call_frame_t *frame, rpcsvc_request_t *req, void *arg,
@@ -246,4 +249,8 @@ serialize_rsp_direntp (gf_dirent_t *entries, gfs3_readdirp_rsp *rsp);
 
 server_ctx_t*
 server_ctx_get (client_t *client, xlator_t *xlator);
+
+void *
+server_graph_janitor_threads(void *);
+
 #endif /* !_SERVER_H */

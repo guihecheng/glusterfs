@@ -42,7 +42,7 @@ get_frame_from_request (rpcsvc_request_t *req);
 
 int
 server_connection_cleanup (xlator_t *this, struct _client *client,
-                           int32_t flags);
+                           int32_t flags, gf_boolean_t *fd_exist);
 
 gf_boolean_t
 server_cancel_grace_timer (xlator_t *this, struct _client *client);
