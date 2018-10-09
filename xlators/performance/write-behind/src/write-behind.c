@@ -2763,7 +2763,7 @@ wb_priv_dump (xlator_t *this)
         gf_proc_dump_build_key (key_prefix, "xlator.performance.write-behind",
                                 "priv");
 
-        gf_proc_dump_add_section (key_prefix);
+        gf_proc_dump_add_section ("%s", key_prefix);
 
         gf_proc_dump_write ("aggregate_size", "%d", conf->aggregate_size);
         gf_proc_dump_write ("window_size", "%d", conf->window_size);
@@ -2787,7 +2787,7 @@ __wb_dump_requests (struct list_head *head, char *prefix)
                 gf_proc_dump_build_key (key_prefix, key, "%s",
                                         (char *)gf_fop_list[req->fop]);
 
-                gf_proc_dump_add_section(key_prefix);
+                gf_proc_dump_add_section("%s", key_prefix);
 
                 gf_proc_dump_write ("unique", "%"PRIu64, req->unique);
 
@@ -2859,7 +2859,7 @@ wb_inode_dump (xlator_t *this, inode_t *inode)
         gf_proc_dump_build_key (key_prefix, "xlator.performance.write-behind",
                                 "wb_inode");
 
-        gf_proc_dump_add_section (key_prefix);
+        gf_proc_dump_add_section ("%s", key_prefix);
 
         __inode_path (inode, NULL, &path);
         if (path != NULL) {

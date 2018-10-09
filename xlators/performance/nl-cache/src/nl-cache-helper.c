@@ -1177,7 +1177,7 @@ nlc_dump_inodectx (xlator_t *this, inode_t *inode)
                 gf_proc_dump_build_key (key_prefix,
                                         "xlator.performance.nl-cache",
                                         "nlc_inode");
-                gf_proc_dump_add_section (key_prefix);
+                gf_proc_dump_add_section ("%s", key_prefix);
 
                 __inode_path (inode, NULL, &path);
                 if (path != NULL) {

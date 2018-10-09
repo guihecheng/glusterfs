@@ -172,7 +172,8 @@ int _gf_log_callingfn (const char *domain, const char *file,
                        const char *fmt, ...)
                        __attribute__ ((__format__ (__printf__, 6, 7)));
 
-int _gf_log_eh (const char *function, const char *fmt, ...);
+int _gf_log_eh (const char *function, const char *fmt, ...)
+  __attribute__ ((__format__ (__printf__, 2, 3)));
 
 
 

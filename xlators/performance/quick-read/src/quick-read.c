@@ -748,7 +748,7 @@ qr_inodectx_dump (xlator_t *this, inode_t *inode)
 
         gf_proc_dump_build_key (key_prefix, "xlator.performance.quick-read",
                                 "inodectx");
-        gf_proc_dump_add_section (key_prefix);
+        gf_proc_dump_add_section ("%s", key_prefix);
 
         gf_proc_dump_write ("entire-file-cached", "%s", qr_inode->data ? "yes" : "no");
 
@@ -794,7 +794,7 @@ qr_priv_dump (xlator_t *this)
         gf_proc_dump_build_key (key_prefix, "xlator.performance.quick-read",
                                 "priv");
 
-        gf_proc_dump_add_section (key_prefix);
+        gf_proc_dump_add_section ("%s", key_prefix);
 
         gf_proc_dump_write ("max_file_size", "%d", conf->max_file_size);
         gf_proc_dump_write ("cache_timeout", "%d", conf->cache_timeout);

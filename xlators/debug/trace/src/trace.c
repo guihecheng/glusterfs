@@ -3059,7 +3059,7 @@ trace_dump_history (xlator_t *this)
         if (conf && conf->log_history == _gf_true) {
                 gf_proc_dump_build_key (key_prefix, "xlator.debug.trace",
                                         "history");
-                gf_proc_dump_add_section (key_prefix);
+                gf_proc_dump_add_section ("%s", key_prefix);
                 eh_dump (this->history, NULL, dump_history_trace);
         }
         ret = 0;

@@ -6960,7 +6960,7 @@ posix_priv (xlator_t *this)
 
         (void) snprintf(key_prefix, GF_DUMP_MAX_BUF_LEN, "%s.%s",
                         this->type, this->name);
-        gf_proc_dump_add_section(key_prefix);
+        gf_proc_dump_add_section("%s", key_prefix);
 
         if (!this)
                 return 0;

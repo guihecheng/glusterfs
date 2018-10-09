@@ -2008,7 +2008,7 @@ ioc_inode_dump (xlator_t *this, inode_t *inode)
                 if (gf_uuid_is_null (ioc_inode->inode->gfid))
                         goto unlock;
 
-                gf_proc_dump_add_section (key_prefix);
+                gf_proc_dump_add_section ("%s", key_prefix);
                 section_added = _gf_true;
 
                 __inode_path (ioc_inode->inode, NULL, &path);
@@ -2031,7 +2031,7 @@ unlock:
 out:
         if (ret && ioc_inode) {
                 if (section_added == _gf_false)
-                        gf_proc_dump_add_section (key_prefix);
+                        gf_proc_dump_add_section ("%s", key_prefix);
                 gf_proc_dump_write ("Unable to print the status of ioc_inode",
                                     "(Lock acquisition failed) %s",
                                     uuid_utoa (inode->gfid));
@@ -2053,7 +2053,7 @@ ioc_priv_dump (xlator_t *this)
         priv = this->private;
 
         gf_proc_dump_build_key (key_prefix, "io-cache", "priv");
-        gf_proc_dump_add_section (key_prefix);
+        gf_proc_dump_add_section ("%s", key_prefix);
         add_section = _gf_true;
 
         ret = pthread_mutex_trylock (&priv->table_lock);
@@ -2074,7 +2074,7 @@ out:
                 if (!add_section) {
                         gf_proc_dump_build_key (key_prefix, "xlator."
                                                 "performance.io-cache", "priv");
-                        gf_proc_dump_add_section (key_prefix);
+                        gf_proc_dump_add_section ("%s", key_prefix);
                 }
                 gf_proc_dump_write ("Unable to dump the state of private "
                                     "structure of io-cache xlator", "(Lock "

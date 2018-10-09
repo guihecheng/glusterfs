@@ -2855,7 +2855,7 @@ client_priv_dump (xlator_t *this)
         gf_proc_dump_build_key(key_prefix, "xlator.protocol.client",
                                "%s.priv", this->name);
 
-        gf_proc_dump_add_section(key_prefix);
+        gf_proc_dump_add_section("%s", key_prefix);
 
         list_for_each_entry(tmp, &conf->saved_fds, sfd_pos) {
                 sprintf (key, "fd.%d.remote_fd", i);

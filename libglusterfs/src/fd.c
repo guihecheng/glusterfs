@@ -1056,7 +1056,7 @@ fd_dump (fd_t *fd, char *prefix)
 
         if (fd->inode) {
                 gf_proc_dump_build_key (key, "inode", NULL);
-                gf_proc_dump_add_section(key);
+                gf_proc_dump_add_section("%s", key);
                 inode_dump (fd->inode, key);
         }
 
@@ -1104,7 +1104,7 @@ fdtable_dump (fdtable_t *fdtable, char *prefix)
                 if (GF_FDENTRY_ALLOCATED ==
                     fdtable->fdentries[i].next_free) {
                         gf_proc_dump_build_key(key, prefix, "fdentry[%d]", i);
-                        gf_proc_dump_add_section(key);
+                        gf_proc_dump_add_section("%s", key);
                         fdentry_dump(&fdtable->fdentries[i], key);
                 }
         }

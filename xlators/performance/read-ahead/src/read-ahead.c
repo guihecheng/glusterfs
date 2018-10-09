@@ -823,7 +823,7 @@ ra_fdctx_dump (xlator_t *this, fd_t *fd)
                                 "xlator.performance.read-ahead",
                                 "file");
 
-        gf_proc_dump_add_section (key_prefix);
+        gf_proc_dump_add_section ("%s", key_prefix);
 
         ret = __inode_path (fd->inode, NULL, &path);
         if (path != NULL) {
@@ -1068,7 +1068,7 @@ ra_priv_dump (xlator_t *this)
         gf_proc_dump_build_key (key_prefix, "xlator.performance.read-ahead",
                                 "priv");
 
-        gf_proc_dump_add_section (key_prefix);
+        gf_proc_dump_add_section ("%s", key_prefix);
         add_section = _gf_true;
 
         ret = pthread_mutex_trylock (&conf->conf_lock);
@@ -1086,7 +1086,7 @@ ra_priv_dump (xlator_t *this)
 out:
         if (ret && conf) {
                 if (add_section == _gf_false)
-                        gf_proc_dump_add_section (key_prefix);
+                        gf_proc_dump_add_section ("%s", key_prefix);
 
                 gf_proc_dump_write ("Unable to dump priv",
                                     "(Lock acquisition failed) %s", this->name);

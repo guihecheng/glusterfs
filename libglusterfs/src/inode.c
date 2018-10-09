@@ -31,7 +31,7 @@
                 list_for_each_entry (inode, head, list) {               \
                         gf_proc_dump_build_key(key_buf, key_prefix,     \
                                                "%s.%d",list_type, i++); \
-                        gf_proc_dump_add_section(key_buf);              \
+                        gf_proc_dump_add_section("%s", key_buf);        \
                         inode_dump(inode, key);                         \
                 }                                                       \
         }

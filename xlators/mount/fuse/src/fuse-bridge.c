@@ -5189,7 +5189,7 @@ fuse_history_dump (xlator_t *this)
 
         gf_proc_dump_build_key (key_prefix, "xlator.mount.fuse",
                                 "history");
-        gf_proc_dump_add_section (key_prefix);
+        gf_proc_dump_add_section ("%s", key_prefix);
         eh_dump (this->history, NULL, dump_history_fuse);
 
         ret = 0;

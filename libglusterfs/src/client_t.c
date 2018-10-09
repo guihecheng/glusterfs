@@ -650,7 +650,7 @@ clienttable_dump (clienttable_t *clienttable, char *prefix)
                             clienttable->cliententries[i].next_free) {
                                 gf_proc_dump_build_key(key, prefix,
                                                        "cliententry[%d]", i);
-                                gf_proc_dump_add_section(key);
+                                gf_proc_dump_add_section("%s", key);
                                 cliententry_dump(&clienttable->cliententries[i],
                                                  key);
                         }

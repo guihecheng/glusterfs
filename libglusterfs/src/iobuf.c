@@ -1174,7 +1174,7 @@ iobuf_arena_info_dump (struct iobuf_arena *iobuf_arena, const char *key_prefix)
         gf_proc_dump_write(key, "%"PRIu64, iobuf_arena->page_size);
         list_for_each_entry (trav, &iobuf_arena->active.list, list) {
                 gf_proc_dump_build_key(key, key_prefix,"active_iobuf.%d", i++);
-                gf_proc_dump_add_section(key);
+                gf_proc_dump_add_section("%s", key);
                 iobuf_info_dump(trav, key);
         }
 
@@ -1215,21 +1215,21 @@ iobuf_stats_dump (struct iobuf_pool *iobuf_pool)
                 list_for_each_entry (trav, &iobuf_pool->arenas[j], list) {
                         snprintf(msg, sizeof(msg),
                                  "arena.%d", i);
-                        gf_proc_dump_add_section(msg);
+                        gf_proc_dump_add_section("%s", msg);
                         iobuf_arena_info_dump(trav,msg);
                         i++;
                 }
                 list_for_each_entry (trav, &iobuf_pool->purge[j], list) {
                         snprintf(msg, sizeof(msg),
                                  "purge.%d", i);
-                        gf_proc_dump_add_section(msg);
+                        gf_proc_dump_add_section("%s", msg);
                         iobuf_arena_info_dump(trav,msg);
                         i++;
                 }
                 list_for_each_entry (trav, &iobuf_pool->filled[j], list) {
                         snprintf(msg, sizeof(msg),
                                  "filled.%d", i);
-                        gf_proc_dump_add_section(msg);
+                        gf_proc_dump_add_section("%s", msg);
                         iobuf_arena_info_dump(trav,msg);
                         i++;
                 }
