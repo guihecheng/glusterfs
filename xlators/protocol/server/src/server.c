@@ -1732,7 +1732,7 @@ notify (xlator_t *this, int32_t event, void *data, ...)
                         glusterfs_mgmt_pmap_signout (ctx,
                                                      victim->name);
                         if (!xprt_found && victim_found) {
-                                server_call_xlator_mem_cleanup (this, victim);
+                                server_call_xlator_mem_cleanup (this, victim->name);
                         }
                 }
                 break;
