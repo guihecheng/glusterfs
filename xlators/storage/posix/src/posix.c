@@ -6970,11 +6970,11 @@ posix_priv (xlator_t *this)
         if (!priv)
                 return 0;
 
-        gf_proc_dump_write("base_path","%s", priv->base_path);
-        gf_proc_dump_write("base_path_length","%d", priv->base_path_length);
-        gf_proc_dump_write("max_read","%d", priv->read_value);
-        gf_proc_dump_write("max_write","%d", priv->write_value);
-        gf_proc_dump_write("nr_files","%ld", priv->nr_files);
+        gf_proc_dump_write("base_path", "%s", priv->base_path);
+        gf_proc_dump_write("base_path_length", "%d", priv->base_path_length);
+        gf_proc_dump_write("max_read", "%" PRId64, priv->read_value);
+        gf_proc_dump_write("max_write", "%" PRId64, priv->write_value);
+        gf_proc_dump_write("nr_files", "%ld", priv->nr_files);
 
         return 0;
 }

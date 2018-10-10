@@ -1050,7 +1050,7 @@ fd_dump (fd_t *fd, char *prefix)
                 return;
 
         memset(key, 0, sizeof(key));
-        gf_proc_dump_write("pid", "%llu", fd->pid);
+        gf_proc_dump_write("pid", "%" PRIu64, fd->pid);
         gf_proc_dump_write("refcount", "%d", fd->refcount);
         gf_proc_dump_write("flags", "%d", fd->flags);
 

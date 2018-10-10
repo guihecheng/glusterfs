@@ -2859,7 +2859,7 @@ client_priv_dump (xlator_t *this)
 
         list_for_each_entry(tmp, &conf->saved_fds, sfd_pos) {
                 sprintf (key, "fd.%d.remote_fd", i);
-                gf_proc_dump_write(key, "%d", tmp->remote_fd);
+                gf_proc_dump_write(key, "%" PRId64, tmp->remote_fd);
                 client_fd_lk_ctx_dump (this, tmp->lk_ctx, i);
                 i++;
         }

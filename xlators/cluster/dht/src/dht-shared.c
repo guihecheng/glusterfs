@@ -179,7 +179,7 @@ dht_priv_dump (xlator_t *this)
                                             conf->du_stats[i].avail_inodes);
 
                         snprintf (key, sizeof (key), "du_stats[%d].log", i);
-                        gf_proc_dump_write (key, "%lu",
+                        gf_proc_dump_write (key, "%" PRIu32,
                                             conf->du_stats[i].log);
                 }
         }

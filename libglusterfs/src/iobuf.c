@@ -1169,7 +1169,7 @@ iobuf_arena_info_dump (struct iobuf_arena *iobuf_arena, const char *key_prefix)
         gf_proc_dump_build_key(key, key_prefix, "alloc_cnt");
         gf_proc_dump_write(key, "%"PRIu64, iobuf_arena->alloc_cnt);
         gf_proc_dump_build_key(key, key_prefix, "max_active");
-        gf_proc_dump_write(key, "%"PRIu64, iobuf_arena->max_active);
+        gf_proc_dump_write(key, "%d", iobuf_arena->max_active);
         gf_proc_dump_build_key(key, key_prefix, "page_size");
         gf_proc_dump_write(key, "%"PRIu64, iobuf_arena->page_size);
         list_for_each_entry (trav, &iobuf_arena->active.list, list) {
@@ -1202,9 +1202,9 @@ iobuf_stats_dump (struct iobuf_pool *iobuf_pool)
         }
         gf_proc_dump_add_section("iobuf.global");
         gf_proc_dump_write("iobuf_pool","%p", iobuf_pool);
-        gf_proc_dump_write("iobuf_pool.default_page_size", "%d",
-                                                iobuf_pool->default_page_size);
-        gf_proc_dump_write("iobuf_pool.arena_size", "%d",
+        gf_proc_dump_write("iobuf_pool.default_page_size", "%" GF_PRI_SIZET,
+                           iobuf_pool->default_page_size);
+        gf_proc_dump_write("iobuf_pool.arena_size", "%" GF_PRI_SIZET,
                            iobuf_pool->arena_size);
         gf_proc_dump_write("iobuf_pool.arena_cnt", "%d",
                            iobuf_pool->arena_cnt);

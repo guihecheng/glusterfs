@@ -933,7 +933,7 @@ ob_fdctx_dump (xlator_t *this, fd_t *fd)
         gf_proc_dump_write ("open_frame", "%p", ob_fd->open_frame);
 
         if (ob_fd->open_frame)
-                gf_proc_dump_write ("open_frame.root.unique", "%p",
+                gf_proc_dump_write ("open_frame.root.unique", "%" PRIu64,
                                     ob_fd->open_frame->root->unique);
 
 	gf_proc_dump_write ("loc.path", "%s", ob_fd->loc.path);

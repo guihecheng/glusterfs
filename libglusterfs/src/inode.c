@@ -2415,7 +2415,7 @@ inode_table_dump (inode_table_t *itable, char *prefix)
         }
 
         gf_proc_dump_build_key(key, prefix, "hashsize");
-        gf_proc_dump_write(key, "%d", itable->hashsize);
+        gf_proc_dump_write(key, "%"GF_PRI_SIZET, itable->hashsize);
         gf_proc_dump_build_key(key, prefix, "name");
         gf_proc_dump_write(key, "%s", itable->name);
 

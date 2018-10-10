@@ -5148,11 +5148,11 @@ fuse_priv_dump (xlator_t  *this)
                             private->proto_minor);
         gf_proc_dump_write("volfile", "%s",
                             private->volfile?private->volfile:"None");
-        gf_proc_dump_write("volfile_size", "%d",
+        gf_proc_dump_write("volfile_size", "%" GF_PRI_SIZET,
                             private->volfile_size);
         gf_proc_dump_write("mount_point", "%s",
                             private->mount_point);
-        gf_proc_dump_write("iobuf", "%u",
+        gf_proc_dump_write("iobuf", "%p",
                             private->iobuf);
         gf_proc_dump_write("fuse_thread_started", "%d",
                             (int)private->fuse_thread_started);
@@ -5208,7 +5208,7 @@ dump_history_fuse (circular_buffer_t *cb, void *data)
                   ".%"GF_PRI_SUSECONDS, cb->tv.tv_usec);
         gf_proc_dump_write ("TIME", "%s", timestr);
 
-        gf_proc_dump_write ("message", "%s\n", cb->data);
+        gf_proc_dump_write ("message", "%s\n", (char *)cb->data);
 
         return 0;
 }

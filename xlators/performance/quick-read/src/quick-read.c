@@ -796,7 +796,7 @@ qr_priv_dump (xlator_t *this)
 
         gf_proc_dump_add_section ("%s", key_prefix);
 
-        gf_proc_dump_write ("max_file_size", "%d", conf->max_file_size);
+        gf_proc_dump_write ("max_file_size", "%" PRIu64, conf->max_file_size);
         gf_proc_dump_write ("cache_timeout", "%d", conf->cache_timeout);
 
         if (!table) {
@@ -811,7 +811,7 @@ qr_priv_dump (xlator_t *this)
         }
 
         gf_proc_dump_write ("total_files_cached", "%d", file_count);
-        gf_proc_dump_write ("total_cache_used", "%d", total_size);
+        gf_proc_dump_write ("total_cache_used", "%" PRIu64, total_size);
 
 out:
         return 0;

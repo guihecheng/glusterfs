@@ -2065,8 +2065,8 @@ ioc_priv_dump (xlator_t *this)
                 gf_proc_dump_write ("cache_used", "%ld", priv->cache_used);
                 gf_proc_dump_write ("inode_count", "%u", priv->inode_count);
                 gf_proc_dump_write ("cache_timeout", "%u", priv->cache_timeout);
-                gf_proc_dump_write ("min-file-size", "%u", priv->min_file_size);
-                gf_proc_dump_write ("max-file-size", "%u", priv->max_file_size);
+                gf_proc_dump_write ("min-file-size", "%" PRIu64, priv->min_file_size);
+                gf_proc_dump_write ("max-file-size", "%" PRIu64, priv->max_file_size);
         }
         pthread_mutex_unlock (&priv->table_lock);
 out:

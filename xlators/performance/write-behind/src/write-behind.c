@@ -2765,8 +2765,8 @@ wb_priv_dump (xlator_t *this)
 
         gf_proc_dump_add_section ("%s", key_prefix);
 
-        gf_proc_dump_write ("aggregate_size", "%d", conf->aggregate_size);
-        gf_proc_dump_write ("window_size", "%d", conf->window_size);
+        gf_proc_dump_write ("aggregate_size", "%" PRIu64, conf->aggregate_size);
+        gf_proc_dump_write ("window_size", "%" PRIu64, conf->window_size);
         gf_proc_dump_write ("flush_behind", "%d", conf->flush_behind);
         gf_proc_dump_write ("trickling_writes", "%d", conf->trickling_writes);
 
@@ -2798,7 +2798,7 @@ __wb_dump_requests (struct list_head *head, char *prefix)
 		else
 			gf_proc_dump_write ("wound", "no");
 
-                gf_proc_dump_write ("generation-number", "%d", req->gen);
+                gf_proc_dump_write ("generation-number", "%" PRIu64, req->gen);
 
                 gf_proc_dump_write ("req->op_ret", "%d", req->op_ret);
                 gf_proc_dump_write ("req->op_errno", "%d", req->op_errno);

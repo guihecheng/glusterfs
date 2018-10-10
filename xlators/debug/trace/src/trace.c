@@ -68,7 +68,7 @@ dump_history_trace (circular_buffer_t *cb, void *data)
                   ".%"GF_PRI_SUSECONDS, cb->tv.tv_usec);
         gf_proc_dump_write ("TIME", "%s", timestr);
 
-        gf_proc_dump_write ("FOP", "%s\n", cb->data);
+        gf_proc_dump_write ("FOP", "%s\n", (char *)cb->data);
 
         return 0;
 }
