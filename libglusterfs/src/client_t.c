@@ -603,7 +603,7 @@ client_dump (client_t *client, char *prefix)
                 return;
 
         memset(key, 0, sizeof key);
-        gf_proc_dump_write("refcount", GF_PRI_ATOMIC,
+        gf_proc_dump_write("refcount", "%"GF_PRI_ATOMIC,
                            GF_ATOMIC_GET (client->count));
 }
 
@@ -807,7 +807,7 @@ gf_client_dump_fdtables (xlator_t *this)
                         }
                         gf_proc_dump_build_key (key, "conn", "%d.ref",
                                                         count);
-                        gf_proc_dump_write (key, GF_PRI_ATOMIC,
+                        gf_proc_dump_write (key, "%"GF_PRI_ATOMIC,
                                             GF_ATOMIC_GET (client->count));
                         if (client->bound_xl) {
                                 gf_proc_dump_build_key (key, "conn",
