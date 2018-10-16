@@ -270,6 +270,7 @@ xlator_mem_cleanup (xlator_t *this) {
                 top = glusterfsd_ctx->active->first;
                 LOCK (&ctx->volfile_lock);
                 /* TODO here we have leak for xlator node in a graph */
+                /* Need to move only top xlator from a graph */
                 for (trav_p = &top->children; *trav_p; trav_p = &(*trav_p)->next) {
                         victim = (*trav_p)->xlator;
                         if (victim->call_cleanup && !strcmp (victim->name, this->name)) {
@@ -277,20 +278,6 @@ xlator_mem_cleanup (xlator_t *this) {
                                         break;
                         }
                 }
-                /* TODO Sometime brick xlator is not moved from graph so followed below
-                   approach to move brick xlator from a graph, will move specific brick
-                   xlator from graph only while inode table and mem_acct are cleaned up
-                */
-                trav_p = &top->children;
-                while (*trav_p) {
-                        victim = (*trav_p)->xlator;
-                        if (victim->call_cleanup && !victim->itable && !victim->mem_acct) {
-                                (*trav_p) = (*trav_p)->next;
-                        } else {
-                                trav_p = &(*trav_p)->next;
-                        }
-                }
-                UNLOCK (&ctx->volfile_lock);
         }
 }
 
