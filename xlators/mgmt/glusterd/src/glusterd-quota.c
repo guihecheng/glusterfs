@@ -2101,7 +2101,7 @@ glusterd_op_stage_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict)
                         if (errno == ERANGE || hard_limit < 0)
                                 gf_asprintf (op_errstr, "Hard-limit "
                                         "value out of range (0 - %"PRId64
-                                        "): %s", hard_limit_str);
+                                        "): %s", hard_limit, hard_limit_str);
                         else
                                 gf_msg (this->name, GF_LOG_ERROR, errno,
                                         GD_MSG_CONVERSION_FAILED,

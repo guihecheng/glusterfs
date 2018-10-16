@@ -710,7 +710,6 @@ server_graph_janitor_threads(void *data)
 {
         xlator_t *victim = NULL;
         xlator_t *this = NULL;
-        server_conf_t *conf = NULL;
         glusterfs_ctx_t *ctx = NULL;
         char *victim_name = NULL;
         server_cleanup_xprt_arg_t *arg = NULL;
@@ -724,7 +723,6 @@ server_graph_janitor_threads(void *data)
         this = arg->this;
         victim_name = arg->victim_name;
         THIS = arg->this;
-        conf = this->private;
 
         ctx = THIS->ctx;
         GF_VALIDATE_OR_GOTO(this->name, ctx, out);
