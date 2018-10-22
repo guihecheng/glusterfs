@@ -866,7 +866,7 @@ install -p -m 0744 -D extras/command-completion/gluster.bash \
     %{buildroot}%{_sysconfdir}/bash_completion.d/gluster
 
 %if ( 0%{?_build_server} )
-echo "RHGS 3.4.0" > %{buildroot}%{_datadir}/glusterfs/release
+echo "RHGS 3.4" > %{buildroot}%{_datadir}/glusterfs/release
 %endif
 
 %clean
