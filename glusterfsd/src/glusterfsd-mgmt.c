@@ -278,6 +278,7 @@ xlator_mem_cleanup (xlator_t *this) {
                                         break;
                         }
                 }
+                UNLOCK (&ctx->volfile_lock);
         }
 }
 
