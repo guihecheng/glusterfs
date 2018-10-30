@@ -2104,10 +2104,9 @@ dht_lookup_unlink_of_false_linkto_cbk (call_frame_t *frame, void *cookie,
 
         this_call_cnt = dht_frame_return (frame);
         if (is_last_call (this_call_cnt)) {
-
-                if (op_ret == 0) {
-                        dht_lookup_everywhere_done (frame, this);
-                } else {
+          if ((op_ret == 0) || ((op_errno != EBUSY) && (op_errno != ENOTCONN))) {
+            dht_lookup_everywhere_done (frame, this);
+          } else {
                        /*When dht_lookup_everywhere is performed, one cached
                          *and one hashed file was found and hashed file does
                          *not point to the above mentioned cached node. So it
