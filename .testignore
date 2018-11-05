@@ -32,6 +32,8 @@ extras/cliutils/README.md
 extras/command-completion/README
 extras/create_new_xlator/README.md
 extras/glusterfs.vim
+extras/glusterfs-logrotate
+extras/glusterfs-georep-logrotate
 extras/group-gluster-block
 extras/group-db-workload
 extras/group-metadata-cache
