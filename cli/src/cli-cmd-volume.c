@@ -1021,7 +1021,8 @@ cli_cmd_volume_add_brick_cbk (struct cli_state *state,
         if (!frame)
                 goto out;
 
-        ret = cli_cmd_volume_add_brick_parse (words, wordcount, &options, 0);
+        ret = cli_cmd_volume_add_brick_parse (state, words, wordcount, &options,
+                                              0);
         if (ret) {
                 cli_usage_out (word->pattern);
                 parse_error = 1;
@@ -1151,7 +1152,8 @@ do_cli_cmd_volume_attach_tier (struct cli_state *state,
         if (!frame)
                 goto out;
 
-        ret = cli_cmd_volume_add_brick_parse (words, wordcount, &options, &type);
+        ret = cli_cmd_volume_add_brick_parse (state, words, wordcount, &options,
+                                              &type);
         if (ret) {
                 cli_usage_out (word->pattern);
                 parse_error = 1;
@@ -2032,8 +2034,9 @@ cli_cmd_volume_remove_brick_cbk (struct cli_state *state,
         if (!frame)
                 goto out;
 
-        ret = cli_cmd_volume_remove_brick_parse (words, wordcount, &options,
-                                                 &need_question, &brick_count);
+        ret = cli_cmd_volume_remove_brick_parse (state, words, wordcount,
+                                                 &options, &need_question,
+                                                 &brick_count);
         if (ret) {
                 cli_usage_out (word->pattern);
                 parse_error = 1;

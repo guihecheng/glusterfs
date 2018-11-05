@@ -1774,8 +1774,8 @@ out:
 }
 
 int32_t
-cli_cmd_volume_add_brick_parse (const char **words, int wordcount,
-                                dict_t **options, int *ret_type)
+cli_cmd_volume_add_brick_parse (struct cli_state *state, const char **words,
+                                int wordcount, dict_t **options, int *ret_type)
 {
         dict_t  *dict = NULL;
         char    *volname = NULL;
@@ -1790,6 +1790,8 @@ cli_cmd_volume_add_brick_parse (const char **words, int wordcount,
         int     index;
         gf_boolean_t is_force = _gf_false;
         int wc = wordcount;
+        gf_answer_t answer = GF_ANSWER_NO;
+        const char *question = NULL;
 
         GF_ASSERT (words);
         GF_ASSERT (options);
@@ -1853,6 +1855,23 @@ cli_cmd_volume_add_brick_parse (const char **words, int wordcount,
                         if (ret)
                                 goto out;
                         index = 7;
+                }
+
+                if (count == 2) {
+                        if (strcmp (words[wordcount - 1], "force")) {
+                                question = "Replica 2 volumes are prone to "
+                                           "split-brain. Use Arbiter or "
+                                           "Replica 3 to avoid this.\n"
+                                           "Do you still want to continue?\n";
+                                answer = cli_cmd_get_confirmation (state,
+                                                                   question);
+                                if (GF_ANSWER_NO == answer) {
+                                        gf_log ("cli", GF_LOG_ERROR, "Add brick"
+                                                " cancelled, exiting");
+                                        ret = -1;
+                                        goto out;
+                                }
+                        }
                 }
         } else if ((strcmp (w, "stripe")) == 0) {
                 type = GF_CLUSTER_TYPE_STRIPE;
@@ -2061,9 +2080,9 @@ out:
 }
 
 int32_t
-cli_cmd_volume_remove_brick_parse (const char **words, int wordcount,
-                                   dict_t **options, int *question,
-                                   int *brick_count)
+cli_cmd_volume_remove_brick_parse (struct cli_state *state, const char **words,
+                                   int wordcount, dict_t **options,
+                                   int *question, int *brick_count)
 {
         dict_t  *dict = NULL;
         char    *volname = NULL;
@@ -2081,6 +2100,8 @@ cli_cmd_volume_remove_brick_parse (const char **words, int wordcount,
         char    *w = NULL;
         int32_t  command = GF_OP_CMD_NONE;
         long     count = 0;
+        gf_answer_t answer = GF_ANSWER_NO;
+        const char *ques = NULL;
 
         GF_ASSERT (words);
         GF_ASSERT (options);
@@ -2113,6 +2134,23 @@ cli_cmd_volume_remove_brick_parse (const char **words, int wordcount,
                                  "case of remove-brick");
                         ret = -1;
                         goto out;
+                }
+
+                if (count == 2) {
+                        if (strcmp (words[wordcount - 1], "force")) {
+                                ques = "Replica 2 volumes are prone to "
+                                       "split-brain. Use Arbiter or Replica 3 "
+                                       "to avoid this.\n"
+                                       "Do you still want to continue?\n";
+                                answer = cli_cmd_get_confirmation (state,
+                                                                   ques);
+                                if (GF_ANSWER_NO == answer) {
+                                        gf_log ("cli", GF_LOG_ERROR, "Remove "
+                                                "brick cancelled, exiting");
+                                        ret = -1;
+                                        goto out;
+                                }
+                        }
                 }
 
                 ret = dict_set_int32 (dict, "replica-count", count);
