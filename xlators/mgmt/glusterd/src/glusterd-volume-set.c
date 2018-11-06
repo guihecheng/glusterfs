@@ -3300,7 +3300,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         },
         { .key        = "features.shard-lru-limit",
           .voltype    = "features/shard",
-          .op_version = GD_OP_VERSION_4_2_0,
+          .op_version = GD_OP_VERSION_3_13_4,
           .flags      = OPT_FLAG_CLIENT_OPT,
           .type       = NO_DOC,
         },
