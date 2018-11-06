@@ -4378,7 +4378,7 @@ socket_init (rpc_transport_t *this)
 #endif
 
 		if ((bio = BIO_new_file(dh_param, "r")) == NULL) {
-			gf_log(this->name,GF_LOG_ERROR,
+			gf_log(this->name, GF_LOG_INFO,
 			       "failed to open %s, "
 			       "DH ciphers are disabled", dh_param);
 		}
