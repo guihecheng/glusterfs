@@ -6832,7 +6832,7 @@ shard_priv_dump (xlator_t *this)
                             gf_uint64_2human_readable (priv->block_size));
         gf_proc_dump_write ("inode-count", "%d", priv->inode_count);
         gf_proc_dump_write ("ilist_head", "%p", &priv->ilist_head);
-        gf_proc_dump_write ("lru-max-limit", "%d", priv->lru_limit);
+        gf_proc_dump_write ("lru-max-limit", "%" PRIu64, priv->lru_limit);
 
         return 0;
 }
