@@ -2032,7 +2032,7 @@ glusterd_op_stage_status_volume (dict_t *dict, char **op_errstr)
         return ret;
 }
 
-static int
+int
 glusterd_op_stage_stats_volume (dict_t *dict, char **op_errstr)
 {
         int                                     ret = -1;
@@ -3322,7 +3322,7 @@ glusterd_remove_profile_volume_options (glusterd_volinfo_t *volinfo)
         dict_del (volinfo->dict, fd_stats_key);
 }
 
-static int
+int
 glusterd_op_stats_volume (dict_t *dict, char **op_errstr,
                           dict_t *rsp_dict)
 {
