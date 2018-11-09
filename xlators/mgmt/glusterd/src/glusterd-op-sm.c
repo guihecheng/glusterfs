@@ -2622,6 +2622,7 @@ glusterd_op_set_all_volume_options (xlator_t *this, dict_t *dict,
         glusterd_volinfo_t  *volinfo                = NULL;
         glusterd_svc_t      *svc                    = NULL;
         gf_boolean_t         start_nfs_svc          = _gf_false;
+        gf_boolean_t         svcs_reconfigure       = _gf_false;
 
         conf = this->private;
         ret = dict_get_str (dict, "key1", &key);
@@ -2717,15 +2718,16 @@ glusterd_op_set_all_volume_options (xlator_t *this, dict_t *dict,
                                 }
                                 if (GLUSTERD_STATUS_STARTED
                                                  == volinfo->status) {
-                                        ret = glusterd_svcs_reconfigure ();
-                                        if (ret) {
-                                                gf_msg (this->name,
-                                                        GF_LOG_ERROR, 0,
-                                                        GD_MSG_SVC_RESTART_FAIL,
-                                                        "Unable to restart "
-                                                        "services");
-                                                goto out;
-                                        }
+                                        svcs_reconfigure = _gf_true;
+                                }
+                        }
+                        if (svcs_reconfigure) {
+                                ret = glusterd_svcs_reconfigure();
+                                if (ret) {
+                                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                                GD_MSG_SVC_RESTART_FAIL,
+                                                "Unable to restart services");
+                                        goto out;
                                 }
                         }
                         if (start_nfs_svc) {
@@ -2758,7 +2760,6 @@ glusterd_op_set_all_volume_options (xlator_t *this, dict_t *dict,
         ret = dict_set_str (dup_opt, key, value);
         if (ret)
                 goto out;
-
         ret = glusterd_get_next_global_opt_version_str (conf->opts,
                                                         &next_version);
         if (ret)
