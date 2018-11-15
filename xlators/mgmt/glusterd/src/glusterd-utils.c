@@ -1088,6 +1088,7 @@ glusterd_brickinfo_new (glusterd_brickinfo_t **brickinfo)
                 goto out;
 
         CDS_INIT_LIST_HEAD (&new_brickinfo->brick_list);
+        CDS_INIT_LIST_HEAD (&new_brickinfo->mux_bricks);
         pthread_mutex_init (&new_brickinfo->restart_mutex, NULL);
         *brickinfo = new_brickinfo;
 
@@ -1978,6 +1979,7 @@ glusterd_volume_start_glusterfs (glusterd_volinfo_t  *volinfo,
         struct rpc_clnt         *rpc = NULL;
         rpc_clnt_connection_t   *conn  = NULL;
         int                     pid    = -1;
+        glusterd_brick_proc_t   *brick_proc = NULL;
 
         GF_ASSERT (volinfo);
         GF_ASSERT (brickinfo);
@@ -2188,14 +2190,19 @@ retry:
                 goto out;
         }
 
-        ret = glusterd_brick_process_add_brick (brickinfo);
+        ret = glusterd_brickprocess_new(&brick_proc);
         if (ret) {
-                gf_msg (this->name, GF_LOG_ERROR, 0,
-                        GD_MSG_BRICKPROC_ADD_BRICK_FAILED, "Adding brick %s:%s "
-                        "to brick process failed.", brickinfo->hostname,
-                        brickinfo->path);
+                gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_BRICKPROC_NEW_FAILED,
+                       "Failed to create new brick process instance");
                 goto out;
         }
+
+        brick_proc->port = brickinfo->port;
+        cds_list_add_tail(&brick_proc->brick_proc_list, &priv->brick_procs);
+        brickinfo->brick_proc = brick_proc;
+        cds_list_add_tail(&brickinfo->mux_bricks, &brick_proc->bricks);
+        brickinfo->brick_proc = brick_proc;
+        brick_proc->brick_count++;
 
 connect:
         ret = glusterd_brick_connect (volinfo, brickinfo, socketpath);
@@ -2328,9 +2335,6 @@ glusterd_brick_process_remove_brick (glusterd_brickinfo_t *brickinfo)
         xlator_t                *this = NULL;
         glusterd_conf_t         *priv = NULL;
         glusterd_brick_proc_t   *brick_proc = NULL;
-        glusterd_brickinfo_t    *brickinfoiter = NULL;
-        glusterd_brick_proc_t   *brick_proc_tmp = NULL;
-        glusterd_brickinfo_t    *tmp = NULL;
 
         this = THIS;
         GF_VALIDATE_OR_GOTO ("glusterd", this, out);
@@ -2339,48 +2343,44 @@ glusterd_brick_process_remove_brick (glusterd_brickinfo_t *brickinfo)
         GF_VALIDATE_OR_GOTO (this->name, priv, out);
         GF_VALIDATE_OR_GOTO (this->name, brickinfo, out);
 
-        cds_list_for_each_entry_safe (brick_proc, brick_proc_tmp,
-                                      &priv->brick_procs, brick_proc_list) {
-                if (brickinfo->port != brick_proc->port) {
-                        continue;
-                }
-
-                GF_VALIDATE_OR_GOTO (this->name, (brick_proc->brick_count > 0), out);
-
-                cds_list_for_each_entry_safe (brickinfoiter, tmp,
-                                              &brick_proc->bricks, brick_list) {
-                        if (strcmp (brickinfoiter->path, brickinfo->path) == 0) {
-                                cds_list_del_init (&brickinfoiter->brick_list);
-
-                                GF_FREE (brickinfoiter->logfile);
-                                GF_FREE (brickinfoiter);
-                                brick_proc->brick_count--;
-                                break;
-                        }
-                }
-
-                /* If all bricks have been removed, delete the brick process */
-                if (brick_proc->brick_count == 0) {
-                        ret = glusterd_brickprocess_delete (brick_proc);
-                        if (ret)
-                                goto out;
-                }
-                break;
+        brick_proc = brickinfo->brick_proc;
+        if (!brick_proc) {
+            if (brickinfo->status != GF_BRICK_STARTED) {
+                /* this function will be called from gluster_pmap_signout and
+                 * glusterd_volume_stop_glusterfs. So it is possible to have
+                 * brick_proc set as null.
+                 */
+                ret = 0;
+            }
+            goto out;
         }
 
+        GF_VALIDATE_OR_GOTO(this->name, (brick_proc->brick_count > 0), out);
+
+        cds_list_del_init(&brickinfo->mux_bricks);
+        brick_proc->brick_count--;
+
+        /* If all bricks have been removed, delete the brick process */
+        if (brick_proc->brick_count == 0) {
+            ret = glusterd_brickprocess_delete(brick_proc);
+            if (ret)
+                goto out;
+        }
+
+        brickinfo->brick_proc = NULL;
         ret = 0;
 out:
         return ret;
 }
 
 int
-glusterd_brick_process_add_brick (glusterd_brickinfo_t *brickinfo)
+glusterd_brick_process_add_brick (glusterd_brickinfo_t *brickinfo,
+                                  glusterd_brickinfo_t *parent_brickinfo)
 {
         int                      ret = -1;
         xlator_t                *this = NULL;
         glusterd_conf_t         *priv = NULL;
         glusterd_brick_proc_t   *brick_proc = NULL;
-        glusterd_brickinfo_t    *brickinfo_dup = NULL;
 
         this = THIS;
         GF_VALIDATE_OR_GOTO ("glusterd", this, out);
@@ -2389,37 +2389,28 @@ glusterd_brick_process_add_brick (glusterd_brickinfo_t *brickinfo)
         GF_VALIDATE_OR_GOTO (this->name, priv, out);
         GF_VALIDATE_OR_GOTO (this->name, brickinfo, out);
 
-        ret = glusterd_brickinfo_new (&brickinfo_dup);
-        if (ret) {
-                gf_msg ("glusterd", GF_LOG_ERROR, 0,
-                        GD_MSG_BRICK_NEW_INFO_FAIL,
-                        "Failed to create new brickinfo");
-                goto out;
-        }
-
-        ret = glusterd_brickinfo_dup (brickinfo, brickinfo_dup);
-        if (ret) {
-                gf_msg (this->name, GF_LOG_ERROR, 0,
-                        GD_MSG_BRICK_SET_INFO_FAIL, "Failed to dup brickinfo");
-                goto out;
-        }
-
-        ret = glusterd_brick_proc_for_port (brickinfo->port, &brick_proc);
-        if (ret) {
-                ret = glusterd_brickprocess_new (&brick_proc);
+        if (!parent_brickinfo) {
+                ret = glusterd_brick_proc_for_port(brickinfo->port,
+                                                   &brick_proc);
                 if (ret) {
-                        gf_msg (this->name, GF_LOG_ERROR, 0,
-                                GD_MSG_BRICKPROC_NEW_FAILED, "Failed to create "
-                                "new brick process instance");
-                        goto out;
+                        ret = glusterd_brickprocess_new (&brick_proc);
+                        if (ret) {
+                                gf_msg(this->name, GF_LOG_ERROR, 0,
+                                       GD_MSG_BRICKPROC_NEW_FAILED,
+                                       "Failed to create "
+                                        "new brick process instance");
+                                goto out;
+                        }
+                        brick_proc->port = brickinfo->port;
+                        cds_list_add_tail(&brick_proc->brick_proc_list,
+                                          &priv->brick_procs);
                 }
-
-                brick_proc->port = brickinfo->port;
-
-                cds_list_add_tail (&brick_proc->brick_proc_list, &priv->brick_procs);
+        } else {
+                ret = 0;
+                brick_proc = parent_brickinfo->brick_proc;
         }
-
-        cds_list_add_tail (&brickinfo_dup->brick_list, &brick_proc->bricks);
+        cds_list_add_tail(&brickinfo->mux_bricks, &brick_proc->bricks);
+        brickinfo->brick_proc = brick_proc;
         brick_proc->brick_count++;
 out:
         return ret;
@@ -2538,6 +2529,7 @@ glusterd_volume_stop_glusterfs (glusterd_volinfo_t *volinfo,
 
         brickinfo->status = GF_BRICK_STOPPED;
         brickinfo->start_triggered = _gf_false;
+        brickinfo->brick_proc = NULL;
         if (del_brick)
                 glusterd_delete_brick (volinfo, brickinfo);
 out:
@@ -5704,7 +5696,8 @@ attach_brick (xlator_t *this,
                                         goto out;
                                 }
                                 brickinfo->port = other_brick->port;
-                                ret = glusterd_brick_process_add_brick (brickinfo);
+                                ret = glusterd_brick_process_add_brick(brickinfo
+                                                                 , other_brick);
                                 if (ret) {
                                         gf_msg (this->name, GF_LOG_ERROR, 0,
                                                 GD_MSG_BRICKPROC_ADD_BRICK_FAILED,
@@ -6259,7 +6252,8 @@ glusterd_brick_start (glusterd_volinfo_t *volinfo,
                         (void) glusterd_brick_connect (volinfo, brickinfo,
                                         socketpath);
 
-                        ret = glusterd_brick_process_add_brick (brickinfo);
+                        ret = glusterd_brick_process_add_brick (brickinfo,
+                                                                NULL);
                         if (ret) {
                                 gf_msg (this->name, GF_LOG_ERROR, 0,
                                         GD_MSG_BRICKPROC_ADD_BRICK_FAILED,

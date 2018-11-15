@@ -6046,37 +6046,6 @@ out:
 
 static int gd_stale_rpc_disconnect_log;
 
-static int
-glusterd_mark_bricks_stopped_by_proc (glusterd_brick_proc_t *brick_proc) {
-        glusterd_brickinfo_t     *brickinfo        =  NULL;
-        glusterd_brickinfo_t     *brickinfo_tmp    =  NULL;
-        glusterd_volinfo_t       *volinfo          =  NULL;
-        int                       ret              =  -1;
-
-        cds_list_for_each_entry (brickinfo, &brick_proc->bricks, brick_list) {
-                ret =  glusterd_get_volinfo_from_brick (brickinfo->path,
-                                                        &volinfo);
-                if (ret) {
-                        gf_msg (THIS->name, GF_LOG_ERROR, 0,
-                                GD_MSG_VOLINFO_GET_FAIL, "Failed to get volinfo"
-                                " from brick(%s)", brickinfo->path);
-                        goto out;
-                }
-                cds_list_for_each_entry (brickinfo_tmp, &volinfo->bricks,
-                                         brick_list) {
-                        if (strcmp (brickinfo->path,
-                                    brickinfo_tmp->path) == 0) {
-                                glusterd_set_brick_status (brickinfo_tmp,
-                                                           GF_BRICK_STOPPED);
-                                brickinfo_tmp->start_triggered = _gf_false;
-                        }
-                }
-        }
-        return 0;
-out:
-        return ret;
-}
-
 int
 __glusterd_brick_rpc_notify (struct rpc_clnt *rpc, void *mydata,
                              rpc_clnt_event_t event, void *data)
@@ -6087,7 +6056,6 @@ __glusterd_brick_rpc_notify (struct rpc_clnt *rpc, void *mydata,
         glusterd_brickinfo_t    *brickinfo         = NULL;
         glusterd_volinfo_t      *volinfo           = NULL;
         xlator_t                *this              = NULL;
-        int                      temp              = 0;
         int32_t                  pid               = -1;
         glusterd_brickinfo_t    *brickinfo_tmp     = NULL;
         glusterd_brick_proc_t   *brick_proc        = NULL;
@@ -6218,33 +6186,21 @@ __glusterd_brick_rpc_notify (struct rpc_clnt *rpc, void *mydata,
                         }
                 }
 
-                if (is_brick_mx_enabled()) {
-                        cds_list_for_each_entry (brick_proc, &conf->brick_procs,
-                                                 brick_proc_list) {
-                                cds_list_for_each_entry (brickinfo_tmp,
-                                                         &brick_proc->bricks,
-                                                         brick_list) {
-                                        if (strcmp (brickinfo_tmp->path,
-                                                    brickinfo->path) == 0) {
-                                                ret  = glusterd_mark_bricks_stopped_by_proc
-                                                       (brick_proc);
-                                                if (ret) {
-                                                        gf_msg(THIS->name,
-                                                               GF_LOG_ERROR, 0,
-                                                               GD_MSG_BRICK_STOP_FAIL,
-                                                               "Unable to stop "
-                                                               "bricks of process"
-                                                               " to which brick(%s)"
-                                                               " belongs",
-                                                               brickinfo->path);
-                                                        goto out;
-                                                }
-                                                temp = 1;
-                                                break;
-                                        }
-                                }
-                                if (temp == 1)
-                                        break;
+                if (is_brick_mx_enabled() && glusterd_is_brick_started(brickinfo)) {
+                        brick_proc = brickinfo->brick_proc;
+                        if (!brick_proc)
+                            break;
+                        cds_list_for_each_entry(brickinfo_tmp, &brick_proc->bricks,
+                                                mux_bricks)
+                        {
+                            glusterd_set_brick_status(brickinfo_tmp, GF_BRICK_STOPPED);
+                            brickinfo_tmp->start_triggered = _gf_false;
+                            /* When bricks are stopped, ports also need to
+                             * be cleaned up
+                             */
+                            pmap_registry_remove(
+                                THIS, brickinfo_tmp->port, brickinfo_tmp->path,
+                                GF_PMAP_PORT_BRICKSERVER, NULL, _gf_true);
                         }
                 } else {
                         glusterd_set_brick_status (brickinfo, GF_BRICK_STOPPED);

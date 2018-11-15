@@ -211,6 +211,15 @@ typedef enum gf_brick_status {
         GF_BRICK_STARTING
 } gf_brick_status_t;
 
+struct glusterd_brick_proc {
+        int                     port;
+        uint32_t                brick_count;
+        struct cds_list_head    brick_proc_list;
+        struct cds_list_head    bricks;
+};
+
+typedef struct glusterd_brick_proc glusterd_brick_proc_t;
+
 struct glusterd_brickinfo {
         char               hostname[1024];
         char               path[PATH_MAX];
@@ -249,18 +258,12 @@ struct glusterd_brickinfo {
         gf_boolean_t       port_registered;
         gf_boolean_t       start_triggered;
         pthread_mutex_t    restart_mutex;
+        glusterd_brick_proc_t *brick_proc; /* Information regarding mux bricks */
+        struct cds_list_head mux_bricks;
+        /* List to store the bricks in brick_proc*/
 };
 
 typedef struct glusterd_brickinfo glusterd_brickinfo_t;
-
-struct glusterd_brick_proc {
-        int                     port;
-        uint32_t                brick_count;
-        struct cds_list_head    brick_proc_list;
-        struct cds_list_head    bricks;
-};
-
-typedef struct glusterd_brick_proc glusterd_brick_proc_t;
 
 struct gf_defrag_brickinfo_ {
         char *name;
