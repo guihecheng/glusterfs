@@ -897,4 +897,6 @@ glusterd_get_index_basepath (glusterd_brickinfo_t *brickinfo, char *buffer,
 gf_boolean_t
 glusterd_is_profile_on (glusterd_volinfo_t *volinfo);
 
+char *
+search_brick_path_from_proc(pid_t brick_pid, char *brickpath);
 #endif
