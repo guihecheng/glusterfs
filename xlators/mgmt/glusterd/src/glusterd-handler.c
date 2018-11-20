@@ -6060,6 +6060,7 @@ __glusterd_brick_rpc_notify (struct rpc_clnt *rpc, void *mydata,
         glusterd_brickinfo_t    *brickinfo_tmp     = NULL;
         glusterd_brick_proc_t   *brick_proc        = NULL;
         char                     pidfile[PATH_MAX] = {0};
+        char                    *brickpath         = NULL;
 
         brickid = mydata;
         if (!brickid)
@@ -6167,8 +6168,11 @@ __glusterd_brick_rpc_notify (struct rpc_clnt *rpc, void *mydata,
                          */
                         GLUSTERD_GET_BRICK_PIDFILE (pidfile, volinfo,
                                                     brickinfo, conf);
-                        if (!gf_is_service_running (pidfile, &pid) ||
-                            !search_brick_path_from_proc(pid, brickinfo->path)) {
+                        gf_is_service_running(pidfile, &pid);
+                        if (pid > 0)
+                                brickpath = search_brick_path_from_proc(pid,
+                                                                        brickinfo->path);
+                        if (!gf_is_service_running (pidfile, &pid) || !brickpath) {
                                 ret = pmap_registry_remove (
                                                       THIS, brickinfo->port,
                                                       brickinfo->path,
@@ -6185,6 +6189,9 @@ __glusterd_brick_rpc_notify (struct rpc_clnt *rpc, void *mydata,
                                 }
                         }
                 }
+
+                if (brickpath)
+                        GF_FREE (brickpath);
 
                 if (is_brick_mx_enabled() && glusterd_is_brick_started(brickinfo)) {
                         brick_proc = brickinfo->brick_proc;
