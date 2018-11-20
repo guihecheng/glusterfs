@@ -1120,10 +1120,6 @@ glusterd_init_uds_listener (xlator_t *this)
                 strncpy (sockfile, sock_data->data, UNIX_PATH_MAX);
         }
 
-        options = dict_new ();
-        if (!options)
-                goto out;
-
         ret = rpcsvc_transport_unix_options_build (&options, sockfile);
         if (ret)
                 goto out;
