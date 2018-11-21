@@ -3534,7 +3534,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         },
         { .key         = GLUSTERD_BRICKMUX_LIMIT_KEY,
           .voltype     = "mgmt/glusterd",
-          .value       = "0",
+          .value       = "250",
           .op_version  = GD_OP_VERSION_3_11_1,
           .validate_fn = validate_mux_limit,
           .type        = GLOBAL_DOC,
