@@ -2774,7 +2774,7 @@ config_parse (const char **words, int wordcount, dict_t *dict,
                         ret_chkpt = strptime(append_str, "%Y-%m-%d %H:%M:%S",
                                              &checkpoint_time);
 
-                        if (ret_chkpt == NULL) {
+                        if (ret_chkpt == NULL || *ret_chkpt != '\0') {
                                 ret = -1;
                                 cli_err ("Invalid Checkpoint label. Use format "
                                          "\"Y-m-d H:M:S\", Example: 2016-10-25 15:30:45");
