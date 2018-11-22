@@ -574,6 +574,7 @@ struct _glusterfs_ctx {
         char               btbuf[GF_BACKTRACE_LEN];
 
         pthread_mutex_t    notify_lock;
+        pthread_mutex_t    cleanup_lock;
         pthread_cond_t     notify_cond;
         int                notifying;
 
