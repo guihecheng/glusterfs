@@ -10934,7 +10934,7 @@ glusterd_volume_rebalance_use_rsp_dict (dict_t *aggr, dict_t *rsp_dict)
                 node_uuid_str = gf_strdup (node_uuid);
 
                 /* Finding the index of the node-uuid in the peer-list */
-                rcu_read_lock ();
+                RCU_READ_LOCK;
                 cds_list_for_each_entry_rcu (peerinfo, &conf->peers,
                                              uuid_list) {
                         peer_uuid_str = gd_peer_uuid_str (peerinfo);
@@ -10943,7 +10943,7 @@ glusterd_volume_rebalance_use_rsp_dict (dict_t *aggr, dict_t *rsp_dict)
 
                         current_index++;
                 }
-                rcu_read_unlock ();
+                RCU_READ_UNLOCK;
 
                 /* Setting the largest index value as the total count. */
                 ret = dict_get_int32 (ctx_dict, "count", &count);
@@ -13716,7 +13716,7 @@ glusterd_count_connected_peers (int32_t *count)
 
         *count = 1;
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         cds_list_for_each_entry_rcu (peerinfo, &conf->peers, uuid_list) {
                 /* Find peer who is connected and is a friend */
                 if ((peerinfo->connected) &&
@@ -13724,7 +13724,7 @@ glusterd_count_connected_peers (int32_t *count)
                         (*count)++;
                 }
         }
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
 
         ret = 0;
 out:

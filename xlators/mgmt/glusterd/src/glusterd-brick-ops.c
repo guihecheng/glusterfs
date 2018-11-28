@@ -2097,7 +2097,7 @@ check:
                         continue;
                 }
 
-                rcu_read_lock ();
+                RCU_READ_LOCK;
                 peerinfo = glusterd_peerinfo_find_by_uuid
                                                 (brickinfo->uuid);
                 if (!peerinfo) {
@@ -2105,7 +2105,7 @@ check:
                                   "brick %s is not in cluster", brick);
                         *errstr = gf_strdup (msg);
                         ret = -1;
-                        rcu_read_unlock ();
+                        RCU_READ_UNLOCK;
                         goto out;
                 }
                 if (!peerinfo->connected) {
@@ -2113,10 +2113,10 @@ check:
                                   "brick %s is down", brick);
                         *errstr = gf_strdup (msg);
                         ret = -1;
-                        rcu_read_unlock ();
+                        RCU_READ_UNLOCK;
                         goto out;
                 }
-                rcu_read_unlock ();
+                RCU_READ_UNLOCK;
         }
 
 out:

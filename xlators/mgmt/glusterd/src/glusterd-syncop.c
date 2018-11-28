@@ -52,13 +52,13 @@ gd_collate_errors (struct syncargs *args, int op_ret, int op_errno,
                 args->op_ret = op_ret;
                 args->op_errno = op_errno;
 
-                rcu_read_lock ();
+                RCU_READ_LOCK;
                 peerinfo = glusterd_peerinfo_find (peerid, NULL);
                 if (peerinfo)
                         peer_str = gf_strdup (peerinfo->hostname);
                 else
                         peer_str = gf_strdup (uuid_utoa (uuid));
-                rcu_read_unlock ();
+                RCU_READ_UNLOCK;
 
                 if (op_errstr && strcmp (op_errstr, "")) {
                         len = snprintf (err_str, sizeof(err_str) - 1,
@@ -571,7 +571,7 @@ _gd_syncop_mgmt_lock_cbk (struct rpc_req *req, struct iovec *iov,
 
         gf_uuid_copy (args->uuid, rsp.uuid);
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         peerinfo = glusterd_peerinfo_find (*peerid, NULL);
         if (peerinfo) {
                 /* Set peer as locked, so we unlock only the locked peers */
@@ -584,7 +584,7 @@ _gd_syncop_mgmt_lock_cbk (struct rpc_req *req, struct iovec *iov,
                         "Could not find peer with "
                         "ID %s", uuid_utoa (*peerid));
         }
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
 
         op_ret = rsp.op_ret;
         op_errno = rsp.op_errno;
@@ -670,7 +670,7 @@ _gd_syncop_mgmt_unlock_cbk (struct rpc_req *req, struct iovec *iov,
 
         gf_uuid_copy (args->uuid, rsp.uuid);
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         peerinfo = glusterd_peerinfo_find (*peerid, NULL);
         if (peerinfo) {
                 peerinfo->locked = _gf_false;
@@ -680,7 +680,7 @@ _gd_syncop_mgmt_unlock_cbk (struct rpc_req *req, struct iovec *iov,
                         GD_MSG_PEER_NOT_FOUND, "Could not find peer with "
                         "ID %s", uuid_utoa (*peerid));
         }
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
 
         op_ret = rsp.op_ret;
         op_errno = rsp.op_errno;
@@ -780,9 +780,9 @@ _gd_syncop_stage_op_cbk (struct rpc_req *req, struct iovec *iov,
                 }
         }
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         ret = (glusterd_peerinfo_find (rsp.uuid, NULL) == NULL);
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
         if (ret) {
                 ret = -1;
                 gf_msg (this->name, GF_LOG_CRITICAL, 0,
@@ -1110,9 +1110,9 @@ _gd_syncop_commit_op_cbk (struct rpc_req *req, struct iovec *iov,
                 }
         }
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         ret = (glusterd_peerinfo_find (rsp.uuid, NULL) == 0);
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
         if (ret) {
                 ret = -1;
                 gf_msg (this->name, GF_LOG_CRITICAL, 0,
@@ -1227,7 +1227,7 @@ gd_lock_op_phase (glusterd_conf_t  *conf, glusterd_op_t op, dict_t *op_ctx,
         synctask_barrier_init((&args));
         peer_cnt = 0;
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         cds_list_for_each_entry_rcu (peerinfo, &conf->peers, uuid_list) {
                 /* Only send requests to peers who were available before the
                  * transaction started
@@ -1252,7 +1252,7 @@ gd_lock_op_phase (glusterd_conf_t  *conf, glusterd_op_t op, dict_t *op_ctx,
                                                 MY_UUID, peer_uuid, txn_id);
                 peer_cnt++;
         }
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
 
         if (0 == peer_cnt) {
                 ret = 0;
@@ -1360,7 +1360,7 @@ stage_done:
         synctask_barrier_init((&args));
         peer_cnt = 0;
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         cds_list_for_each_entry_rcu (peerinfo, &conf->peers, uuid_list) {
                 /* Only send requests to peers who were available before the
                  * transaction started
@@ -1379,7 +1379,7 @@ stage_done:
                                                op, req_dict, op_ctx);
                 peer_cnt++;
         }
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
 
         if (0 == peer_cnt) {
                 ret = 0;
@@ -1491,7 +1491,7 @@ commit_done:
         synctask_barrier_init((&args));
         peer_cnt = 0;
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         cds_list_for_each_entry_rcu (peerinfo, &conf->peers, uuid_list) {
                 /* Only send requests to peers who were available before the
                  * transaction started
@@ -1510,7 +1510,7 @@ commit_done:
                                                 op, req_dict, op_ctx);
                 peer_cnt++;
         }
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
 
         if (0 == peer_cnt) {
                 ret = 0;
@@ -1568,7 +1568,7 @@ gd_unlock_op_phase (glusterd_conf_t  *conf, glusterd_op_t op, int *op_ret,
         peer_cnt = 0;
 
         if (cluster_lock) {
-                rcu_read_lock ();
+                RCU_READ_LOCK;
                 cds_list_for_each_entry_rcu (peerinfo, &conf->peers,
                                              uuid_list) {
                         /* Only send requests to peers who were available before
@@ -1590,7 +1590,7 @@ gd_unlock_op_phase (glusterd_conf_t  *conf, glusterd_op_t op, int *op_ret,
                                 peer_cnt++;
                         }
                 }
-                rcu_read_unlock ();
+                RCU_READ_UNLOCK;
         } else {
 
                 ret = dict_get_int32 (op_ctx, "hold_global_locks", &global);
@@ -1599,7 +1599,7 @@ gd_unlock_op_phase (glusterd_conf_t  *conf, glusterd_op_t op, int *op_ret,
                 else
                         type = "vol";
                 if (volname || global) {
-                        rcu_read_lock ();
+                        RCU_READ_LOCK;
                         cds_list_for_each_entry_rcu (peerinfo, &conf->peers,
                                                      uuid_list) {
                                 /* Only send requests to peers who were
@@ -1620,7 +1620,7 @@ gd_unlock_op_phase (glusterd_conf_t  *conf, glusterd_op_t op, int *op_ret,
                                                           tmp_uuid, txn_id);
                                 peer_cnt++;
                         }
-                        rcu_read_unlock ();
+                        RCU_READ_UNLOCK;
                 }
         }
 

@@ -804,6 +804,22 @@ do {                                                                       \
                 *snap_volname_ptr = '\0';                               \
         } while (0)
 
+#define RCU_READ_LOCK do {                                                   \
+        pthread_mutex_lock(&(THIS->ctx)->cleanup_lock);                      \
+        {                                                                    \
+                rcu_read_lock();                                             \
+        }                                                                    \
+        pthread_mutex_unlock(&(THIS->ctx)->cleanup_lock);                    \
+        } while (0)
+
+#define RCU_READ_UNLOCK do {                                                 \
+        pthread_mutex_lock(&(THIS->ctx)->cleanup_lock);                      \
+        {                                                                    \
+                rcu_read_unlock();                                           \
+        }                                                                    \
+        pthread_mutex_unlock(&(THIS->ctx)->cleanup_lock);                    \
+        } while (0)
+
 #define GLUSTERD_DUMP_PEERS(head, member, xpeers) do {                       \
                 glusterd_peerinfo_t  *_peerinfo                = NULL;       \
                 int                   index                    = 1;          \
@@ -815,7 +831,7 @@ do {                                                                       \
                         snprintf (key, sizeof (key),                         \
                                   "glusterd.xaction_peer");                  \
                                                                              \
-                rcu_read_lock ();                                            \
+                RCU_READ_LOCK;                                            \
                 cds_list_for_each_entry_rcu (_peerinfo, head, member) {      \
                         glusterd_dump_peer (_peerinfo, key, index, xpeers);  \
                         if (!xpeers)                                         \
@@ -823,7 +839,7 @@ do {                                                                       \
                                                             index);          \
                         index++;                                             \
                 }                                                            \
-                rcu_read_unlock ();                                          \
+                RCU_READ_UNLOCK;                                          \
                                                                              \
         } while (0)
 

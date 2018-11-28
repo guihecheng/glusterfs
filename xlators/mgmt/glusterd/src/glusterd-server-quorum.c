@@ -224,14 +224,14 @@ glusterd_get_quorum_cluster_counts (xlator_t *this, int *active_count,
         if (active_count)
                 *active_count = 1;
 
-        rcu_read_lock ();
+        RCU_READ_LOCK;
         cds_list_for_each_entry_rcu (peerinfo, &conf->peers, uuid_list) {
                 if (_is_contributing_to_quorum (peerinfo->quorum_contrib))
                         inquorum_count = inquorum_count + 1;
                 if (active_count && (peerinfo->quorum_contrib == QUORUM_UP))
                         *active_count = *active_count + 1;
         }
-        rcu_read_unlock ();
+        RCU_READ_UNLOCK;
 
         ret = dict_get_str (conf->opts, GLUSTERD_QUORUM_RATIO_KEY, &val);
         if (ret == 0) {
