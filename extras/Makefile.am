@@ -12,7 +12,9 @@ SUBDIRS = init.d systemd benchmarking hook-scripts $(OCF_SUBDIR) LinuxRPM \
 
 confdir = $(sysconfdir)/glusterfs
 conf_DATA = glusterfs-logrotate gluster-rsyslog-7.2.conf gluster-rsyslog-5.8.conf \
-	logger.conf.example glusterfs-georep-logrotate group-virt.example group-metadata-cache group-gluster-block group-nl-cache group-db-workload
+	logger.conf.example glusterfs-georep-logrotate group-virt.example \
+	group-metadata-cache group-gluster-block group-nl-cache group-db-workload \
+	group-distributed-virt
 
 voldir = $(sysconfdir)/glusterfs
 vol_DATA = glusterd.vol
@@ -49,3 +51,5 @@ install-data-local:
 		$(DESTDIR)$(GLUSTERD_WORKDIR)/groups/nl-cache
 	$(INSTALL_DATA) $(top_srcdir)/extras/group-db-workload \
 		$(DESTDIR)$(GLUSTERD_WORKDIR)/groups/db-workload
+	$(INSTALL_DATA) $(top_srcdir)/extras/group-distributed-virt \
+		$(DESTDIR)$(GLUSTERD_WORKDIR)/groups/distributed-virt
