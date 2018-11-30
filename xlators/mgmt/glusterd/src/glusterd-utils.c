@@ -10884,7 +10884,7 @@ glusterd_volume_rebalance_use_rsp_dict (dict_t *aggr, dict_t *rsp_dict)
         int                  ret           = 0;
         int32_t              index         = 0;
         int32_t              count         = 0;
-        int32_t              current_index = 2;
+        int32_t              current_index = 1;
         int32_t              value32       = 0;
         uint64_t             value         = 0;
         char                *peer_uuid_str = NULL;
@@ -10925,7 +10925,7 @@ glusterd_volume_rebalance_use_rsp_dict (dict_t *aggr, dict_t *rsp_dict)
         if (ret)
                 gf_msg ("glusterd", GF_LOG_ERROR, 0,
                         GD_MSG_DICT_GET_FAILED,
-                        "failed to get index");
+                        "failed to get index from rsp dict");
 
         memset (key, 0, 256);
         snprintf (key, 256, "node-uuid-%d", index);

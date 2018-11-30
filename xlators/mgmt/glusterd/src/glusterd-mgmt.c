@@ -224,6 +224,16 @@ gd_mgmt_v3_pre_validate_fn (glusterd_op_t op, dict_t *dict,
                 }
                 break;
 
+        case GD_OP_REBALANCE:
+        case GD_OP_DEFRAG_BRICK_VOLUME:
+                ret = glusterd_mgmt_v3_op_stage_rebalance(dict, op_errstr);
+                if (ret) {
+                        gf_log(this->name, GF_LOG_WARNING,
+                               "Rebalance Prevalidate Failed");
+                        goto out;
+                }
+                break;
+
         case GD_OP_MAX_OPVERSION:
                 ret = 0;
                 break;
@@ -264,6 +274,8 @@ gd_mgmt_v3_brick_op_fn (glusterd_op_t op, dict_t *dict,
                 break;
         }
         case GD_OP_PROFILE_VOLUME:
+        case GD_OP_REBALANCE:
+        case GD_OP_DEFRAG_BRICK_VOLUME:
         {
                 ret = gd_brick_op_phase(op, rsp_dict, dict, op_errstr);
                 if (ret) {
@@ -434,6 +446,19 @@ gd_mgmt_v3_commit_fn (glusterd_op_t op, dict_t *dict,
                                 gf_msg(this->name, GF_LOG_ERROR, 0,
                                        GD_MSG_COMMIT_OP_FAIL, "commit failed "
                                        "volume profile operation.");
+                                goto out;
+                        }
+                        break;
+                }
+                case GD_OP_REBALANCE:
+                case GD_OP_DEFRAG_BRICK_VOLUME:
+                {
+                        ret = glusterd_mgmt_v3_op_rebalance(dict, op_errstr,
+                                                            rsp_dict);
+                        if (ret) {
+                                gf_msg(this->name, GF_LOG_ERROR, 0,
+                                       GD_MSG_COMMIT_OP_FAIL,
+                                       "Rebalance Commit Failed");
                                 goto out;
                         }
                         break;
@@ -880,6 +905,8 @@ glusterd_pre_validate_aggr_rsp_dict (glusterd_op_t op,
         case GD_OP_TIER_START_STOP:
         case GD_OP_REMOVE_TIER_BRICK:
         case GD_OP_PROFILE_VOLUME:
+        case GD_OP_DEFRAG_BRICK_VOLUME:
+        case GD_OP_REBALANCE:
                 break;
         case GD_OP_MAX_OPVERSION:
                 break;
@@ -1197,6 +1224,7 @@ glusterd_mgmt_v3_build_payload (dict_t **req, char **op_errstr, dict_t *dict,
                 break;
         case GD_OP_START_VOLUME:
         case GD_OP_ADD_BRICK:
+        case GD_OP_DEFRAG_BRICK_VOLUME:
         case GD_OP_REPLACE_BRICK:
         case GD_OP_RESET_BRICK:
         case GD_OP_ADD_TIER_BRICK:
@@ -1221,6 +1249,30 @@ glusterd_mgmt_v3_build_payload (dict_t **req, char **op_errstr, dict_t *dict,
                         dict_copy (dict, req_dict);
                 }
                         break;
+
+        case GD_OP_REBALANCE: {
+                if (gd_set_commit_hash(dict) != 0) {
+                        ret = -1;
+                        goto out;
+                }
+                ret = dict_get_str (dict, "volname", &volname);
+                if (ret) {
+                        gf_msg(this->name, GF_LOG_CRITICAL, errno,
+                               GD_MSG_DICT_GET_FAILED,
+                               "volname is not present in "
+                               "operation ctx");
+                        goto out;
+                }
+
+                if (strcasecmp(volname, "all")) {
+                        ret = glusterd_dict_set_volid(dict, volname, op_errstr);
+                        if (ret)
+                                goto out;
+                }
+                dict_copy(dict, req_dict);
+        }
+                break;
+
         case GD_OP_TIER_START_STOP:
         case GD_OP_REMOVE_TIER_BRICK:
         case GD_OP_DETACH_TIER_STATUS:
@@ -1247,6 +1299,7 @@ gd_mgmt_v3_brick_op_cbk_fn (struct rpc_req *req, struct iovec *iov,
         call_frame_t               *frame         = NULL;
         int32_t                     op_ret        = -1;
         int32_t                     op_errno      = -1;
+        dict_t                     *rsp_dict      = NULL;
         xlator_t                   *this          = NULL;
         uuid_t                     *peerid        = NULL;
 
@@ -1278,10 +1331,45 @@ gd_mgmt_v3_brick_op_cbk_fn (struct rpc_req *req, struct iovec *iov,
         if (ret < 0)
                 goto out;
 
-        gf_uuid_copy (args->uuid, rsp.uuid);
+        if (rsp.dict.dict_len) {
+                /* Unserialize the dictionary */
+                rsp_dict  = dict_new ();
 
-        op_ret = rsp.op_ret;
-        op_errno = rsp.op_errno;
+                ret = dict_unserialize (rsp.dict.dict_val,
+                                        rsp.dict.dict_len,
+                                        &rsp_dict);
+                if (ret < 0) {
+                        free (rsp.dict.dict_val);
+                        goto out;
+                } else {
+                        rsp_dict->extra_stdfree = rsp.dict.dict_val;
+                }
+        }
+
+        gf_uuid_copy (args->uuid, rsp.uuid);
+        pthread_mutex_lock (&args->lock_dict);
+        {
+                if (rsp.op == GD_OP_DEFRAG_BRICK_VOLUME)
+                        ret = glusterd_syncop_aggr_rsp_dict (rsp.op, args->dict,
+                                                             rsp_dict);
+        }
+        pthread_mutex_unlock (&args->lock_dict);
+
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_RESP_AGGR_FAIL, "%s",
+                        "Failed to aggregate response from "
+                        " node/brick");
+                if (!rsp.op_ret)
+                        op_ret = ret;
+                else {
+                        op_ret = rsp.op_ret;
+                        op_errno = rsp.op_errno;
+                }
+        } else {
+                op_ret = rsp.op_ret;
+                op_errno = rsp.op_errno;
+        }
 
 out:
         gd_mgmt_v3_collate_errors (args, op_ret, op_errno, rsp.op_errstr,
@@ -1353,11 +1441,12 @@ out:
 }
 
 int
-glusterd_mgmt_v3_brick_op (glusterd_op_t op, dict_t *rsp_dict, dict_t *req_dict,
+glusterd_mgmt_v3_brick_op (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
                            char **op_errstr, uint32_t txn_generation)
 {
         int32_t              ret        = -1;
         int32_t              peer_cnt   = 0;
+        dict_t              *rsp_dict   = NULL;
         glusterd_peerinfo_t *peerinfo   = NULL;
         struct syncargs      args       = {0};
         uuid_t               peer_uuid  = {0};
@@ -1371,6 +1460,13 @@ glusterd_mgmt_v3_brick_op (glusterd_op_t op, dict_t *rsp_dict, dict_t *req_dict,
 
         GF_ASSERT (req_dict);
         GF_ASSERT (op_errstr);
+
+        rsp_dict = dict_new();
+        if (!rsp_dict) {
+                gf_msg(this->name, GF_LOG_ERROR, 0, GD_MSG_DICT_CREATE_FAIL,
+                       "Failed to create response dictionary");
+                goto out;
+        }
 
         /* Perform brick op on local node */
         ret = gd_mgmt_v3_brick_op_fn (op, req_dict, op_errstr,
@@ -1395,9 +1491,21 @@ glusterd_mgmt_v3_brick_op (glusterd_op_t op, dict_t *rsp_dict, dict_t *req_dict,
                 }
                 goto out;
         }
+        if (op == GD_OP_DEFRAG_BRICK_VOLUME || op == GD_OP_PROFILE_VOLUME) {
+                ret = glusterd_syncop_aggr_rsp_dict(op, op_ctx, rsp_dict);
+                if (ret) {
+                        gf_log(this->name, GF_LOG_ERROR, "%s",
+                               "Failed to aggregate response from "
+                               " node/brick");
+                        goto out;
+                }
+        }
+
+        dict_unref(rsp_dict);
+        rsp_dict = NULL;
 
         /* Sending brick op req to other nodes in the cluster */
-        gd_syncargs_init (&args, rsp_dict);
+        gd_syncargs_init (&args, op_ctx);
         synctask_barrier_init((&args));
         peer_cnt = 0;
 
@@ -1616,6 +1724,13 @@ glusterd_mgmt_v3_commit (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
         GF_ASSERT (op_errstr);
         GF_VALIDATE_OR_GOTO (this->name, op_errno, out);
 
+        if (op == GD_OP_REBALANCE || op == GD_OP_DEFRAG_BRICK_VOLUME) {
+                ret = glusterd_set_rebalance_id_in_rsp_dict(req_dict, op_ctx);
+                if (ret) {
+                        gf_log(this->name, GF_LOG_WARNING,
+                               "Failed to set rebalance id in dict.");
+                }
+        }
         rsp_dict = dict_new ();
         if (!rsp_dict) {
                 gf_msg (this->name, GF_LOG_ERROR, 0,
@@ -2140,8 +2255,9 @@ out:
 }
 
 int32_t
-glusterd_mgmt_v3_initiate_profile_phases (rpcsvc_request_t *req,
-                                          glusterd_op_t op, dict_t *dict)
+glusterd_mgmt_v3_initiate_all_phases_with_brickop_phase (rpcsvc_request_t *req,
+                                                         glusterd_op_t op,
+                                                         dict_t *dict)
 {
         int32_t                     ret              = -1;
         int32_t                     op_ret           = -1;
