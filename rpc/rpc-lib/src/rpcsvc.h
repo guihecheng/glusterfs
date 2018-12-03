@@ -610,4 +610,7 @@ rpcsvc_auth_array (rpcsvc_t *svc, char *volname, int *autharr, int arrlen);
 rpcsvc_vector_sizer
 rpcsvc_get_program_vector_sizer (rpcsvc_t *svc, uint32_t prognum,
                                  uint32_t progver, int procnum);
+
+extern int
+rpcsvc_destroy(rpcsvc_t *svc);
 #endif

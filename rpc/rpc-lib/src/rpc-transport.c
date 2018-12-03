@@ -160,6 +160,25 @@ out:
         return msg;
 }
 
+void
+rpc_transport_cleanup(rpc_transport_t *trans)
+{
+    if (!trans)
+        return;
+
+    if (trans->fini)
+        trans->fini(trans);
+
+    GF_FREE(trans->name);
+
+    if (trans->xl)
+        pthread_mutex_destroy(&trans->lock);
+
+    if (trans->dl_handle)
+        dlclose(trans->dl_handle);
+
+    GF_FREE(trans);
+}
 
 
 rpc_transport_t *
@@ -361,12 +380,7 @@ rpc_transport_load (glusterfs_ctx_t *ctx, dict_t *options, char *trans_name)
 
 fail:
         if (trans) {
-                GF_FREE (trans->name);
-
-                if (trans->dl_handle)
-                        dlclose (trans->dl_handle);
-
-                GF_FREE (trans);
+               rpc_transport_cleanup(trans);
         }
 
         GF_FREE (name);
