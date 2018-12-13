@@ -1198,8 +1198,8 @@ exit 0
      %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/debug/trace.so
 %if ( ! ( 0%{?rhel} && 0%{?rhel} < 6 ) )
 # RHEL-5 based distributions have a too old openssl
-%dir %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/encryption
-     %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/encryption/crypt.so
+%exclude %dir %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/encryption
+%exclude      %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/encryption/crypt.so
 %endif
 %dir %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features
      %{_libdir}/glusterfs/%{version}%{?prereltag}/xlator/features/access-control.so
