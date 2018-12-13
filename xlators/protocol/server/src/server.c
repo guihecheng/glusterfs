@@ -1932,7 +1932,7 @@ struct volume_options options[] = {
           .type  = GF_OPTION_TYPE_INT,
           .min   = 1,
           .max   = 1024,
-          .default_value = "1",
+          .default_value = "2",
           .description = "Specifies the number of event threads to execute "
                          "in parallel. Larger values would help process"
                          " responses faster, depending on available processing"
