@@ -282,6 +282,7 @@ Summary:          GlusterFS api library
 Group:            System Environment/Daemons
 Requires:         %{name}%{?_isa} = %{version}-%{release}
 Requires:         %{name}-client-xlators%{?_isa} = %{version}-%{release}
+Requires:         %{name}-libs%{?_isa} = %{version}-%{release}
 
 %description api
 GlusterFS is a distributed file-system capable of scaling to several
@@ -300,6 +301,7 @@ Group:            Development/Libraries
 Requires:         %{name}%{?_isa} = %{version}-%{release}
 Requires:         %{name}-devel%{?_isa} = %{version}-%{release}
 Requires:         libacl-devel
+Requires:         %{name}-api%{?_isa} = %{version}-%{release}
 
 %description api-devel
 GlusterFS is a distributed file-system capable of scaling to several
@@ -336,6 +338,8 @@ Requires:         %{name}%{?_isa} = %{version}-%{release}
 %if ( 0%{!?_without_extra_xlators:1} )
 Requires:         %{name}-extra-xlators = %{version}-%{release}
 %endif
+Requires:         %{name}-libs%{?_isa} = %{version}-%{release}
+Requires:         %{name}-server%{?_isa} = %{version}-%{release}
 
 %description devel
 GlusterFS is a distributed file-system capable of scaling to several
@@ -385,6 +389,7 @@ Requires:         %{name}-client-xlators%{?_isa} = %{version}-%{release}
 
 Obsoletes:        %{name}-client < %{version}-%{release}
 Provides:         %{name}-client = %{version}-%{release}
+Requires:         %{name}-libs%{?_isa} = %{version}-%{release}
 
 %description fuse
 GlusterFS is a distributed file-system capable of scaling to several
@@ -454,6 +459,7 @@ BuildRequires:    python-ctypes
 Requires:         python2-gluster = %{version}-%{release}
 Requires:         rsync
 Requires:         util-linux
+Requires:         %{name}-libs%{?_isa} = %{version}-%{release}
 
 %description geo-replication
 GlusterFS is a distributed file-system capable of scaling to several
@@ -526,6 +532,7 @@ BuildRequires:    libibverbs-devel
 BuildRequires:    librdmacm-devel >= 1.0.15
 %endif
 Requires:         %{name}%{?_isa} = %{version}-%{release}
+Requires:         %{name}-libs%{?_isa} = %{version}-%{release}
 
 %description rdma
 GlusterFS is a distributed file-system capable of scaling to several
@@ -656,6 +663,7 @@ This package provides the glusterfs server daemon.
 %package client-xlators
 Summary:          GlusterFS client-side translators
 Group:            Applications/File
+Requires:         %{name}-libs%{?_isa} = %{version}-%{release}
 
 %description client-xlators
 GlusterFS is a distributed file-system capable of scaling to several
