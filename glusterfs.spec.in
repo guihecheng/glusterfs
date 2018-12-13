@@ -1168,7 +1168,7 @@ exit 0
 %exclude %{_tmpfilesdir}/gluster.conf
 %endif
 %if ( 0%{?_with_firewalld:1} )
-%exclude /usr/lib/firewalld/services/glusterfs.xml
+%exclude %{_prefix}/lib/firewalld/services/glusterfs.xml
 %endif
 %endif
 %doc ChangeLog COPYING-GPLV2 COPYING-LGPLV3 INSTALL README.md THANKS
