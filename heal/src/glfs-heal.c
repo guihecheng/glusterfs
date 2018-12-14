@@ -40,6 +40,9 @@ xmlDocPtr        glfsh_doc = NULL;
                         ret = 0;                                \
         } while (0)                                             \
 
+#define MODE_XML (1 << 0)
+#define MODE_NO_LOG (1 << 1)
+
 typedef struct num_entries {
         uint64_t num_entries;
         uint64_t pending_entries;
@@ -1434,6 +1437,28 @@ out:
         return ret;
 }
 
+static void
+parse_flags(int *argc, char **argv, int *flags)
+{
+        int i = 0;
+        char *opt = NULL;
+        int count = 0;
+
+        for (i = 0; i < *argc; i++) {
+                opt = strtail(argv[i], "--");
+                if (!opt)
+                        continue;
+                if (strcmp(opt, "nolog") == 0) {
+                        *flags |= MODE_NO_LOG;
+                        count++;
+                } else if (strcmp(opt, "xml") == 0) {
+                        *flags |= MODE_XML;
+                        count++;
+                }
+        }
+        *argc = *argc - count;
+}
+
 int
 glfsh_heal_from_bigger_file_or_mtime (glfs_t *fs, xlator_t *top_subvol,
                                       loc_t *rootloc, char *file,
@@ -1518,6 +1543,8 @@ main (int argc, char **argv)
         char      *file = NULL;
         char      *op_errstr = NULL;
         gf_xl_afr_op_t heal_op = -1;
+        gf_loglevel_t log_level = GF_LOG_INFO;
+        int flags = 0;
 
         if (argc < 2) {
                 printf (USAGE_STR, argv[0]);
@@ -1526,6 +1553,13 @@ main (int argc, char **argv)
         }
 
         volname = argv[1];
+
+        parse_flags(&argc, argv, &flags);
+        if (flags & MODE_NO_LOG)
+                log_level = GF_LOG_NONE;
+        if (flags & MODE_XML)
+                is_xml = 1;
+
         switch (argc) {
         case 2:
                 heal_op = GF_SHD_OP_INDEX_SUMMARY;
@@ -1533,9 +1567,6 @@ main (int argc, char **argv)
         case 3:
                 if (!strcmp (argv[2], "split-brain-info")) {
                         heal_op = GF_SHD_OP_SPLIT_BRAIN_FILES;
-                } else if (!strcmp (argv[2], "xml")) {
-                        heal_op = GF_SHD_OP_INDEX_SUMMARY;
-                        is_xml = 1;
                 } else if (!strcmp (argv[2], "granular-entry-heal-op")) {
                         heal_op = GF_SHD_OP_GRANULAR_ENTRY_HEAL_ENABLE;
 		} else if (!strcmp (argv[2], "info-summary")) {
@@ -1547,15 +1578,7 @@ main (int argc, char **argv)
                 }
                 break;
         case 4:
-                if ((!strcmp (argv[2], "split-brain-info"))
-                                && (!strcmp (argv[3], "xml"))) {
-                        heal_op = GF_SHD_OP_SPLIT_BRAIN_FILES;
-                        is_xml = 1;
-                } else if ((!strcmp (argv[2], "info-summary"))
-                                && (!strcmp (argv[3], "xml"))) {
-                        heal_op = GF_SHD_OP_HEAL_SUMMARY;
-                        is_xml = 1;
-                } else if (!strcmp (argv[2], "bigger-file")) {
+                if (!strcmp (argv[2], "bigger-file")) {
                         heal_op = GF_SHD_OP_SBRAIN_HEAL_FROM_BIGGER_FILE;
                         file = argv[3];
                 } else if (!strcmp (argv[2], "latest-mtime")) {
@@ -1592,7 +1615,15 @@ main (int argc, char **argv)
         glfsh_output = &glfsh_human_readable;
         if (is_xml) {
 #if (HAVE_LIB_XML)
-                glfsh_output = &glfsh_xml_output;
+                if ((heal_op == GF_SHD_OP_INDEX_SUMMARY) ||
+                    (heal_op == GF_SHD_OP_SPLIT_BRAIN_FILES) ||
+                    (heal_op == GF_SHD_OP_HEAL_SUMMARY)) {
+                        glfsh_output = &glfsh_xml_output;
+                } else {
+                        printf(USAGE_STR, argv[0]);
+                        ret = -1;
+                        goto out;
+                }
 #else
                 /*No point doing anything, just fail the command*/
                 exit (EXIT_FAILURE);
@@ -1636,7 +1667,7 @@ main (int argc, char **argv)
         }
         snprintf (logfilepath, sizeof (logfilepath),
                   DEFAULT_HEAL_LOG_FILE_DIRECTORY"/glfsheal-%s.log", volname);
-        ret = glfs_set_logging(fs, logfilepath, GF_LOG_INFO);
+        ret = glfs_set_logging(fs, logfilepath, log_level);
         if (ret < 0) {
                 ret = -errno;
                 gf_asprintf (&op_errstr, "Failed to set the log file path, "
