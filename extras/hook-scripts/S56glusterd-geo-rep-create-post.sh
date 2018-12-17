@@ -90,5 +90,6 @@ if [ -f $pub_file ]; then
         ssh -p ${SSH_PORT} $slave_ip "mv $pub_file_tmp ${pub_file_dname}/${mastervol}_${slavevol}_${pub_file_bname}"
         ssh -p ${SSH_PORT} $slave_ip "gluster system:: copy file /geo-replication/${mastervol}_${slavevol}_common_secret.pem.pub > /dev/null"
         ssh -p ${SSH_PORT} $slave_ip "gluster system:: execute add_secret_pub root geo-replication/${mastervol}_${slavevol}_common_secret.pem.pub > /dev/null"
+        ssh -p ${SSH_PORT} $slave_ip "gluster vol set ${slavevol} features.read-only on"
     fi
 fi

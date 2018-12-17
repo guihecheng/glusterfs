@@ -62,6 +62,9 @@ TEST $GEOREP_CLI $master $slave config use_meta_volume true
 #Config tarssh as sync-engine
 TEST $GEOREP_CLI $master $slave config use_tarssh true
 
+#Verify "features.read-only" Option
+EXPECT_WITHIN $GEO_REP_TIMEOUT 0 check_slave_read_only $GSV0
+
 #Start_georep
 TEST $GEOREP_CLI $master $slave start
 

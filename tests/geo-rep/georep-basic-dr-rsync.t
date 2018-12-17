@@ -57,6 +57,9 @@ EXPECT 4 check_status_num_rows "Created"             #15
 #Enable_metavolume
 TEST $GEOREP_CLI $master $slave config use_meta_volume true
 
+#Verify "features.read-only" Option
+EXPECT_WITHIN $GEO_REP_TIMEOUT 0 check_slave_read_only $GSV0
+
 #Start_georep
 TEST $GEOREP_CLI $master $slave start
 
