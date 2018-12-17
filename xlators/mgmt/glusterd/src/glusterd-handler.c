@@ -3113,10 +3113,10 @@ __glusterd_handle_cli_profile_volume (rpcsvc_request_t *req)
                 goto out;
         }
 
-        if (conf->op_version < GD_OP_VERSION_6_0) {
+        if (conf->op_version < GD_OP_VERSION_3_13_5) {
                 gf_msg_debug(this->name, 0, "The cluster is operating at "
                              "version less than %d. Falling back to op-sm "
-                             "framework.", GD_OP_VERSION_6_0);
+                             "framework.", GD_OP_VERSION_3_13_5);
                 ret = glusterd_op_begin(req, cli_op, dict, err_str, sizeof(err_str));
                 glusterd_friend_sm();
                 glusterd_op_sm();

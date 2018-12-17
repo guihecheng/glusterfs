@@ -43,7 +43,7 @@
  */
 #define GD_OP_VERSION_MIN  1 /* MIN is the fresh start op-version, mostly
                                 should not change */
-#define GD_OP_VERSION_MAX  GD_OP_VERSION_3_13_4 /* MAX VERSION is the maximum
+#define GD_OP_VERSION_MAX  GD_OP_VERSION_3_13_5 /* MAX VERSION is the maximum
                                                   count in VME table, should
                                                   keep changing with
                                                   introduction of newer
@@ -111,12 +111,11 @@
 
 #define GD_OP_VERSION_3_13_3   31303 /* Op-version for GlusterFS 3.13.3 */
 
-#define GD_OP_VERSION_6_0      60000 /* Op-version for GlusterFS 6.0 */
-
 /* Downstream only change */
 #define GD_OP_VERSION_3_11_2   31102 /* Op-version for RHGS 3.3.1-async */
 #define GD_OP_VERSION_3_13_3   31303 /* Op-version for RHGS-3.4-Batch Update-1*/
 #define GD_OP_VERSION_3_13_4   31304 /* Op-version for RHGS-3.4-Batch Update-2*/
+#define GD_OP_VERSION_3_13_5   31305 /* Op-version for RHGS-3.4-Batch Update-3*/
 
 #include "xlator.h"
 
