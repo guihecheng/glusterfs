@@ -711,6 +711,7 @@ mem_pool_new_fn (glusterfs_ctx_t *ctx, unsigned long sizeof_type,
         new->count = count;
         new->name = name;
         new->pool = pool;
+        GF_ATOMIC_INIT (new->active, 0);
         INIT_LIST_HEAD (&new->owner);
 
         LOCK (&ctx->lock);
@@ -864,6 +865,8 @@ mem_get (struct mem_pool *mem_pool)
         retval->pool_list = pool_list;
         retval->power_of_two = mem_pool->pool->power_of_two;
 
+        GF_ATOMIC_INC (mem_pool->active);
+
         return retval + 1;
 #endif /* GF_DISABLE_MEMPOOL */
 }
@@ -894,6 +897,7 @@ mem_put (void *ptr)
         pt_pool = &pool_list->pools[hdr->power_of_two-POOL_SMALLEST];
 
         hdr->magic = GF_MEM_INVALID_MAGIC;
+        GF_ATOMIC_DEC (hdr->pool->active);
 
         (void) pthread_spin_lock (&pool_list->lock);
         if (!pool_list->poison) {
