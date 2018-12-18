@@ -14,15 +14,6 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-#define GF_MEM_POOL_LIST_BOUNDARY        (sizeof(struct list_head))
-#define GF_MEM_POOL_PTR                  (sizeof(struct mem_pool*))
-#define GF_MEM_POOL_PAD_BOUNDARY         (GF_MEM_POOL_LIST_BOUNDARY  + GF_MEM_POOL_PTR + sizeof(int))
-#define mem_pool_chunkhead2ptr(head)     ((head) + GF_MEM_POOL_PAD_BOUNDARY)
-#define mem_pool_ptr2chunkhead(ptr)      ((ptr) - GF_MEM_POOL_PAD_BOUNDARY)
-#define is_mem_chunk_in_use(ptr)         (*ptr == 1)
-#define mem_pool_from_ptr(ptr)           ((ptr) + GF_MEM_POOL_LIST_BOUNDARY)
-
-#define GLUSTERFS_ENV_MEM_ACCT_STR  "GLUSTERFS_DISABLE_MEM_ACCT"
 
 #include "unittest/unittest.h"
 #include "libglusterfs-messages.h"
@@ -380,7 +371,7 @@ static pthread_mutex_t          pool_lock       = PTHREAD_MUTEX_INITIALIZER;
 static struct list_head         pool_threads;
 static pthread_mutex_t          pool_free_lock  = PTHREAD_MUTEX_INITIALIZER;
 static struct list_head         pool_free_threads;
-static struct mem_pool          pools[NPOOLS];
+static struct mem_pool_shared   pools[NPOOLS];
 static size_t                   pool_list_size;
 
 #if !defined(GF_DISABLE_MEMPOOL)
@@ -689,6 +680,8 @@ mem_pool_new_fn (unsigned long sizeof_type,
                  unsigned long count, char *name)
 {
         unsigned int            i;
+        struct mem_pool         *new = NULL;
+        struct mem_pool_shared  *pool = NULL;
 
         if (!sizeof_type) {
                 gf_msg_callingfn ("mem-pool", GF_LOG_ERROR, EINVAL,
@@ -698,13 +691,27 @@ mem_pool_new_fn (unsigned long sizeof_type,
 
         for (i = 0; i < NPOOLS; ++i) {
                 if (sizeof_type <= AVAILABLE_SIZE(pools[i].power_of_two)) {
-                        return &pools[i];
+                        pool = &pools[i];
+                        break;
                 }
         }
 
-        gf_msg_callingfn ("mem-pool", GF_LOG_ERROR, EINVAL,
-                          LG_MSG_INVALID_ARG, "invalid argument");
-        return NULL;
+        if (!pool) {
+                gf_msg_callingfn ("mem-pool", GF_LOG_ERROR, EINVAL,
+                                  LG_MSG_INVALID_ARG, "invalid argument");
+                return NULL;
+        }
+
+        new = GF_CALLOC (sizeof (struct mem_pool), 1, gf_common_mt_mem_pool);
+        if (!new)
+                return NULL;
+
+        new->sizeof_type = sizeof_type;
+        new->count = count;
+        new->name = name;
+        new->pool = pool;
+
+        return new;
 }
 
 void*
@@ -721,7 +728,7 @@ mem_get0 (struct mem_pool *mem_pool)
         ptr = mem_get(mem_pool);
 
         if (ptr) {
-                memset (ptr, 0, AVAILABLE_SIZE(mem_pool->power_of_two));
+                memset (ptr, 0, AVAILABLE_SIZE(mem_pool->pool->power_of_two));
         }
 
         return ptr;
@@ -784,7 +791,7 @@ mem_get_from_pool (struct mem_pool *mem_pool)
                 return NULL;
         }
 
-        pt_pool = &pool_list->pools[mem_pool->power_of_two-POOL_SMALLEST];
+        pt_pool = &pool_list->pools[mem_pool->pool->power_of_two-POOL_SMALLEST];
 
         (void) pthread_spin_lock (&pool_list->lock);
 
@@ -802,7 +809,7 @@ mem_get_from_pool (struct mem_pool *mem_pool)
                 } else {
                         (void) pthread_spin_unlock (&pool_list->lock);
                         GF_ATOMIC_INC (pt_pool->parent->allocs_stdc);
-                        retval = malloc (1 << mem_pool->power_of_two);
+                        retval = malloc (1 << mem_pool->pool->power_of_two);
                 }
         }
 
@@ -810,7 +817,7 @@ mem_get_from_pool (struct mem_pool *mem_pool)
                 retval->magic = GF_MEM_HEADER_MAGIC;
                 retval->next = NULL;
                 retval->pool_list = pool_list;
-                retval->power_of_two = mem_pool->power_of_two;
+                retval->power_of_two = mem_pool->pool->power_of_two;
         }
 
         return retval;
@@ -821,9 +828,10 @@ void *
 mem_get (struct mem_pool *mem_pool)
 {
 #if defined(GF_DISABLE_MEMPOOL)
-        return GF_CALLOC (1, AVAILABLE_SIZE (mem_pool->power_of_two),
+        return GF_CALLOC (1, AVAILABLE_SIZE (mem_pool->pool->power_of_two),
                           gf_common_mt_mem_pool);
 #else
+        per_thread_pool_list_t  *pool_list;
         pooled_obj_hdr_t        *retval;
 
         if (!mem_pool) {
@@ -832,10 +840,21 @@ mem_get (struct mem_pool *mem_pool)
                 return NULL;
         }
 
+        pool_list = mem_get_pool_list ();
+        if (!pool_list || pool_list->poison) {
+                return NULL;
+        }
+
         retval = mem_get_from_pool (mem_pool);
+
         if (!retval) {
                 return NULL;
         }
+
+        retval->magic = GF_MEM_HEADER_MAGIC;
+        retval->pool = mem_pool;
+        retval->pool_list = pool_list;
+        retval->power_of_two = mem_pool->pool->power_of_two;
 
         return retval + 1;
 #endif /* GF_DISABLE_MEMPOOL */
@@ -886,14 +905,12 @@ mem_put (void *ptr)
 void
 mem_pool_destroy (struct mem_pool *pool)
 {
-        if (!pool)
-                return;
+        GF_FREE (pool);
 
         /*
-         * Pools are now permanent, so this does nothing.  Yes, this means we
-         * can keep allocating from a pool after calling mem_destroy on it, but
-         * that's kind of OK.  All of the objects *in* the pool will eventually
-         * be freed via the pool-sweeper thread, and this way we don't have to
-         * add a lot of reference-counting complexity.
+         * Pools are now permanent, so the mem_pool->pool is kept around. All
+         * of the objects *in* the pool will eventually be freed via the
+         * pool-sweeper thread, and this way we don't have to add a lot of
+         * reference-counting complexity.
          */
 }
