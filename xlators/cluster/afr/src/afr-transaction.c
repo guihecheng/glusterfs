@@ -160,7 +160,7 @@ afr_changelog_has_quorum (afr_local_t *local, xlator_t *this)
                 }
         }
 
-        if (afr_has_quorum (success_children, this)) {
+        if (afr_has_quorum (success_children, this, NULL)) {
                 return _gf_true;
         }
 
@@ -690,7 +690,7 @@ afr_handle_symmetric_errors (call_frame_t *frame, xlator_t *this)
 }
 
 gf_boolean_t
-afr_has_quorum (unsigned char *subvols, xlator_t *this)
+afr_has_quorum (unsigned char *subvols, xlator_t *this, call_frame_t *frame)
 {
         unsigned int  quorum_count = 0;
         afr_private_t *priv  = NULL;
@@ -698,6 +698,9 @@ afr_has_quorum (unsigned char *subvols, xlator_t *this)
 
         priv = this->private;
         up_children_count = AFR_COUNT (subvols, priv->child_count);
+
+        if (afr_lookup_has_quorum (frame, this, subvols))
+                return _gf_true;
 
         if (priv->quorum_count == AFR_QUORUM_AUTO) {
                 /*
@@ -753,7 +756,7 @@ afr_has_fop_quorum (call_frame_t *frame)
 
         locked_nodes = afr_locked_nodes_get (local->transaction.type,
                                              &local->internal_lock);
-        return afr_has_quorum (locked_nodes, this);
+        return afr_has_quorum (locked_nodes, this, NULL);
 }
 
 static gf_boolean_t
@@ -771,7 +774,7 @@ afr_has_fop_cbk_quorum (call_frame_t *frame)
                                 success[i] = 1;
         }
 
-        return afr_has_quorum (success, this);
+        return afr_has_quorum (success, this, NULL);
 }
 
 gf_boolean_t

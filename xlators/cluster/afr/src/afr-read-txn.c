@@ -193,7 +193,8 @@ afr_read_txn (call_frame_t *frame, xlator_t *this, inode_t *inode,
 	local->inode = inode_ref (inode);
         local->is_read_txn = _gf_true;
 
-        if (priv->quorum_count && !afr_has_quorum (local->child_up, this)) {
+        if (priv->quorum_count &&
+            !afr_has_quorum (local->child_up, this, NULL)) {
                 local->op_ret = -1;
                 local->op_errno = ENOTCONN;
                 read_subvol = -1;

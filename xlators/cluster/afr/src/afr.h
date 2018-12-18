@@ -1227,4 +1227,8 @@ afr_is_symmetric_error (call_frame_t *frame, xlator_t *this);
 
 gf_boolean_t
 afr_is_pending_set (xlator_t *this, dict_t *xdata, int type);
+
+gf_boolean_t
+afr_lookup_has_quorum (call_frame_t *frame, xlator_t *this,
+                       unsigned char *subvols);
 #endif /* __AFR_H__ */
