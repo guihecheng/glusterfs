@@ -825,6 +825,7 @@ mem_get_from_pool (struct mem_pool *mem_pool)
         if (retval) {
                 retval->magic = GF_MEM_HEADER_MAGIC;
                 retval->next = NULL;
+                retval->pool = mem_pool;
                 retval->pool_list = pool_list;
                 retval->power_of_two = mem_pool->pool->power_of_two;
         }
@@ -859,11 +860,6 @@ mem_get (struct mem_pool *mem_pool)
         if (!retval) {
                 return NULL;
         }
-
-        retval->magic = GF_MEM_HEADER_MAGIC;
-        retval->pool = mem_pool;
-        retval->pool_list = pool_list;
-        retval->power_of_two = mem_pool->pool->power_of_two;
 
         GF_ATOMIC_INC (mem_pool->active);
 
