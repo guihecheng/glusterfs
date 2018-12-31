@@ -880,8 +880,12 @@ __dht_check_free_space (xlator_t *this, xlator_t *to, xlator_t *from, loc_t *loc
         dict_t         *xdata      = NULL;
         dht_layout_t   *layout     = NULL;
         uint64_t        src_statfs_blocks = 1;
+        uint64_t        src_total_blocks = 0;
         uint64_t        dst_statfs_blocks = 1;
-        double          post_availspacepercent = 0;
+        uint64_t        dst_total_blocks = 0;
+        uint64_t        file_blocks = 0;
+        double          dst_post_availspacepercent = 0;
+        double          src_post_availspacepercent = 0;
 
         xdata = dict_new ();
         if (!xdata) {
@@ -926,8 +930,24 @@ __dht_check_free_space (xlator_t *this, xlator_t *to, xlator_t *from, loc_t *loc
         }
 
         gf_msg_debug (this->name, 0, "min_free_disk - %f , block available - %lu ,"
-                      " block size - %lu ", conf->min_free_disk, dst_statfs.f_bavail,
-                      dst_statfs.f_bsize);
+                      " block size - %lu ", conf->min_free_disk,
+                      dst_statfs.f_bavail, dst_statfs.f_frsize);
+
+        dst_statfs_blocks = ((dst_statfs.f_bavail *
+                             dst_statfs.f_frsize) /
+                             GF_DISK_SECTOR_SIZE);
+
+        src_statfs_blocks = ((src_statfs.f_bavail *
+                             src_statfs.f_frsize) /
+                             GF_DISK_SECTOR_SIZE);
+
+        dst_total_blocks = ((dst_statfs.f_blocks *
+                            dst_statfs.f_frsize) /
+                            GF_DISK_SECTOR_SIZE);
+
+        src_total_blocks = ((src_statfs.f_blocks *
+                            src_statfs.f_frsize) /
+                            GF_DISK_SECTOR_SIZE);
 
         /* if force option is given, do not check for space @ dst.
          * Check only if space is avail for the file */
@@ -940,17 +960,22 @@ __dht_check_free_space (xlator_t *this, xlator_t *to, xlator_t *from, loc_t *loc
            subvol gains certain 'blocks' of free space. A valid check is
            necessary here to avoid errorneous move to destination where
            the space could be scantily available.
+           With heterogenous brick support, an actual space comparison could
+           prevent any files being migrated to newly added bricks if they are
+           smaller then the free space available on the existing bricks.
          */
         if (stbuf) {
-                dst_statfs_blocks = ((dst_statfs.f_bavail *
-                                      dst_statfs.f_bsize) /
-                                     GF_DISK_SECTOR_SIZE);
-                src_statfs_blocks = ((src_statfs.f_bavail *
-                                      src_statfs.f_bsize) /
-                                     GF_DISK_SECTOR_SIZE);
-                if ((dst_statfs_blocks) <
-                    (src_statfs_blocks + stbuf->ia_blocks)) {
+                file_blocks = stbuf->ia_size + GF_DISK_SECTOR_SIZE - 1;
+                file_blocks /= GF_DISK_SECTOR_SIZE;
 
+                src_post_availspacepercent =
+                        (((src_statfs_blocks + file_blocks) * 100) /
+                         src_total_blocks);
+
+                dst_post_availspacepercent = ((dst_statfs_blocks * 100) /
+                                              dst_total_blocks);
+
+                if (dst_post_availspacepercent < src_post_availspacepercent) {
                         gf_msg (this->name, GF_LOG_WARNING, 0,
                                DHT_MSG_MIGRATE_FILE_FAILED,
                                "data movement of file "
@@ -969,16 +994,18 @@ __dht_check_free_space (xlator_t *this, xlator_t *to, xlator_t *from, loc_t *loc
                 }
         }
 
-
 check_avail_space:
 
         if (conf->disk_unit == 'p' && dst_statfs.f_blocks) {
-                post_availspacepercent = (dst_statfs.f_bavail * 100) / dst_statfs.f_blocks;
+                dst_post_availspacepercent =
+                                     (dst_statfs_blocks) / dst_total_blocks;
+
                 gf_msg_debug (this->name, 0, "file : %s, post_availspacepercent : %lf "
                               "f_bavail : %lu min-free-disk: %lf", loc->path,
-                              post_availspacepercent, dst_statfs.f_bavail, conf->min_free_disk);
+                              dst_post_availspacepercent, dst_statfs.f_bavail,
+                              conf->min_free_disk);
 
-                if (post_availspacepercent < conf->min_free_disk) {
+                if (dst_post_availspacepercent < conf->min_free_disk) {
                         gf_msg (this->name, GF_LOG_WARNING, 0, 0,
                                 "Write will cross min-free-disk for "
                                 "file - %s on subvol - %s. Looking "
