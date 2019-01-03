@@ -998,7 +998,7 @@ check_avail_space:
 
         if (conf->disk_unit == 'p' && dst_statfs.f_blocks) {
                 dst_post_availspacepercent =
-                                     (dst_statfs_blocks) / dst_total_blocks;
+                                     (dst_statfs_blocks * 100) / dst_total_blocks;
 
                 gf_msg_debug (this->name, 0, "file : %s, post_availspacepercent : %lf "
                               "f_bavail : %lu min-free-disk: %lf", loc->path,
