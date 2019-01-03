@@ -1349,7 +1349,8 @@ gd_mgmt_v3_brick_op_cbk_fn (struct rpc_req *req, struct iovec *iov,
         gf_uuid_copy (args->uuid, rsp.uuid);
         pthread_mutex_lock (&args->lock_dict);
         {
-                if (rsp.op == GD_OP_DEFRAG_BRICK_VOLUME)
+                if (rsp.op == GD_OP_DEFRAG_BRICK_VOLUME ||
+                    rsp.op == GD_OP_PROFILE_VOLUME)
                         ret = glusterd_syncop_aggr_rsp_dict (rsp.op, args->dict,
                                                              rsp_dict);
         }
