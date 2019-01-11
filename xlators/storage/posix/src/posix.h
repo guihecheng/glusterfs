@@ -305,7 +305,7 @@ int posix_handle_pair (xlator_t *this, const char *real_path, char *key,
                        data_t *value, int flags, struct iatt *stbuf);
 int posix_fhandle_pair (xlator_t *this, int fd, char *key, data_t *value,
                         int flags, struct iatt *stbuf);
-void posix_spawn_janitor_thread (xlator_t *this);
+int posix_spawn_janitor_thread (xlator_t *this);
 int posix_acl_xattr_set (xlator_t *this, const char *path, dict_t *xattr_req);
 int posix_gfid_heal (xlator_t *this, const char *path, loc_t *loc, dict_t *xattr_req);
 int posix_entry_create_xattr_set (xlator_t *this, const char *path,
@@ -320,9 +320,9 @@ gf_boolean_t posix_special_xattr (char **pattern, char *key);
 void
 __posix_fd_set_odirect (fd_t *fd, struct posix_fd *pfd, int opflags,
 			off_t offset, size_t size);
-void posix_spawn_health_check_thread (xlator_t *this);
+int posix_spawn_health_check_thread (xlator_t *this);
 
-void posix_spawn_disk_space_check_thread (xlator_t *this);
+int posix_spawn_disk_space_check_thread (xlator_t *this);
 
 void *posix_fsyncer (void *);
 int
