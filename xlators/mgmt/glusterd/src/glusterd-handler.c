@@ -1808,6 +1808,8 @@ out:
         glusterd_to_cli (req, &rsp, NULL, 0, NULL,
                          (xdrproc_t)xdr_gf_cli_rsp, dict);
 
+        GF_FREE(rsp.dict.dict_val);
+
         return 0;
 }
 int
@@ -1871,6 +1873,7 @@ out:
         if (dict)
                 dict_unref (dict);
 
+        GF_FREE(rsp.dict.dict_val);
         glusterd_friend_sm ();
         glusterd_op_sm ();
 
@@ -4991,6 +4994,7 @@ out:
 
         glusterd_submit_reply (req, &rsp, NULL, 0, NULL,
                                (xdrproc_t)xdr_gf_cli_rsp);
+        GF_FREE(rsp.dict.dict_val);
         return ret;
 }
 
@@ -5221,7 +5225,7 @@ glusterd_print_snapinfo_by_vol (FILE *fp, glusterd_volinfo_t *volinfo, int volco
                 fprintf (fp, "Volume%d.snapshot%d.name: %s\n",
                          volcount, snapcount, snapinfo->snapname);
                 fprintf (fp, "Volume%d.snapshot%d.id: %s\n", volcount, snapcount,
-                         gf_strdup (uuid_utoa (snapinfo->snap_id)));
+                         uuid_utoa (snapinfo->snap_id));
                 fprintf (fp, "Volume%d.snapshot%d.time: %s\n",
                          volcount, snapcount, timestr);
 
@@ -5494,6 +5498,7 @@ glusterd_get_state (rpcsvc_request_t *req, dict_t *dict)
                                 GD_MSG_DICT_GET_FAILED, "%s", err_str);
                 }
 
+                GF_FREE (odir);
                 ret = -1;
                 goto out;
         }
@@ -5528,7 +5533,7 @@ glusterd_get_state (rpcsvc_request_t *req, dict_t *dict)
         GF_FREE (odir);
         GF_FREE (filename);
 
-        ret = dict_set_str (dict, "ofilepath", ofilepath);
+        ret = dict_set_dynstr (dict, "ofilepath", ofilepath);
         if (ret) {
                 gf_msg (this->name, GF_LOG_ERROR, 0,
                         GD_MSG_DICT_SET_FAILED, "Unable to set output path");
@@ -5568,6 +5573,7 @@ glusterd_get_state (rpcsvc_request_t *req, dict_t *dict)
                                         GD_MSG_VOL_OPTS_IMPORT_FAIL, "Failed to "
                                         "fetch the value of all volume options "
                                         "for volume %s", volinfo->volname);
+                                dict_unref (vol_all_opts);
                                 continue;
                         }
 
@@ -5942,7 +5948,7 @@ out:
                                            &rsp.dict.dict_len);
         glusterd_to_cli (req, &rsp, NULL, 0, NULL,
                          (xdrproc_t)xdr_gf_cli_rsp, dict);
-
+        GF_FREE(rsp.dict.dict_val);
         return ret;
 }
 
@@ -5986,6 +5992,7 @@ __glusterd_handle_get_state (rpcsvc_request_t *req)
                                 "unserialize req-buffer to dictionary");
                         snprintf (err_str, sizeof (err_str), "Unable to decode"
                                   " the command");
+                        free (cli_req.dict.dict_val);
                         goto out;
                 } else {
                         dict->extra_stdfree = cli_req.dict.dict_val;

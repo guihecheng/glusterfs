@@ -13125,6 +13125,7 @@ glusterd_get_default_val_for_volopt (dict_t *ctx, gf_boolean_t all_opts,
         char                    *def_val = NULL;
         char                     dict_key[50] = {0,};
         gf_boolean_t             key_found = _gf_false;
+        gf_boolean_t             get_value_vme = _gf_false;
         glusterd_conf_t         *priv = NULL;
         dict_t                  *vol_dict = NULL;
 
@@ -13149,6 +13150,7 @@ glusterd_get_default_val_for_volopt (dict_t *ctx, gf_boolean_t all_opts,
                 if (!all_opts && strcmp (vme->key, input_key))
                         continue;
                 key_found = _gf_true;
+                get_value_vme = _gf_false;
                 /* First look for the key in the priv->opts for global option
                  * and then into vol_dict, if its not present then look for
                  * translator default value */
@@ -13164,6 +13166,7 @@ glusterd_get_default_val_for_volopt (dict_t *ctx, gf_boolean_t all_opts,
                                 } else {
                                         ret = glusterd_get_value_for_vme_entry
                                                  (vme, &def_val);
+                                        get_value_vme = _gf_true;
                                         if (!all_opts && ret)
                                                 goto out;
                                         else if (ret == -2)
@@ -13179,6 +13182,8 @@ glusterd_get_default_val_for_volopt (dict_t *ctx, gf_boolean_t all_opts,
                                 GD_MSG_DICT_SET_FAILED,
                                 "Failed to "
                                 "set %s in dictionary", vme->key);
+                        if (get_value_vme)
+                                GF_FREE (def_val);
                         goto out;
                 }
                 sprintf (dict_key, "value%d", count);
@@ -13189,8 +13194,14 @@ glusterd_get_default_val_for_volopt (dict_t *ctx, gf_boolean_t all_opts,
                                 "Failed to "
                                 "set %s for key %s in dictionary", def_val,
                                 vme->key);
+                        if (get_value_vme)
+                                GF_FREE (def_val);
+
                         goto out;
                 }
+                if (get_value_vme)
+                        GF_FREE (def_val);
+
                 def_val = NULL;
                 if (!all_opts)
                         break;
