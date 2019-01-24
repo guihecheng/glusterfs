@@ -217,6 +217,7 @@ struct rpc_transport {
          * layer or in client management notification handler functions
          */
         gf_boolean_t               connect_failed;
+        gf_atomic_t                disconnect_progress;
 };
 
 struct rpc_transport_ops {
