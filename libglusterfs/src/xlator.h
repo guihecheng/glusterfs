@@ -965,9 +965,6 @@ struct _xlator {
         /* flag to avoid recall of xlator_mem_cleanup for xame xlator */
         uint32_t call_cleanup;
 
-        /* Variable to save fd_count for detach brick */
-        gf_atomic_t fd_cnt;
-
         /* Variable to save xprt associated for detach brick */
         gf_atomic_t xprtrefcnt;
 
