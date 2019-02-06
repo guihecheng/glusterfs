@@ -1742,8 +1742,8 @@ cli_cmd_volume_set_parse (struct cli_state *state, const char **words,
 
                 if ((strcmp (key, "cluster.brick-multiplex") == 0)) {
                         question = "Brick-multiplexing is supported only for "
-                                   "container workloads (CNS/CRS). Also it is "
-                                   "advised to make sure that either all "
+                                   "OCS converged or independent mode. Also it"
+                                   " is advised to make sure that either all "
                                    "volumes are in stopped state or no bricks "
                                    "are running before this option is modified."
                                    "Do you still want to continue?";
