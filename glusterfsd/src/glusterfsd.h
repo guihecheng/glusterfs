@@ -100,6 +100,7 @@ enum argp_option_keys {
         ARGP_SUBDIR_MOUNT_KEY             = 178,
         ARGP_FUSE_EVENT_HISTORY_KEY       = 179,
         ARGP_READER_THREAD_COUNT_KEY      = 180,
+        ARGP_FUSE_LRU_LIMIT_KEY           = 190,
 };
 
 struct _gfd_vol_top_priv {

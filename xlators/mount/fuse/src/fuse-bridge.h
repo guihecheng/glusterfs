@@ -144,6 +144,9 @@ struct fuse_private {
         gf_boolean_t         mount_finished;
         gf_boolean_t         handle_graph_switch;
         pthread_cond_t       migrate_cond;
+
+        /* LRU Limit, if not set, default is 128k for now */
+        uint32_t lru_limit;
 };
 typedef struct fuse_private fuse_private_t;
 
