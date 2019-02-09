@@ -945,4 +945,7 @@ glusterfs_compute_sha256 (const unsigned char *content, size_t size,
 char*
 get_struct_variable (int mem_num, gf_gsync_status_t *sts_val);
 
+xlator_cmdline_option_t *
+find_xlator_option_in_cmd_args_t(const char *option_name, cmd_args_t *args);
+
 #endif /* _COMMON_UTILS_H */

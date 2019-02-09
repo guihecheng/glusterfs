@@ -1975,6 +1975,7 @@ glusterd_volume_start_glusterfs (glusterd_volinfo_t  *volinfo,
         rpc_clnt_connection_t   *conn  = NULL;
         int                     pid    = -1;
         glusterd_brick_proc_t   *brick_proc = NULL;
+        char                    *inet_family = NULL;
 
         GF_ASSERT (volinfo);
         GF_ASSERT (brickinfo);
@@ -2139,6 +2140,12 @@ retry:
         else if (volinfo->transport_type == GF_TRANSPORT_BOTH_TCP_RDMA)
                 runner_argprintf (&runner,
                                   "--volfile-server-transport=socket,rdma");
+
+        ret = dict_get_str(this->options, "transport.address-family", &inet_family);
+        if (!ret) {
+                runner_add_arg(&runner, "--xlator-option");
+                runner_argprintf(&runner, "transport.address-family=%s", inet_family);
+        }
 
         if (volinfo->memory_accounting)
                 runner_add_arg (&runner, "--mem-accounting");
