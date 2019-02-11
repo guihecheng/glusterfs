@@ -58,14 +58,16 @@ event_pool_new (int count, int eventthreadcount)
 int
 event_register (struct event_pool *event_pool, int fd,
                 event_handler_t handler,
-                void *data, int poll_in, int poll_out)
+                void *data, int poll_in, int poll_out,
+                char notify_poller_death)
 {
         int ret = -1;
 
         GF_VALIDATE_OR_GOTO ("event", event_pool, out);
 
         ret = event_pool->ops->event_register (event_pool, fd, handler, data,
-                                               poll_in, poll_out);
+                                               poll_in, poll_out,
+                                               notify_poller_death);
 out:
         return ret;
 }
@@ -170,7 +172,8 @@ out:
 
 int
 poller_destroy_handler (int fd, int idx, int gen, void *data,
-                       int poll_out, int poll_in, int poll_err)
+                       int poll_out, int poll_in, int poll_err,
+                       char event_thread_exit)
 {
         struct event_destroy_data *destroy = NULL;
         int                        readfd  = -1, ret = -1;
@@ -239,7 +242,7 @@ event_dispatch_destroy (struct event_pool *event_pool)
         /* From the main thread register an event on the pipe fd[0],
          */
         idx = event_register (event_pool, fd[0], poller_destroy_handler,
-                              &data, 1, 0);
+                              &data, 1, 0, 0);
         if (idx < 0)
                 goto out;
 

@@ -32,6 +32,7 @@ struct event_slot_epoll {
 	int fd;
 	int events;
 	int gen;
+        int idx;
 	int ref;
 	int do_close;
 	int in_handler;
@@ -39,6 +40,7 @@ struct event_slot_epoll {
 	void *data;
 	event_handler_t handler;
 	gf_lock_t lock;
+        struct list_head poller_death;
 };
 
 struct event_thread_data {
@@ -60,6 +62,7 @@ __event_newtable (struct event_pool *event_pool, int table_idx)
 	for (i = 0; i < EVENT_EPOLL_SLOTS; i++) {
 		table[i].fd = -1;
 		LOCK_INIT (&table[i].lock);
+                INIT_LIST_HEAD(&table[i].poller_death);
 	}
 
 	event_pool->ereg[table_idx] = table;
@@ -70,7 +73,8 @@ __event_newtable (struct event_pool *event_pool, int table_idx)
 
 
 static int
-__event_slot_alloc (struct event_pool *event_pool, int fd)
+__event_slot_alloc (struct event_pool *event_pool, int fd,
+                    char notify_poller_death)
 {
         int  i = 0;
 	int  table_idx = -1;
@@ -105,34 +109,42 @@ __event_slot_alloc (struct event_pool *event_pool, int fd)
 
 	table_idx = i;
 
-	for (i = 0; i < EVENT_EPOLL_SLOTS; i++) {
-		if (table[i].fd == -1) {
-			/* wipe everything except bump the generation */
-			gen = table[i].gen;
-			memset (&table[i], 0, sizeof (table[i]));
-			table[i].gen = gen + 1;
+        for (i = 0; i < EVENT_EPOLL_SLOTS; i++) {
+                if (table[i].fd == -1) {
+                        /* wipe everything except bump the generation */
+                        gen = table[i].gen;
+                        memset (&table[i], 0, sizeof (table[i]));
+                        table[i].gen = gen + 1;
 
-			LOCK_INIT (&table[i].lock);
+                        LOCK_INIT (&table[i].lock);
+                        INIT_LIST_HEAD(&table[i].poller_death);
 
-			table[i].fd = fd;
-			event_pool->slots_used[table_idx]++;
+                        table[i].fd = fd;
+                        if (notify_poller_death) {
+                                table[i].idx = table_idx * EVENT_EPOLL_SLOTS + i;
+                                list_add_tail(&table[i].poller_death,
+                                                &event_pool->poller_death);
+                        }
 
-			break;
-		}
-	}
+                        event_pool->slots_used[table_idx]++;
+
+                        break;
+                }
+        }
 
 	return table_idx * EVENT_EPOLL_SLOTS + i;
 }
 
 
 static int
-event_slot_alloc (struct event_pool *event_pool, int fd)
+event_slot_alloc (struct event_pool *event_pool, int fd,
+                  char notify_poller_death)
 {
 	int  idx = -1;
 
 	pthread_mutex_lock (&event_pool->mutex);
 	{
-		idx = __event_slot_alloc (event_pool, fd);
+		idx = __event_slot_alloc (event_pool, fd, notify_poller_death);
 	}
 	pthread_mutex_unlock (&event_pool->mutex);
 
@@ -162,6 +174,7 @@ __event_slot_dealloc (struct event_pool *event_pool, int idx)
 	slot->fd = -1;
         slot->handled_error = 0;
         slot->in_handler = 0;
+        list_del_init(&slot->poller_death);
 	event_pool->slots_used[table_idx]--;
 
 	return;
@@ -180,6 +193,23 @@ event_slot_dealloc (struct event_pool *event_pool, int idx)
 	return;
 }
 
+static int
+event_slot_ref(struct event_slot_epoll *slot)
+{
+        int ref;
+
+        if (!slot)
+                return -1;
+
+	LOCK (&slot->lock);
+	{
+		slot->ref++;
+                ref = slot->ref;
+	}
+	UNLOCK (&slot->lock);
+
+        return ref;
+}
 
 static struct event_slot_epoll *
 event_slot_get (struct event_pool *event_pool, int idx)
@@ -198,15 +228,44 @@ event_slot_get (struct event_pool *event_pool, int idx)
 
 	slot = &table[offset];
 
-	LOCK (&slot->lock);
-	{
-		slot->ref++;
-	}
-	UNLOCK (&slot->lock);
-
+        event_slot_ref (slot);
 	return slot;
 }
 
+static void
+__event_slot_unref(struct event_pool *event_pool, struct event_slot_epoll *slot,
+                   int idx)
+{
+        int ref = -1;
+        int fd = -1;
+        int do_close = 0;
+
+	LOCK (&slot->lock);
+	{
+		--(slot->ref);
+                ref = slot->ref;
+	}
+	UNLOCK (&slot->lock);
+
+        if (ref)
+                /* slot still alive */
+                goto done;
+
+        LOCK(&slot->lock);
+        {
+                fd = slot->fd;
+                do_close = slot->do_close;
+                slot->do_close = 0;
+        }
+        UNLOCK(&slot->lock);
+
+        __event_slot_dealloc(event_pool, idx);
+
+        if (do_close)
+                sys_close(fd);
+done:
+        return;
+}
 
 static void
 event_slot_unref (struct event_pool *event_pool, struct event_slot_epoll *slot,
@@ -264,7 +323,7 @@ event_pool_new_epoll (int count, int eventthreadcount)
         event_pool->fd = epfd;
 
         event_pool->count = count;
-
+        INIT_LIST_HEAD(&event_pool->poller_death);
         event_pool->eventthreadcount = eventthreadcount;
         event_pool->auto_thread_count = 0;
 
@@ -315,7 +374,8 @@ __slot_update_events (struct event_slot_epoll *slot, int poll_in, int poll_out)
 int
 event_register_epoll (struct event_pool *event_pool, int fd,
                       event_handler_t handler,
-                      void *data, int poll_in, int poll_out)
+                      void *data, int poll_in, int poll_out,
+                      char notify_poller_death)
 {
         int                 idx = -1;
         int                 ret = -1;
@@ -345,7 +405,7 @@ event_register_epoll (struct event_pool *event_pool, int fd,
         if (destroy == 1)
                goto out;
 
-	idx = event_slot_alloc (event_pool, fd);
+	idx = event_slot_alloc (event_pool, fd, notify_poller_death);
 	if (idx == -1) {
 		gf_msg ("epoll", GF_LOG_ERROR, 0, LG_MSG_SLOT_NOT_FOUND,
 			"could not find slot for fd=%d", fd);
@@ -583,7 +643,7 @@ pre_unlock:
                 ret = handler (fd, idx, gen, data,
                                (event->events & (EPOLLIN|EPOLLPRI)),
                                (event->events & (EPOLLOUT)),
-                               (event->events & (EPOLLERR|EPOLLHUP)));
+                               (event->events & (EPOLLERR|EPOLLHUP)), 0);
         }
 out:
 	event_slot_unref (event_pool, slot, idx);
@@ -600,7 +660,10 @@ event_dispatch_epoll_worker (void *data)
         struct event_thread_data *ev_data = data;
 	struct event_pool  *event_pool;
         int                 myindex = -1;
-        int                 timetodie = 0;
+        int                 timetodie = 0, gen = 0;
+        struct list_head    poller_death_notify;
+        struct event_slot_epoll *slot = NULL, *tmp = NULL;
+
 
         GF_VALIDATE_OR_GOTO ("event", ev_data, out);
 
@@ -610,7 +673,7 @@ event_dispatch_epoll_worker (void *data)
         GF_VALIDATE_OR_GOTO ("event", event_pool, out);
 
         gf_msg ("epoll", GF_LOG_INFO, 0, LG_MSG_STARTED_EPOLL_THREAD, "Started"
-                " thread with index %d", myindex);
+                " thread with index %d", myindex - 1);
 
         pthread_mutex_lock (&event_pool->mutex);
         {
@@ -627,21 +690,58 @@ event_dispatch_epoll_worker (void *data)
                          * reconfigured always */
                         pthread_mutex_lock (&event_pool->mutex);
                         {
-                                if (event_pool->eventthreadcount <
-                                    myindex) {
+                                if (event_pool->eventthreadcount < myindex) {
+                                        while (event_pool->poller_death_sliced) {
+                                                pthread_cond_wait(
+                                                        &event_pool->cond,
+                                                        &event_pool->mutex);
+                                        }
+
+                                        INIT_LIST_HEAD(&poller_death_notify);
+
                                         /* if found true in critical section,
                                          * die */
                                         event_pool->pollers[myindex - 1] = 0;
                                         event_pool->activethreadcount--;
                                         timetodie = 1;
+                                        gen = ++event_pool->poller_gen;
+                                        list_for_each_entry(slot, &event_pool->poller_death,
+                                                            poller_death)
+                                        {
+                                                event_slot_ref(slot);
+                                        }
+
+                                        list_splice_init(&event_pool->poller_death,
+                                                         &poller_death_notify);
+                                        event_pool->poller_death_sliced = 1;
+
                                         pthread_cond_broadcast (&event_pool->cond);
                                 }
                         }
                         pthread_mutex_unlock (&event_pool->mutex);
                         if (timetodie) {
+                                list_for_each_entry(slot, &poller_death_notify, poller_death)
+                                {
+                                        slot->handler(slot->fd, 0, gen, slot->data, 0, 0, 0, 1);
+                                }
+
+                                pthread_mutex_lock(&event_pool->mutex);
+                                {
+                                        list_for_each_entry_safe(slot, tmp, &poller_death_notify, poller_death)
+                                        {
+                                                __event_slot_unref(event_pool, slot, slot->idx);
+                                        }
+
+                                        list_splice(&poller_death_notify,
+                                                        &event_pool->poller_death);
+                                        event_pool->poller_death_sliced = 0;
+                                        pthread_cond_broadcast(&event_pool->cond);
+                                }
+                                pthread_mutex_unlock(&event_pool->mutex);
+
                                 gf_msg ("epoll", GF_LOG_INFO, 0,
                                         LG_MSG_EXITED_EPOLL_THREAD, "Exited "
-                                        "thread with index %d", myindex);
+                                        "thread with index %d", myindex - 1);
                                 goto out;
                         }
                 }

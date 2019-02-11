@@ -109,7 +109,7 @@ cli_rl_process_line (char *line)
 
 int
 cli_rl_stdin (int fd, int idx, int gen, void *data,
-              int poll_out, int poll_in, int poll_err)
+              int poll_out, int poll_in, int poll_err, char event_thread_died)
 {
         struct cli_state *state = NULL;
 
@@ -394,7 +394,7 @@ cli_rl_enable (struct cli_state *state)
         }
 
         ret = event_register (state->ctx->event_pool, 0, cli_rl_stdin, state,
-                              1, 0);
+                              1, 0, 0);
         if (ret == -1)
                 goto out;
 

@@ -99,6 +99,7 @@ typedef enum {
         RPC_TRANSPORT_MSG_RECEIVED,         /* Complete rpc msg has been read */
         RPC_TRANSPORT_CONNECT,              /* client is connected to server */
         RPC_TRANSPORT_MSG_SENT,
+        RPC_TRANSPORT_EVENT_THREAD_DIED /* event-thread has died */
 } rpc_transport_event_t;
 
 struct rpc_transport_msg {
@@ -218,6 +219,8 @@ struct rpc_transport {
          */
         gf_boolean_t               connect_failed;
         gf_atomic_t                disconnect_progress;
+        char notify_poller_death;
+        char poller_death_accept;
 };
 
 struct rpc_transport_ops {

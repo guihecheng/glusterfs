@@ -1342,6 +1342,9 @@ init (xlator_t *this)
                 ret = -1;
                 goto out;
         }
+
+        ret = dict_set_int32(this->options, "notify-poller-death", 1);
+
         ret = rpcsvc_create_listeners (conf->rpc, this->options,
                                        this->name);
         if (ret < 1) {
