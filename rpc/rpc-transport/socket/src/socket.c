@@ -1646,7 +1646,7 @@ __socket_read_accepted_successful_reply (rpc_transport_t *this)
 
                 /* need to round off to proper roof (%4), as XDR packing pads
                    the end of opaque object with '0' */
-                size = roof (read_rsp.xdata.xdata_len, 4);
+                size = gf_roof (read_rsp.xdata.xdata_len, 4);
 
                 if (!size) {
                         frag->call_body.reply.accepted_success_state
