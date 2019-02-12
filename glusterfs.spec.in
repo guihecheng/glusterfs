@@ -84,7 +84,7 @@
 %global _build_server 0
 %endif
 
-%if ( "%{?dist}" == ".el6rhs" ) || ( "%{?dist}" == ".el7rhs" ) || ( "%{?dist}" == ".el7rhgs" )
+%if ( "%{?dist}" == ".el6rhs" ) || ( "%{?dist}" == ".el7rhs" ) || ( "%{?dist}" == ".el7rhgs" ) || ( "%{?dist}" == ".el7.centos" )
 %global _build_server 1
 %else
 %global _build_server 0
