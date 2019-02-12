@@ -1640,10 +1640,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1677,10 +1674,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1714,10 +1708,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1751,10 +1742,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1788,10 +1776,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1825,10 +1810,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1862,10 +1844,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1900,10 +1879,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1938,10 +1914,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -1976,10 +1949,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -2015,10 +1985,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -2053,10 +2020,7 @@ if [ $? -eq 0 ]; then
 fi
 ]]
 
--- Since we run pretrans scripts only for RPMs built for a server build,
--- we can now use os.tmpname() since it is available on RHEL6 and later
--- platforms which are server platforms.
-ok, how, val = os.execute("/bin/bash -c \"" .. script .. "\"")
+ok, how, val = os.execute(script)
 if not (ok == 0) then
    error("Detected running glusterfs processes", ok)
 end
@@ -2113,6 +2077,9 @@ fi
 %endif
 
 %changelog
+* Tue Feb 09 2019 Milind Changire <mchangir@redhat.com>
+- Fix lua script execution during install (#1410145)
+
 * Sat Feb 09 2019 Milind Changire <mchangir@redhat.com>
 - Avoid creation of temporary file in lua script during install (#1410145)
 
