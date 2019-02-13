@@ -2974,8 +2974,6 @@ fuse_lseek (xlator_t *this, fuse_in_header_t *finh, void *msg,
 void
 fuse_flush_resume (fuse_state_t *state)
 {
-        FUSE_FOP (state, fuse_err_cbk, GF_FOP_FLUSH,
-                  flush, state->fd, state->xdata);
         FUSE_FOP (state, fuse_flush_cbk, GF_FOP_FLUSH,
                   flush, state->fd, state->xdata);
 }
