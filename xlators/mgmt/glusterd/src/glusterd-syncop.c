@@ -1707,6 +1707,7 @@ gd_brick_op_phase (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
                    char **op_errstr)
 {
         glusterd_pending_node_t *pending_node = NULL;
+        glusterd_pending_node_t *tmp = NULL;
         struct cds_list_head    selected = {0,};
         xlator_t                *this = NULL;
         int                     brick_count = 0;
@@ -1742,7 +1743,7 @@ gd_brick_op_phase (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
         rsp_dict = NULL;
 
         brick_count = 0;
-        cds_list_for_each_entry (pending_node, &selected, list) {
+        cds_list_for_each_entry_safe (pending_node, tmp, &selected, list) {
                 rpc = glusterd_pending_node_get_rpc (pending_node);
                 if (!rpc) {
                         if (pending_node->type == GD_NODE_REBALANCE) {
@@ -1792,6 +1793,7 @@ gd_brick_op_phase (glusterd_op_t op, dict_t *op_ctx, dict_t *req_dict,
 
                 brick_count++;
                 glusterd_pending_node_put_rpc (pending_node);
+                GF_FREE(pending_node);
         }
 
         pending_node = NULL;
