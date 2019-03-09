@@ -7115,6 +7115,15 @@ notify (xlator_t *this,
         ...)
 {
         xlator_t *victim = data;
+        struct posix_private *priv = NULL;
+        struct timespec sleep_till = {0,};
+
+        if (!this)
+                return 0;
+
+        priv = this->private;
+        if (!priv)
+                return 0;
 
         switch (event)
         {
@@ -7128,6 +7137,17 @@ notify (xlator_t *this,
         {
                 if (!victim->cleanup_starting)
                         break;
+                pthread_mutex_lock (&priv->janitor_lock);
+                {
+                        while (!list_empty (&priv->janitor_fds)) {
+                                clock_gettime(CLOCK_REALTIME, &sleep_till);
+                                sleep_till.tv_sec += 1;
+                                (void)pthread_cond_timedwait(&priv->janitor_cond, &priv->janitor_lock,
+                                                             &sleep_till);
+                        }
+                }
+                pthread_mutex_unlock (&priv->janitor_lock);
+
                 gf_log(this->name, GF_LOG_INFO, "Sending CHILD_DOWN for brick %s",
                        victim->name);
                 default_notify(this->parents->xlator, GF_EVENT_CHILD_DOWN, data);
