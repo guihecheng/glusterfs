@@ -1347,7 +1347,7 @@ dht_lookup_dir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
         if (!op_ret && gf_uuid_is_null (local->gfid)) {
                 memcpy (local->gfid, stbuf->ia_gfid, 16);
         }
-        if (local->gfid)
+        if (!gf_uuid_is_null (local->gfid))
                 gf_uuid_unparse(local->gfid, gfid_local);
 
         /* Check if the gfid is different for file from other node */
@@ -1376,9 +1376,13 @@ dht_lookup_dir_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 if (op_ret == -1) {
                         local->op_errno = op_errno;
                         gf_msg_debug (this->name, op_errno,
-                                      "lookup of %s on %s returned error",
+                                      "%s: lookup on %s returned error",
                                       local->loc.path, prev->name);
 
+                        /* The GFID is missing on this subvol. Force a heal. */
+                        if (op_errno == ENODATA) {
+                                local->need_selfheal = 1;
+                        }
                         goto unlock;
                 }
 
@@ -1485,6 +1489,17 @@ unlock:
 
                 if (local->need_selfheal) {
                         local->need_selfheal = 0;
+                        /* Set the gfid-req so posix will set the GFID*/
+                        if (!gf_uuid_is_null(local->gfid)) {
+                                ret = dict_set_static_bin(local->xattr_req,
+                                                          "gfid-req",
+                                                          local->gfid, 16);
+                        } else {
+                                if (!gf_uuid_is_null(local->gfid_req))
+                                        ret = dict_set_static_bin(local->xattr_req,
+                                                           "gfid-req",
+                                                           local->gfid_req, 16);
+                        }
                         dht_lookup_everywhere (frame, this, &local->loc);
                         return 0;
                 }
@@ -1686,6 +1701,12 @@ dht_revalidate_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                                         local->need_lookup_everywhere = 1;
                                 }
                         }
+                      /* The GFID is missing on this subvol*/
+                        if ((op_errno == ENODATA) &&
+                            (IA_ISDIR(local->loc.inode->ia_type))) {
+                                local->need_lookup_everywhere = 1;
+                        }
+
                         goto unlock;
                 }
 
@@ -1931,6 +1952,13 @@ cont:
                         /* We know that current cached subvol is no more
                            valid, get the new one */
                         local->cached_subvol = NULL;
+                        if (local->xattr_req) {
+                                if (!gf_uuid_is_null(local->gfid)) {
+                                        ret = dict_set_static_bin(local->xattr_req,
+                                                                  "gfid-req",
+                                                                  local->gfid, 16);
+                                }
+                        }
                         dht_lookup_everywhere (frame, this, &local->loc);
                         return 0;
                 }
@@ -2391,6 +2419,17 @@ dht_lookup_everywhere_done (call_frame_t *frame, xlator_t *this)
                 return 0;
         }
 
+        if (local->op_ret && local->gfid_missing) {
+                if (gf_uuid_is_null(local->gfid_req)) {
+                        DHT_STACK_UNWIND(lookup, frame, -1, ENODATA, NULL,
+                                         NULL, NULL, NULL);
+                        return 0;
+                }
+                /* A hack */
+                dht_lookup_directory(frame, this, &local->loc);
+                return 0;
+        }
+
         if (local->dir_count) {
                 dht_lookup_directory (frame, this, &local->loc);
                 return 0;
@@ -2751,6 +2790,8 @@ dht_lookup_everywhere_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 if (op_ret == -1) {
                         if (op_errno != ENOENT)
                                 local->op_errno = op_errno;
+                        if (op_errno == ENODATA)
+                                local->gfid_missing = _gf_true;
                         goto unlock;
                 }
 
@@ -3292,7 +3333,8 @@ dht_lookup_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 }
         }
 
-        if (is_dir || (op_ret == -1 && op_errno == ENOTCONN)) {
+        if (is_dir || (op_ret == -1 &&
+                      ((op_errno == ENOTCONN) || (op_errno == ENODATA)))) {
                 dht_lookup_directory (frame, this, &local->loc);
                 return 0;
         }
@@ -3421,6 +3463,7 @@ dht_lookup (call_frame_t *frame, xlator_t *this,
         int           call_cnt = 0;
         int           gen = 0;
         loc_t         new_loc = {0,};
+        void         *gfid_req_ptr = NULL;
 
         VALIDATE_OR_GOTO (frame, err);
         VALIDATE_OR_GOTO (this, err);
@@ -3629,6 +3672,20 @@ dht_lookup (call_frame_t *frame, xlator_t *this,
                 }
                 /* need it for dir self-heal */
                 dht_check_and_set_acl_xattr_req (loc->inode, local->xattr_req);
+
+                /* Fuse sets a random value in gfid-req. If the gfid is missing
+                 * on one or more subvols, posix will set the gfid to this
+                 * value, causing GFID mismatches for directories.
+                 */
+                ret = dict_get_ptr(local->xattr_req, "gfid-req",
+                                   &gfid_req_ptr);
+                if (ret) {
+                        gf_msg_debug(this->name, 0,
+                                     "%s: No gfid-req available", loc->path);
+                } else {
+                        memcpy(local->gfid_req, gfid_req_ptr, sizeof(uuid_t));
+                        dict_del(local->xattr_req, "gfid-req");
+                }
 
                 if (!hashed_subvol) {
 

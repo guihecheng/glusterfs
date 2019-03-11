@@ -346,6 +346,7 @@ struct dht_local {
 
         /* gfid related */
         uuid_t  gfid;
+        uuid_t  gfid_req;
 
         /* flag used to make sure we need to return estale in
            {lookup,revalidate}_cbk */
@@ -394,6 +395,7 @@ struct dht_local {
         loc_t        loc2_copy;
         gf_boolean_t locked;
         gf_boolean_t dont_create_linkto;
+        gf_boolean_t gfid_missing;
 };
 typedef struct dht_local dht_local_t;
 
