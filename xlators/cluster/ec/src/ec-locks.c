@@ -292,7 +292,7 @@ int32_t ec_manager_entrylk(ec_fop_data_t * fop, int32_t state)
 }
 
 void ec_entrylk(call_frame_t * frame, xlator_t * this, uintptr_t target,
-                int32_t minimum, fop_entrylk_cbk_t func, void * data,
+                uint32_t fop_flags, fop_entrylk_cbk_t func, void *data,
                 const char * volume, loc_t * loc, const char * basename,
                 entrylk_cmd cmd, entrylk_type type, dict_t * xdata)
 {
@@ -306,9 +306,9 @@ void ec_entrylk(call_frame_t * frame, xlator_t * this, uintptr_t target,
     GF_VALIDATE_OR_GOTO(this->name, frame, out);
     GF_VALIDATE_OR_GOTO(this->name, this->private, out);
 
-    fop = ec_fop_data_allocate(frame, this, GF_FOP_ENTRYLK, 0, target, minimum,
-                               ec_wind_entrylk, ec_manager_entrylk, callback,
-                               data);
+    fop = ec_fop_data_allocate(frame, this, GF_FOP_ENTRYLK, 0, target,
+                               fop_flags, ec_wind_entrylk, ec_manager_entrylk,
+                               callback, data);
     if (fop == NULL) {
         goto out;
     }
@@ -427,7 +427,7 @@ void ec_wind_fentrylk(ec_t * ec, ec_fop_data_t * fop, int32_t idx)
 }
 
 void ec_fentrylk(call_frame_t * frame, xlator_t * this, uintptr_t target,
-                 int32_t minimum, fop_fentrylk_cbk_t func, void * data,
+                 uint32_t fop_flags, fop_fentrylk_cbk_t func, void *data,
                  const char * volume, fd_t * fd, const char * basename,
                  entrylk_cmd cmd, entrylk_type type, dict_t * xdata)
 {
@@ -442,7 +442,7 @@ void ec_fentrylk(call_frame_t * frame, xlator_t * this, uintptr_t target,
     GF_VALIDATE_OR_GOTO(this->name, this->private, out);
 
     fop = ec_fop_data_allocate(frame, this, GF_FOP_FENTRYLK, 0, target,
-                               minimum, ec_wind_fentrylk, ec_manager_entrylk,
+                               fop_flags, ec_wind_fentrylk, ec_manager_entrylk,
                                callback, data);
     if (fop == NULL) {
         goto out;
@@ -695,7 +695,7 @@ int32_t ec_manager_inodelk(ec_fop_data_t * fop, int32_t state)
 }
 
 void ec_inodelk (call_frame_t *frame, xlator_t *this, gf_lkowner_t *owner,
-                 uintptr_t target, int32_t minimum, fop_inodelk_cbk_t func,
+                 uintptr_t target, uint32_t fop_flags, fop_inodelk_cbk_t func,
                  void *data, const char *volume, loc_t *loc, int32_t cmd,
                  struct gf_flock *flock, dict_t *xdata)
 {
@@ -709,9 +709,9 @@ void ec_inodelk (call_frame_t *frame, xlator_t *this, gf_lkowner_t *owner,
     GF_VALIDATE_OR_GOTO(this->name, frame, out);
     GF_VALIDATE_OR_GOTO(this->name, this->private, out);
 
-    fop = ec_fop_data_allocate(frame, this, GF_FOP_INODELK, 0, target, minimum,
-                               ec_wind_inodelk, ec_manager_inodelk, callback,
-                               data);
+    fop = ec_fop_data_allocate(frame, this, GF_FOP_INODELK, 0, target,
+                               fop_flags, ec_wind_inodelk, ec_manager_inodelk,
+                               callback, data);
     if (fop == NULL) {
         goto out;
     }
@@ -832,7 +832,7 @@ void ec_wind_finodelk(ec_t * ec, ec_fop_data_t * fop, int32_t idx)
 }
 
 void ec_finodelk(call_frame_t *frame, xlator_t *this, gf_lkowner_t *owner,
-                 uintptr_t target, int32_t minimum, fop_finodelk_cbk_t func,
+                 uintptr_t target, uint32_t fop_flags, fop_finodelk_cbk_t func,
                  void *data, const char *volume, fd_t *fd, int32_t cmd,
                  struct gf_flock *flock, dict_t *xdata)
 {
@@ -847,7 +847,7 @@ void ec_finodelk(call_frame_t *frame, xlator_t *this, gf_lkowner_t *owner,
     GF_VALIDATE_OR_GOTO(this->name, this->private, out);
 
     fop = ec_fop_data_allocate(frame, this, GF_FOP_FINODELK, 0, target,
-                               minimum, ec_wind_finodelk, ec_manager_inodelk,
+                               fop_flags, ec_wind_finodelk, ec_manager_inodelk,
                                callback, data);
     if (fop == NULL) {
         goto out;
@@ -1101,7 +1101,7 @@ int32_t ec_manager_lk(ec_fop_data_t * fop, int32_t state)
 }
 
 void ec_lk(call_frame_t * frame, xlator_t * this, uintptr_t target,
-           int32_t minimum, fop_lk_cbk_t func, void * data, fd_t * fd,
+           uint32_t fop_flags, fop_lk_cbk_t func, void *data, fd_t *fd,
            int32_t cmd, struct gf_flock * flock, dict_t * xdata)
 {
     ec_cbk_t callback = { .lk = func };
@@ -1114,7 +1114,7 @@ void ec_lk(call_frame_t * frame, xlator_t * this, uintptr_t target,
     GF_VALIDATE_OR_GOTO(this->name, frame, out);
     GF_VALIDATE_OR_GOTO(this->name, this->private, out);
 
-    fop = ec_fop_data_allocate(frame, this, GF_FOP_LK, 0, target, minimum,
+    fop = ec_fop_data_allocate(frame, this, GF_FOP_LK, 0, target, fop_flags,
                                ec_wind_lk, ec_manager_lk, callback, data);
     if (fop == NULL) {
         goto out;

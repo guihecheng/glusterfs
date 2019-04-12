@@ -57,9 +57,12 @@ enum _ec_xattrop_flags {
 
 #define EC_SELFHEAL_BIT 62
 
-#define EC_MINIMUM_ONE   -1
-#define EC_MINIMUM_MIN   -2
-#define EC_MINIMUM_ALL   -3
+#define EC_MINIMUM_ONE (1 << 6)
+#define EC_MINIMUM_MIN (2 << 6)
+#define EC_MINIMUM_ALL (3 << 6)
+#define EC_FOP_NO_PROPAGATE_ERROR (1 << 8)
+#define EC_FOP_MINIMUM(_flags) ((_flags)&255)
+#define EC_FOP_FLAGS(_flags) ((_flags) & ~255)
 
 #define EC_UPDATE_DATA   1
 #define EC_UPDATE_META   2
@@ -142,9 +145,10 @@ void ec_dispatch_inc(ec_fop_data_t * fop);
 void ec_dispatch_min(ec_fop_data_t * fop);
 void ec_dispatch_one(ec_fop_data_t * fop);
 
+void ec_succeed_all(ec_fop_data_t *fop);
 void ec_sleep(ec_fop_data_t *fop);
 void ec_resume(ec_fop_data_t * fop, int32_t error);
-void ec_resume_parent(ec_fop_data_t * fop, int32_t error);
+void ec_resume_parent(ec_fop_data_t *fop);
 
 void ec_manager(ec_fop_data_t * fop, int32_t error);
 gf_boolean_t ec_is_recoverable_error (int32_t op_errno);

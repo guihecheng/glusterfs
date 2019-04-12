@@ -19,7 +19,7 @@ ec_cbk_data_t * ec_cbk_data_allocate(call_frame_t * frame, xlator_t * this,
                                      int32_t op_errno);
 ec_fop_data_t * ec_fop_data_allocate(call_frame_t * frame, xlator_t * this,
                                      int32_t id, uint32_t flags,
-                                     uintptr_t target, int32_t minimum,
+                                     uintptr_t target, uint32_t fop_flags,
                                      ec_wind_f wind, ec_handler_f handler,
                                      ec_cbk_t cbks, void * data);
 void ec_fop_data_acquire(ec_fop_data_t * fop);
