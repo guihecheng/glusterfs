@@ -122,7 +122,7 @@ ec_fix_open (ec_fop_data_t *fop)
                    NULL, NULL, &fop->loc[0], fop->fd, NULL);
     } else{
         ec_open(fop->frame, fop->xl, need_open, EC_MINIMUM_ONE,
-                NULL, NULL, &loc, fop->fd->flags, fop->fd, NULL);
+                NULL, NULL, &loc, fop->fd->flags & (~O_TRUNC), fop->fd, NULL);
     }
 
 out:
