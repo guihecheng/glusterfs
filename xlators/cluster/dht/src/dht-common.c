@@ -890,7 +890,8 @@ dht_common_mark_mdsxattr (call_frame_t *frame, int *errst, int mark_during_fresh
                                 "Failed to get hashed subvol for path %s"
                                 "gfid is %s ",
                                 local->loc.path, gfid_local);
-                        (*errst) = 1;
+                        if (errst)
+                                (*errst) = 1;
                         ret = -1;
                         goto out;
                 }
