@@ -1891,15 +1891,22 @@ void ec_writev_start(ec_fop_data_t *fop)
         goto failed_fd;
     }
 
-    if (fop->head > 0) {
-        if (ec_make_internal_fop_xdata (&xdata)) {
-                err = -ENOMEM;
-                goto failed_xdata;
-        }
-        ec_readv(fop->frame, fop->xl, -1, EC_MINIMUM_MIN, ec_writev_merge_head,
-                 NULL, fd, ec->stripe_size, fop->offset, 0, xdata);
-    }
     tail = fop->size - fop->user_size - fop->head;
+    if (fop->head > 0) {
+        if (current > fop->offset) {
+            if (ec_make_internal_fop_xdata (&xdata)) {
+                    err = -ENOMEM;
+                    goto failed_xdata;
+            }
+            ec_readv(fop->frame, fop->xl, -1, EC_MINIMUM_MIN,
+                     ec_writev_merge_head, NULL, fd, ec->stripe_size,
+                     fop->offset, 0, xdata);
+        } else {
+            memset(fop->vector[0].iov_base, 0, fop->head);
+            memset(fop->vector[0].iov_base + fop->size - tail, 0, tail);
+        }
+    }
+
     if ((tail > 0) && ((fop->head == 0) || (fop->size > ec->stripe_size))) {
             /* Current locking scheme will make sure the 'current' below will
              * never decrease while the fop is in progress, so the checks will
