@@ -165,4 +165,5 @@ ec_get_heal_info (xlator_t *this, loc_t *loc, dict_t **dict);
 void
 ec_update_fd_status (fd_t *fd, xlator_t *xl,
                      int child_index, int32_t ret_status);
+void ec_lock_update_good(ec_lock_t *lock, ec_fop_data_t *fop);
 #endif /* __EC_COMMON_H__ */
