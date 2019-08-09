@@ -56,6 +56,7 @@ gf_lock_t nlm_client_list_lk;
 
 /* race on this is harmless */
 int nlm_grace_period = 50;
+static gf_boolean_t nlm4_inited = _gf_false;
 
 #define nlm4_validate_nfs3_state(request, state, status, label, retval) \
         do      {                                                       \
@@ -2577,7 +2578,6 @@ nlm4svc_init(xlator_t *nfsx)
         struct timespec timeout = {0,};
         FILE   *pidfile = NULL;
         pid_t   pid     = -1;
-        static gf_boolean_t nlm4_inited = _gf_false;
 
         /* Already inited */
         if (nlm4_inited)
@@ -2734,7 +2734,7 @@ nlm_priv (xlator_t *this)
 
         gf_proc_dump_add_section("nfs.nlm");
 
-        if (TRY_LOCK (&nlm_client_list_lk))
+        if ((nlm4_inited == _gf_false) || TRY_LOCK(&nlm_client_list_lk))
                 goto out;
 
         list_for_each_entry (client, &nlm_client_list, nlm_clients) {
@@ -2765,7 +2765,8 @@ nlm_priv (xlator_t *this)
         if (ret) {
                 gf_proc_dump_build_key (key, "nlm", "statedump_error");
                 gf_proc_dump_write (key, "Unable to dump nlm state because "
-                                    "nlm_client_list_lk lock couldn't be acquired");
+                           "nlm is not initialised or nlm_client_list_lk "
+                           "lock couldn't be acquired");
         }
 
         return ret;
