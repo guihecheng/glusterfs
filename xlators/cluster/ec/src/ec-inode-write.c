@@ -185,26 +185,26 @@ ec_xattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this, int32_t op_ret,
         switch (fop->id) {
         case GF_FOP_SETXATTR:
                 if (fop->cbks.setxattr) {
-                        fop->cbks.setxattr (frame, cookie, this, op_ret,
-                                            op_errno, xdata);
+                    QUORUM_CBK(fop->cbks.setxattr, fop, frame, cookie, this, op_ret,
+                               op_errno, xdata);
                 }
                 break;
         case GF_FOP_REMOVEXATTR:
                 if (fop->cbks.removexattr) {
-                        fop->cbks.removexattr (frame, cookie, this, op_ret,
-                                               op_errno, xdata);
+                    QUORUM_CBK(fop->cbks.removexattr, fop, frame, cookie, this,
+                               op_ret, op_errno, xdata);
                 }
                 break;
         case GF_FOP_FSETXATTR:
                 if (fop->cbks.fsetxattr) {
-                        fop->cbks.fsetxattr (frame, cookie, this, op_ret,
-                                             op_errno, xdata);
+                    QUORUM_CBK(fop->cbks.fsetxattr, fop, frame, cookie, this,
+                               op_ret, op_errno, xdata);
                 }
                 break;
         case GF_FOP_FREMOVEXATTR:
                 if (fop->cbks.fremovexattr) {
-                        fop->cbks.fremovexattr (frame, cookie, this, op_ret,
-                                                op_errno, xdata);
+                    QUORUM_CBK(fop->cbks.fremovexattr, fop, frame, cookie, this,
+                               op_ret, op_errno, xdata);
                 }
                 break;
         }
@@ -505,20 +505,18 @@ int32_t ec_manager_setattr(ec_fop_data_t * fop, int32_t state)
             {
                 if (fop->cbks.setattr != NULL)
                 {
-                    fop->cbks.setattr(fop->req_frame, fop, fop->xl,
-                                      cbk->op_ret, cbk->op_errno,
-                                      &cbk->iatt[0], &cbk->iatt[1],
-                                      cbk->xdata);
+                    QUORUM_CBK(fop->cbks.setattr, fop, fop->req_frame, fop,
+                               fop->xl, cbk->op_ret, cbk->op_errno,
+                               &cbk->iatt[0], &cbk->iatt[1], cbk->xdata);
                 }
             }
             else
             {
                 if (fop->cbks.fsetattr != NULL)
                 {
-                    fop->cbks.fsetattr(fop->req_frame, fop, fop->xl,
-                                       cbk->op_ret, cbk->op_errno,
-                                       &cbk->iatt[0], &cbk->iatt[1],
-                                       cbk->xdata);
+                    QUORUM_CBK(fop->cbks.fsetattr, fop, fop->req_frame, fop,
+                               fop->xl, cbk->op_ret, cbk->op_errno,
+                               &cbk->iatt[0], &cbk->iatt[1], cbk->xdata);
                 }
             }
 
@@ -1026,9 +1024,9 @@ int32_t ec_manager_fallocate(ec_fop_data_t *fop, int32_t state)
         GF_ASSERT(cbk != NULL);
 
         if (fop->cbks.fallocate != NULL) {
-                fop->cbks.fallocate(fop->req_frame, fop, fop->xl, cbk->op_ret,
-                                    cbk->op_errno, &cbk->iatt[0], &cbk->iatt[1],
-                                    cbk->xdata);
+            QUORUM_CBK(fop->cbks.fallocate, fop, fop->req_frame, fop,
+                       fop->xl, cbk->op_ret, cbk->op_errno, &cbk->iatt[0],
+                       &cbk->iatt[1], cbk->xdata);
         }
 
         return EC_STATE_LOCK_REUSE;
@@ -1277,9 +1275,9 @@ int32_t ec_manager_discard(ec_fop_data_t *fop, int32_t state)
         GF_ASSERT(cbk != NULL);
 
         if (fop->cbks.discard != NULL) {
-                fop->cbks.discard(fop->req_frame, fop, fop->xl, cbk->op_ret,
-                                  cbk->op_errno, &cbk->iatt[0], &cbk->iatt[1],
-                                  cbk->xdata);
+            QUORUM_CBK(fop->cbks.discard, fop, fop->req_frame, fop, fop->xl,
+                       cbk->op_ret, cbk->op_errno, &cbk->iatt[0],
+                       &cbk->iatt[1], cbk->xdata);
         }
 
         return EC_STATE_LOCK_REUSE;
@@ -1504,20 +1502,18 @@ int32_t ec_manager_truncate(ec_fop_data_t * fop, int32_t state)
             {
                 if (fop->cbks.truncate != NULL)
                 {
-                    fop->cbks.truncate(fop->req_frame, fop, fop->xl,
-                                       cbk->op_ret, cbk->op_errno,
-                                       &cbk->iatt[0], &cbk->iatt[1],
-                                       cbk->xdata);
+                    QUORUM_CBK(fop->cbks.truncate, fop, fop->req_frame, fop,
+                               fop->xl, cbk->op_ret, cbk->op_errno,
+                               &cbk->iatt[0], &cbk->iatt[1], cbk->xdata);
                 }
             }
             else
             {
                 if (fop->cbks.ftruncate != NULL)
                 {
-                    fop->cbks.ftruncate(fop->req_frame, fop, fop->xl,
-                                        cbk->op_ret, cbk->op_errno,
-                                        &cbk->iatt[0], &cbk->iatt[1],
-                                        cbk->xdata);
+                    QUORUM_CBK(fop->cbks.ftruncate, fop, fop->req_frame, fop,
+                               fop->xl, cbk->op_ret, cbk->op_errno,
+                               &cbk->iatt[0], &cbk->iatt[1], cbk->xdata);
                 }
             }
 
@@ -2112,9 +2108,9 @@ int32_t ec_manager_writev(ec_fop_data_t *fop, int32_t state)
 
             if (fop->cbks.writev != NULL)
             {
-                fop->cbks.writev(fop->req_frame, fop, fop->xl, cbk->op_ret,
-                                 cbk->op_errno, &cbk->iatt[0], &cbk->iatt[1],
-                                 cbk->xdata);
+                QUORUM_CBK(fop->cbks.writev, fop, fop->req_frame, fop, fop->xl,
+                           cbk->op_ret, cbk->op_errno, &cbk->iatt[0],
+                           &cbk->iatt[1], cbk->xdata);
             }
 
             return EC_STATE_LOCK_REUSE;

@@ -29,6 +29,30 @@ typedef enum {
 
 #define EC_FLAG_LOCK_SHARED             0x0001
 
+#define QUORUM_CBK(fn, fop, frame, cookie, this, op_ret, op_errno, params...)  \
+    do {                                                                       \
+        ec_t *__ec = fop->xl->private;                                         \
+        int32_t __op_ret = 0;                                                  \
+        int32_t __op_errno = 0;                                                \
+        int32_t __success_count = gf_bits_count(fop->good);                    \
+                                                                               \
+        __op_ret = op_ret;                                                     \
+        __op_errno = op_errno;                                                 \
+        if (!fop->parent && frame &&                                           \
+            (GF_CLIENT_PID_SELF_HEALD != frame->root->pid) &&                  \
+            __ec->quorum_count && (__success_count < __ec->quorum_count) &&    \
+            op_ret >= 0) {                                                     \
+            __op_ret = -1;                                                     \
+            __op_errno = EIO;                                                  \
+            gf_msg(__ec->xl->name, GF_LOG_ERROR, 0,                            \
+                   EC_MSG_CHILDS_INSUFFICIENT,                                 \
+                   "Insufficient available children for this request "         \
+                   "(have %d, need %d). %s",                                   \
+                   __success_count, __ec->quorum_count, ec_msg_str(fop));      \
+        }                                                                      \
+        fn(frame, cookie, this, __op_ret, __op_errno, params);                 \
+    } while (0)
+
 enum _ec_xattrop_flags {
         EC_FLAG_XATTROP,
         EC_FLAG_DATA_DIRTY,
@@ -166,4 +190,5 @@ void
 ec_update_fd_status (fd_t *fd, xlator_t *xl,
                      int child_index, int32_t ret_status);
 void ec_lock_update_good(ec_lock_t *lock, ec_fop_data_t *fop);
+char *ec_msg_str (ec_fop_data_t *fop);
 #endif /* __EC_COMMON_H__ */

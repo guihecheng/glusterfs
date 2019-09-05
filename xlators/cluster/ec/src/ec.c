@@ -299,6 +299,7 @@ reconfigure (xlator_t *this, dict_t *options)
                           options, bool, failed);
         GF_OPTION_RECONF ("parallel-writes", ec->parallel_writes,
                           options, bool, failed);
+        GF_OPTION_RECONF("quorum-count", ec->quorum_count, options, uint32, failed);
         ret = 0;
         if (ec_assign_read_policy (ec, read_policy)) {
                 ret = -1;
@@ -690,6 +691,7 @@ init (xlator_t *this)
     GF_OPTION_INIT ("shd-wait-qlength", ec->shd.wait_qlength, uint32, failed);
     GF_OPTION_INIT ("optimistic-change-log", ec->optimistic_changelog, bool, failed);
     GF_OPTION_INIT ("parallel-writes", ec->parallel_writes, bool, failed);
+    GF_OPTION_INIT("quorum-count", ec->quorum_count, uint32, failed);
 
     this->itable = inode_table_new (EC_SHD_INODE_LRU_LIMIT, this);
     if (!this->itable)
@@ -1332,6 +1334,7 @@ int32_t ec_dump_private(xlator_t *this)
     gf_proc_dump_write("heal-waiters", "%d", ec->heal_waiters);
     gf_proc_dump_write("read-policy", "%s", ec_read_policies[ec->read_policy]);
     gf_proc_dump_write("parallel-writes", "%d", ec->parallel_writes);
+    gf_proc_dump_write("quorum-count", "%u", ec->quorum_count);
 
     return 0;
 }
@@ -1532,6 +1535,16 @@ struct volume_options options[] =
       .default_value = "on",
       .description = "This controls if writes can be wound in parallel as long"
                      "as it doesn't modify same stripes"
+    },
+    {
+        .key = {"quorum-count"},
+        .type = GF_OPTION_TYPE_INT,
+        .default_value = "0",
+        .description =
+            "This option can be used to define how many successes on"
+            "the bricks constitute a success to the application. This"
+            " count should be in the range"
+            "[disperse-data-count,  disperse-count] (inclusive)",
     },
     { .key = {NULL} }
 };
