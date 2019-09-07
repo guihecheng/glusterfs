@@ -200,12 +200,14 @@ void ec_flush(call_frame_t * frame, xlator_t * this, uintptr_t target,
     GF_VALIDATE_OR_GOTO(this->name, frame, out);
     GF_VALIDATE_OR_GOTO(this->name, this->private, out);
 
-    error = ec_validate_fd(fd, this);
-    if (error) {
-        gf_msg(this->name, GF_LOG_ERROR, EBADF, EC_MSG_FD_BAD,
-               "Failing %s on %s", gf_fop_list[GF_FOP_FLUSH],
-               fd->inode ? uuid_utoa(fd->inode->gfid) : "");
-        goto out;
+    if (fd) {
+        error = ec_validate_fd(fd, this);
+        if (error) {
+            gf_msg(this->name, GF_LOG_ERROR, EBADF, EC_MSG_FD_BAD,
+                   "Failing %s on %s", gf_fop_list[GF_FOP_FLUSH],
+                   fd->inode ? uuid_utoa(fd->inode->gfid) : "");
+            goto out;
+        }
     }
 
     fop = ec_fop_data_allocate(frame, this, GF_FOP_FLUSH, 0, target, fop_flags,
@@ -433,12 +435,14 @@ void ec_fsync(call_frame_t * frame, xlator_t * this, uintptr_t target,
     GF_VALIDATE_OR_GOTO(this->name, frame, out);
     GF_VALIDATE_OR_GOTO(this->name, this->private, out);
 
-    error = ec_validate_fd(fd, this);
-    if (error) {
-        gf_msg(this->name, GF_LOG_ERROR, EBADF, EC_MSG_FD_BAD,
-               "Failing %s on %s", gf_fop_list[GF_FOP_FSYNC],
-               fd->inode ? uuid_utoa(fd->inode->gfid) : "");
-        goto out;
+    if (fd) {
+        error = ec_validate_fd(fd, this);
+        if (error) {
+            gf_msg(this->name, GF_LOG_ERROR, EBADF, EC_MSG_FD_BAD,
+                   "Failing %s on %s", gf_fop_list[GF_FOP_FSYNC],
+                   fd->inode ? uuid_utoa(fd->inode->gfid) : "");
+            goto out;
+        }
     }
 
     fop = ec_fop_data_allocate(frame, this, GF_FOP_FSYNC, 0, target, fop_flags,
