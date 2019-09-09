@@ -3640,7 +3640,7 @@ struct volopt_map_entry glusterd_volopt_map[] = {
         { .key = "disperse.quorum-count",
           .voltype = "cluster/disperse",
           .type = NO_DOC,
-          .op_version = GD_OP_VERSION_8_0,
+          .op_version = GD_OP_VERSION_3_13_6,
           .validate_fn = validate_disperse_quorum_count,
           .description = "This option can be used to define how many successes on"
                        "the bricks constitute a success to the application. This"
