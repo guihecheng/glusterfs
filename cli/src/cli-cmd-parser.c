@@ -1384,6 +1384,315 @@ out:
         return ret;
 }
 
+int32_t
+cli_cmd_xquota_parse (const char **words, int wordcount, dict_t **options)
+{
+        dict_t          *dict        = NULL;
+        char            *volname     = NULL;
+        int              ret         = -1;
+        int              i           = -1;
+        char             key[20]     = {0, };
+        int64_t          value       = 0;
+        gf_xquota_type   type        = GF_XQUOTA_OPTION_TYPE_NONE;
+        char            *opwords[]   = { "enable", "disable",
+                                         "limit-usage", "remove-usage", "list-usage",
+                                         "alert-time", "soft-timeout", "hard-timeout",
+                                         "default-soft-limit", NULL};
+        char            *category[]  = { "project", NULL};
+        char            *w           = NULL;
+        char            *c           = NULL;
+        uint32_t         time        = 0;
+        double           percent     = 0;
+        char            *end_ptr     = NULL;
+        int64_t          projid      = 0;
+        int64_t          limit       = 0;
+
+        GF_ASSERT (words);
+        GF_ASSERT (options);
+
+        dict = dict_new ();
+        if (!dict) {
+                gf_log ("cli", GF_LOG_ERROR, "dict_new failed");
+                goto out;
+        }
+
+        if (wordcount < 4)
+                goto out;
+
+        volname = (char *)words[2];
+        if (!volname) {
+                ret = -1;
+                goto out;
+        }
+
+        /* Validate the volume name here itself */
+        if (cli_validate_volname (volname) < 0)
+                goto out;
+
+        ret = dict_set_str (dict, "volname", volname);
+        if (ret < 0)
+                goto out;
+
+        w = str_getunamb (words[3], opwords);
+        if (!w) {
+                cli_out ("Invalid xquota option : %s", words[3]);
+                ret = - 1;
+                goto out;
+        }
+
+        if (strcmp (w, "enable") == 0) {
+                if (wordcount == 4) {
+                        type = GF_XQUOTA_OPTION_TYPE_ENABLE;
+                        ret = 0;
+                        goto set_type;
+                } else {
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        if (strcmp (w, "disable") == 0) {
+                if (wordcount == 4) {
+                        type = GF_XQUOTA_OPTION_TYPE_DISABLE;
+                        ret = 0;
+                        goto set_type;
+                } else {
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        if (strcmp (w, "limit-usage") == 0
+                || strcmp (w, "remove-usage") == 0
+                || strcmp (w, "list-usage") == 0) {
+            c = str_getunamb (words[4], category);
+            if (!c) {
+                    cli_out ("Invalid xquota category : %s", words[4]);
+                    ret = - 1;
+                    goto out;
+            }
+        }
+
+        if (strcmp (w, "limit-usage") == 0) {
+            if (strcmp (c, "project") == 0) {
+                type = GF_XQUOTA_OPTION_TYPE_PROJECT_LIMIT_USAGE;
+            }
+        }
+
+        if (type == GF_XQUOTA_OPTION_TYPE_PROJECT_LIMIT_USAGE) {
+
+                if (wordcount < 8 || wordcount > 9) {
+                        ret = -1;
+                        goto out;
+                }
+
+                if (words[5][0] != '/') {
+                        cli_err ("Please enter absolute path");
+                        ret = -1;
+                        goto out;
+                }
+                ret = dict_set_str (dict, "path", (char *) words[5]);
+                if (ret)
+                        goto out;
+
+                errno = 0;
+                projid = strtol (words[6], &end_ptr, 10);
+                if (errno == ERANGE || errno == EINVAL
+                                    || projid <= 0 || projid > UINT32_MAX
+                                    || strcmp (end_ptr, "") != 0) {
+                        ret = -1;
+                        cli_err ("Please enter an integer value in "
+                                 "the range 1 - %"PRIu32, UINT32_MAX);
+                        goto out;
+                }
+
+                ret  = dict_set_str (dict, "projid", (char *) words[6]);
+                if (ret < 0)
+                        goto out;
+
+                if (!words[7]) {
+                        cli_err ("Please enter the limit value to be set");
+                        ret = -1;
+                        goto out;
+                }
+
+                if (type == GF_XQUOTA_OPTION_TYPE_PROJECT_LIMIT_USAGE) {
+                        ret = gf_string2bytesize_int64 (words[7], &value);
+                        if (ret != 0 || value <= 0) {
+                                if (errno == ERANGE || value <= 0) {
+                                        ret = -1;
+                                        cli_err ("Please enter an integer "
+                                                 "value in the range of "
+                                                 "(1 - %"PRId64 ")",
+                                                 INT64_MAX);
+                                } else
+                                        cli_err ("Please enter a correct "
+                                                 "value");
+                                goto out;
+                        }
+                } else {
+                        errno = 0;
+                        end_ptr = NULL;
+                        limit = strtol (words[7], &end_ptr, 10);
+                        if (errno == ERANGE || errno == EINVAL || limit <= 0
+                                            || strcmp (end_ptr, "") != 0) {
+                                ret = -1;
+                                cli_err ("Please enter an integer value in "
+                                         "the range 1 - %"PRId64, INT64_MAX);
+                                goto out;
+                        }
+                }
+
+                ret  = dict_set_str (dict, "hard-limit", (char *) words[7]);
+                if (ret < 0)
+                        goto out;
+
+                if (wordcount == 9) {
+
+                        ret = gf_string2percent (words[8], &percent);
+                        if (ret != 0 || percent > 100) {
+                                ret = -1;
+                                cli_err ("Please enter a correct value "
+                                         "in the range of 0 to 100");
+                                goto out;
+                        }
+
+                        ret = dict_set_str (dict, "soft-limit",
+                                            (char *) words[8]);
+                        if (ret < 0)
+                                goto out;
+                }
+
+                goto set_type;
+        }
+
+        if (strcmp (w, "remove-usage") == 0) {
+                if (wordcount != 6) {
+                        ret = -1;
+                        goto out;
+                }
+
+                if (strcmp (c, "project") == 0) {
+                    type = GF_XQUOTA_OPTION_TYPE_PROJECT_REMOVE_USAGE;
+                }
+
+                ret = dict_set_str (dict, "path", (char *) words[5]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        }
+
+        if (strcmp (w, "list-usage") == 0) {
+
+                if (strcmp (c, "project") == 0) {
+                    type = GF_XQUOTA_OPTION_TYPE_PROJECT_LIST_USAGE;
+                }
+
+                i = 5;
+                while (i < wordcount) {
+                        snprintf (key, 20, "path%d", i-5);
+
+                        ret = dict_set_str (dict, key, (char *) words [i++]);
+                        if (ret < 0)
+                                goto out;
+                }
+
+                ret = dict_set_int32 (dict, "count", i-5);
+                if (ret < 0)
+                        goto out;
+
+                goto set_type;
+        }
+
+        if (strcmp (w, "alert-time") == 0) {
+                if (wordcount != 5) {
+                        ret = -1;
+                        goto out;
+                }
+                type = GF_XQUOTA_OPTION_TYPE_ALERT_TIME;
+
+                ret = gf_string2time (words[4], &time);
+                if (ret) {
+                        cli_err ("Invalid argument %s. Please enter a valid "
+                                 "string", words[4]);
+                        goto out;
+                }
+
+                ret = dict_set_str (dict, "value", (char *)words[4]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        }
+
+        if (strcmp (w, "soft-timeout") == 0) {
+                if (wordcount != 5) {
+                        ret = -1;
+                        goto out;
+                }
+                type = GF_XQUOTA_OPTION_TYPE_SOFT_TIMEOUT;
+
+                ret = gf_string2time (words[4], &time);
+                if (ret) {
+                        cli_err ("Invalid argument %s. Please enter a valid "
+                                 "string", words[4]);
+                        goto out;
+                }
+
+                ret = dict_set_str (dict, "value", (char *)words[4]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        }
+
+        if (strcmp (w, "hard-timeout") == 0) {
+                if(wordcount != 5) {
+                        ret = -1;
+                        goto out;
+                }
+                type = GF_XQUOTA_OPTION_TYPE_HARD_TIMEOUT;
+
+                ret = gf_string2time (words[4], &time);
+                if (ret) {
+                        cli_err ("Invalid argument %s. Please enter a valid "
+                                 "string", words[4]);
+                        goto out;
+                }
+
+                ret = dict_set_str (dict, "value", (char *)words[4]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        }
+        if (strcmp (w, "default-soft-limit") == 0) {
+                if(wordcount != 5) {
+                        ret = -1;
+                        goto out;
+                }
+                type = GF_XQUOTA_OPTION_TYPE_DEFAULT_SOFT_LIMIT;
+
+                ret = dict_set_str (dict, "value", (char *)words[4]);
+                if (ret < 0)
+                        goto out;
+                goto set_type;
+        } else {
+                GF_ASSERT (!"opword mismatch");
+        }
+
+set_type:
+        ret = dict_set_int32 (dict, "type", type);
+        if (ret < 0)
+                goto out;
+
+        *options = dict;
+out:
+        if (ret < 0) {
+                if (dict)
+                        dict_unref (dict);
+        }
+
+        return ret;
+}
+
 static gf_boolean_t
 cli_is_key_spl (char *key)
 {
@@ -3345,6 +3654,8 @@ cli_cmd_volume_status_parse (const char **words, int wordcount,
                                         cmd |= GF_CLI_STATUS_SHD;
                                 } else if (!strcmp (words[3], "quotad")) {
                                         cmd |= GF_CLI_STATUS_QUOTAD;
+                                } else if (!strcmp (words[3], "xquotad")) {
+                                        cmd |= GF_CLI_STATUS_XQUOTAD;
                                 } else if (!strcmp (words[3], "snapd")) {
                                         cmd |= GF_CLI_STATUS_SNAPD;
                                 } else if (!strcmp (words[3], "tierd")) {
@@ -3419,6 +3730,17 @@ cli_cmd_volume_status_parse (const char **words, int wordcount,
                                 goto out;
                         }
                         cmd |= GF_CLI_STATUS_QUOTAD;
+                } else if (!strcmp (words[3], "xquotad")) {
+                        if (cmd == GF_CLI_STATUS_FD ||
+                            cmd == GF_CLI_STATUS_CLIENTS ||
+                            cmd == GF_CLI_STATUS_DETAIL ||
+                            cmd == GF_CLI_STATUS_INODE) {
+                                cli_err ("Detail/FD/Clients/Inode status not "
+                                         "available for XQuota Daemon");
+                                ret = -1;
+                                goto out;
+                        }
+                        cmd |= GF_CLI_STATUS_XQUOTAD;
                 } else if  (!strcmp (words[3], "snapd")) {
                         if (cmd == GF_CLI_STATUS_FD ||
                             cmd == GF_CLI_STATUS_CLIENTS ||
@@ -3478,7 +3800,7 @@ cli_cmd_validate_dumpoption (const char *arg, char **option)
 {
         char    *opwords[] = {"all", "nfs", "mem", "iobuf", "callpool", "priv",
                               "fd", "inode", "history", "inodectx", "fdctx",
-                              "quotad", NULL};
+                              "quotad", "xquotad", NULL};
         char    *w = NULL;
 
         w = str_getunamb (arg, opwords);
@@ -3534,7 +3856,7 @@ cli_cmd_volume_statedump_options_parse (const char **words, int wordcount,
                         strncat (option_str, option, strlen (option));
                         strncat (option_str, " ", 1);
                 }
-                if ((strstr (option_str, "nfs")) && strstr (option_str, "quotad")) {
+                if ((strstr (option_str, "nfs")) && strstr (option_str, "quotad") && strstr (option_str, "xquotad")) {
                         ret = -1;
                         goto out;
                 }

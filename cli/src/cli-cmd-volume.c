@@ -30,9 +30,11 @@
 
 extern struct rpc_clnt *global_rpc;
 extern struct rpc_clnt *global_quotad_rpc;
+extern struct rpc_clnt *global_xquotad_rpc;
 
 extern rpc_clnt_prog_t *cli_rpc_prog;
 extern rpc_clnt_prog_t cli_quotad_clnt;
+extern rpc_clnt_prog_t cli_xquotad_clnt;
 
 int
 cli_cmd_volume_help_cbk (struct cli_state *state, struct cli_cmd_word *in_word,
@@ -1442,6 +1444,53 @@ out:
         return ret;
 }
 
+int
+cli_xquota_get_soft_limit (dict_t *options, const char **words, dict_t *xdata)
+{
+        call_frame_t            *frame          = NULL;
+        cli_local_t             *local          = NULL;
+        rpc_clnt_procedure_t    *proc           = NULL;
+        char                    *default_sl     = NULL;
+        char                    *default_sl_dup = NULL;
+        int                      ret  = -1;
+
+        frame = create_frame (THIS, THIS->ctx->pool);
+        if (!frame) {
+                ret = -1;
+                goto out;
+        }
+
+        //We need a ref on @options to prevent CLI_STACK_DESTROY
+        //from destroying it prematurely.
+        dict_ref (options);
+        CLI_LOCAL_INIT (local, words, frame, options);
+        proc = &cli_rpc_prog->proctable[GLUSTER_CLI_XQUOTA];
+        ret = proc->fn (frame, THIS, options);
+
+        ret = dict_get_str (options, "xquota-default-soft-limit", &default_sl);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get xquota default soft limit");
+                goto out;
+        }
+
+        default_sl_dup = gf_strdup (default_sl);
+        if (!default_sl_dup) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = dict_set_dynstr (xdata, "xquota-default-soft-limit", default_sl_dup);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set default soft limit");
+                GF_FREE (default_sl_dup);
+                goto out;
+        }
+
+out:
+        CLI_STACK_DESTROY (frame);
+        return ret;
+}
+
 /* Checks if at least one limit has been set on the volume
  *
  * Returns true if at least one limit is set. Returns false otherwise.
@@ -1481,6 +1530,54 @@ _limits_set_on_volume (char *volname, int type) {
         while (1) {
                 ret = quota_conf_read_gfid (fd, buf, &gfid_type_stored,
                                             version);
+                if (ret <= 0)
+                        break;
+
+                if (gfid_type_stored == gfid_type) {
+                        limits_set = _gf_true;
+                        break;
+                }
+        }
+out:
+        if (fd != -1)
+                sys_close (fd);
+
+        return limits_set;
+}
+
+gf_boolean_t
+_xquota_limits_set_on_volume (char *volname, int type) {
+        gf_boolean_t    limits_set                 = _gf_false;
+        int             ret                        = -1;
+        char            xquota_conf_file[PATH_MAX] = {0,};
+        int             fd                         = -1;
+        char            buf[16]                    = {0,};
+        float           version                    = 0.0f;
+        char            gfid_type_stored           = 0;
+        char            gfid_type                  = 0;
+
+        /* TODO: fix hardcoding; Need to perform an RPC call to glusterd
+         * to fetch working directory
+         */
+        snprintf (xquota_conf_file, sizeof xquota_conf_file,
+                  "%s/vols/%s/xquota.conf",
+                  GLUSTERD_DEFAULT_WORKDIR,
+                  volname);
+        fd = open (xquota_conf_file, O_RDONLY);
+        if (fd == -1)
+                goto out;
+
+        ret = xquota_conf_read_version (fd, &version);
+        if (ret)
+                goto out;
+
+        if (type == GF_XQUOTA_OPTION_TYPE_PROJECT_LIST_USAGE)
+                gfid_type = GF_XQUOTA_CONF_TYPE_USAGE;
+
+        /* Try to read atleast one gfid  of type 'gfid_type' */
+        while (1) {
+                ret = xquota_conf_read_gfid (fd, buf, &gfid_type_stored,
+                                             version);
                 if (ret <= 0)
                         break;
 
@@ -1713,6 +1810,195 @@ out:
         GF_FREE (gfid_str);
         if (ret) {
                 gf_log ("cli", GF_LOG_ERROR, "Could not fetch and display quota"
+                        " limits");
+        }
+        CLI_STACK_DESTROY (frame);
+        return ret;
+}
+
+int
+cli_cmd_xquota_handle_list_all (const char **words, dict_t *options)
+{
+        int                      all_failed                 = 1;
+        int                      count                      = 0;
+        int                      ret                        = -1;
+        rpc_clnt_procedure_t    *proc                       = NULL;
+        cli_local_t             *local                      = NULL;
+        call_frame_t            *frame                      = NULL;
+        dict_t                  *xdata                      = NULL;
+        char                    *gfid_str                   = NULL;
+        char                    *volname                    = NULL;
+        char                    *volname_dup                = NULL;
+        unsigned char            buf[16]                    = {0};
+        int                      fd                         = -1;
+        char                     xquota_conf_file[PATH_MAX] = {0};
+        char                     err_str[NAME_MAX]          = {0,};
+        int32_t                  type                       = 0;
+        char                     gfid_type                  = 0;
+        float                    version                    = 0.0f;
+        int32_t                  max_count                  = 0;
+
+        xdata = dict_new ();
+        if (!xdata) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = dict_get_str (options, "volname", &volname);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get volume name");
+                goto out;
+        }
+
+        ret = dict_get_int32 (options, "type", &type);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get quota option type");
+                goto out;
+        }
+
+        ret = dict_set_int32 (xdata, "type", type);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set type in xdata");
+                goto out;
+        }
+
+        ret = cli_xquota_get_soft_limit (options, words, xdata);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to fetch default "
+                        "soft-limit");
+                goto out;
+        }
+
+        /* Check if at least one limit is set on volume. No need to check for
+         * xquota enabled as cli_xquota_get_soft_limit() handles that
+         */
+        if (!_xquota_limits_set_on_volume (volname, type)) {
+                snprintf (err_str, sizeof (err_str), "No%s xquota configured on"
+                          " volume %s",
+                          (type == GF_XQUOTA_OPTION_TYPE_PROJECT_LIST_USAGE) ? "" : " inode",
+                          volname);
+		cli_out ("xquota: %s", err_str);
+                ret = 0;
+                goto out;
+        }
+
+        frame = create_frame (THIS, THIS->ctx->pool);
+        if (!frame) {
+                ret = -1;
+                goto out;
+        }
+
+        volname_dup = gf_strdup (volname);
+        if (!volname_dup) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = dict_set_dynstr (xdata, "volume-uuid", volname_dup);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set volume-uuid");
+                GF_FREE (volname_dup);
+                goto out;
+        }
+
+        //TODO: fix hardcoding; Need to perform an RPC call to glusterd
+        //to fetch working directory
+        snprintf (xquota_conf_file, sizeof xquota_conf_file,
+                  "%s/vols/%s/xquota.conf",
+                  GLUSTERD_DEFAULT_WORKDIR,
+                  volname);
+        fd = open (xquota_conf_file, O_RDONLY);
+        if (fd == -1) {
+                //This may because no limits were yet set on the volume
+                gf_log ("cli", GF_LOG_TRACE, "Unable to open "
+                        "xquota.conf");
+                ret = 0;
+                goto out;
+         }
+
+        ret = xquota_conf_read_version (fd, &version);
+        if (ret)
+                goto out;
+
+        CLI_LOCAL_INIT (local, words, frame, xdata);
+        proc = &cli_xquotad_clnt.proctable[GF_XAGGREGATOR_GETLIMIT];
+
+        gfid_str = GF_CALLOC (1, gf_common_mt_char, 64);
+        if (!gfid_str) {
+                ret = -1;
+                goto out;
+        }
+
+        for (count = 0;; count++) {
+                ret = xquota_conf_read_gfid (fd, buf, &gfid_type, version);
+                if (ret == 0) {
+                        break;
+                } else if (ret < 0) {
+                        gf_log (THIS->name, GF_LOG_CRITICAL, "XQuota "
+                                "configuration store may be corrupt.");
+                        goto out;
+                }
+
+                max_count++;
+        }
+        ret = dict_set_int32 (xdata, "max_count", max_count);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set max_count");
+                goto out;
+        }
+
+        ret = sys_lseek (fd, 0L, SEEK_SET);
+        if (ret < 0) {
+                gf_log (THIS->name, GF_LOG_ERROR, "failed to move offset to "
+                        "the beginning: %s", strerror (errno));
+                goto out;
+        }
+        ret = xquota_conf_read_version (fd, &version);
+        if (ret)
+                goto out;
+
+        for (count = 0;; count++) {
+                ret = xquota_conf_read_gfid (fd, buf, &gfid_type, version);
+                if (ret == 0) {
+                        break;
+                } else if (ret < 0) {
+                        gf_log (THIS->name, GF_LOG_CRITICAL, "XQuota "
+                                "configuration store may be corrupt.");
+                        goto out;
+                }
+
+                uuid_utoa_r (buf, gfid_str);
+                ret = dict_set_str (xdata, "gfid", gfid_str);
+                if (ret) {
+                        gf_log ("cli", GF_LOG_ERROR, "Failed to set gfid");
+                        goto out;
+                }
+
+                ret = proc->fn (frame, THIS, xdata);
+                if (ret) {
+                        gf_log ("cli", GF_LOG_ERROR, "Failed to get quota "
+                                "limits for %s", uuid_utoa ((unsigned char*)buf));
+                }
+
+                dict_del (xdata, "gfid");
+                all_failed = all_failed && ret;
+        }
+
+        if (count > 0) {
+                ret = all_failed? -1: 0;
+        } else {
+                ret = 0;
+        }
+
+
+out:
+        if (fd != -1) {
+                sys_close (fd);
+        }
+
+        GF_FREE (gfid_str);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Could not fetch and display xquota"
                         " limits");
         }
         CLI_STACK_DESTROY (frame);
@@ -1968,6 +2254,109 @@ out:
                 }
         }
 
+
+        CLI_STACK_DESTROY (frame);
+        return ret;
+}
+
+int
+cli_cmd_xquota_cbk (struct cli_state *state, struct cli_cmd_word *word,
+                    const char **words, int wordcount)
+{
+
+        int                      ret       = 0;
+        int                      parse_err = 0;
+        int32_t                  type      = 0;
+        rpc_clnt_procedure_t    *proc      = NULL;
+        call_frame_t            *frame     = NULL;
+        dict_t                  *options   = NULL;
+        cli_local_t             *local     = NULL;
+        int                      sent      = 0;
+        char                    *volname   = NULL;
+
+        ret = cli_cmd_xquota_parse (words, wordcount, &options);
+        if (ret < 0) {
+                cli_usage_out (word->pattern);
+                parse_err = 1;
+                goto out;
+        }
+
+        ret = dict_get_int32 (options, "type", &type);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get opcode");
+                goto out;
+        }
+
+        switch (type) {
+        case GF_XQUOTA_OPTION_TYPE_PROJECT_LIST_USAGE:
+                ret = cli_cmd_xquota_handle_list_all (words, options);
+                goto out;
+        default:
+                break;
+        }
+
+        ret = dict_get_str (options, "volname", &volname);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get volume name");
+                goto out;
+        }
+
+        frame = create_frame (THIS, THIS->ctx->pool);
+        if (!frame) {
+                ret = -1;
+                goto out;
+        }
+
+        CLI_LOCAL_INIT (local, words, frame, options);
+        proc = &cli_rpc_prog->proctable[GLUSTER_CLI_XQUOTA];
+
+        if (proc->fn)
+                ret = proc->fn (frame, THIS, options);
+
+out:
+        if (ret) {
+                cli_cmd_sent_status_get (&sent);
+                if (sent == 0 && parse_err == 0)
+                        cli_out ("XQuota command failed. Please check the cli "
+                                 "logs for more details");
+        }
+
+        /* Events for XQuota */
+         if (ret == 0) {
+                switch (type) {
+                case GF_XQUOTA_OPTION_TYPE_ENABLE:
+                        gf_event (EVENT_XQUOTA_ENABLE, "volume=%s", volname);
+                        break;
+                case GF_XQUOTA_OPTION_TYPE_DISABLE:
+                        gf_event (EVENT_XQUOTA_DISABLE, "volume=%s", volname);
+                        break;
+                case GF_XQUOTA_OPTION_TYPE_PROJECT_LIMIT_USAGE:
+                        gf_event (EVENT_XQUOTA_PROJECT_LIMIT_USAGE, "volume=%s;"
+                                  "path=%s;projid=%s;limit=%s", volname, words[5],
+                                  words[6], words[7]);
+                        break;
+                case GF_XQUOTA_OPTION_TYPE_PROJECT_REMOVE_USAGE:
+                        gf_event (EVENT_XQUOTA_PROJECT_REMOVE_USAGE, "volume=%s;"
+                                  "path=%s", volname, words[5]);
+                        break;
+                case GF_XQUOTA_OPTION_TYPE_ALERT_TIME:
+                        gf_event (EVENT_XQUOTA_ALERT_TIME, "volume=%s;time=%s",
+                                  volname, words[4]);
+                        break;
+                case GF_XQUOTA_OPTION_TYPE_SOFT_TIMEOUT:
+                        gf_event (EVENT_XQUOTA_SOFT_TIMEOUT, "volume=%s;"
+                                  "soft-timeout=%s", volname, words[4]);
+                        break;
+                case GF_XQUOTA_OPTION_TYPE_HARD_TIMEOUT:
+                        gf_event (EVENT_XQUOTA_HARD_TIMEOUT, "volume=%s;"
+                                  "hard-timeout=%s", volname, words[4]);
+                        break;
+                case GF_XQUOTA_OPTION_TYPE_DEFAULT_SOFT_LIMIT:
+                        gf_event (EVENT_XQUOTA_DEFAULT_SOFT_LIMIT, "volume=%s;"
+                                  "default-soft-limit=%s", volname, words[4]);
+                        break;
+                }
+        }
 
         CLI_STACK_DESTROY (frame);
         return ret;
@@ -3286,12 +3675,21 @@ struct cli_cmd volume_cmds[] = {
           cli_cmd_quota_cbk,
           "quota translator specific operations"},
 
+        { "volume xquota <VOLNAME> {enable|disable} |\n"
+          "volume xquota <VOLNAME> {limit-usage {project} <path> <projid> <size> [<percent>]} |\n"
+          "volume xquota <VOLNAME> {remove-usage {project} <path>} |\n"
+          "volume xquota <VOLNAME> {list-usage {project} [<path> ...]} |\n"
+          "volume xquota <VOLNAME> {default-soft-limit [<percent>]} |\n"
+          "volume xquota <VOLNAME> {alert-time|soft-timeout|hard-timeout} {<time>}",
+          cli_cmd_xquota_cbk,
+          "xquota translator specific operations"},
+
          { "volume top <VOLNAME> {open|read|write|opendir|readdir|clear} [nfs|brick <brick>] [list-cnt <value>] |\n"
            "volume top <VOLNAME> {read-perf|write-perf} [bs <size> count <count>] [brick <brick>] [list-cnt <value>]",
            cli_cmd_volume_top_cbk,
            "volume top operations"},
 
-        { "volume status [all | <VOLNAME> [nfs|shd|<BRICK>|quotad|tierd]]"
+        { "volume status [all | <VOLNAME> [nfs|shd|<BRICK>|quotad|tierd|xquotad]]"
           " [detail|clients|mem|inode|fd|callpool|tasks]",
           cli_cmd_volume_status_cbk,
           "display status of all or specified volume(s)/brick"},
@@ -3305,7 +3703,7 @@ struct cli_cmd volume_cmds[] = {
           cli_cmd_volume_heal_cbk,
           "self-heal commands on volume specified by <VOLNAME>"},
 
-        {"volume statedump <VOLNAME> [[nfs|quotad] [all|mem|iobuf|callpool|"
+        {"volume statedump <VOLNAME> [[nfs|quotad|xquotad] [all|mem|iobuf|callpool|"
          "priv|fd|inode|history]... | [client <hostname:process-id>]]",
          cli_cmd_volume_statedump_cbk,
          "perform statedump on bricks"},

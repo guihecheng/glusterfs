@@ -42,8 +42,10 @@
 #include "byte-order.h"
 
 #include "cli-quotad-client.h"
+#include "cli-xquotad-client.h"
 #include "run.h"
 #include "quota-common-utils.h"
+#include "xquota-common-utils.h"
 #include "events.h"
 
 enum gf_task_types {
@@ -52,7 +54,9 @@ enum gf_task_types {
 };
 
 extern struct rpc_clnt *global_quotad_rpc;
+extern struct rpc_clnt *global_xquotad_rpc;
 extern rpc_clnt_prog_t cli_quotad_clnt;
+extern rpc_clnt_prog_t cli_xquotad_clnt;
 extern rpc_clnt_prog_t *cli_rpc_prog;
 extern int              cli_op_ret;
 extern int              connected;
@@ -3483,6 +3487,56 @@ out:
 }
 
 static int
+print_xquota_project_list_usage_output (cli_local_t *local, char *path,
+                                        int64_t avail, char *sl_str,
+                                        xquota_meta_t *meta,
+                                        gf_boolean_t sl, gf_boolean_t hl,
+                                        double sl_num, gf_boolean_t limit_set)
+{
+        int32_t         ret          = -1;
+        char           *used_str     = NULL;
+        char           *avail_str    = NULL;
+        char           *hl_str       = NULL;
+        char           *sl_val       = NULL;
+
+        used_str = gf_uint64_2human_readable (meta->usage);
+
+        if (limit_set) {
+                hl_str = gf_uint64_2human_readable (meta->hl);
+                avail_str = gf_uint64_2human_readable (avail);
+
+                sl_val = gf_uint64_2human_readable (sl_num);
+        }
+
+        if (limit_set) {
+                if (!used_str) {
+                        cli_out ("%-20s %-20u %7s %7s(%s) %8"PRIu64 "%9"PRIu64""
+                                 "%15s %18s", path, meta->projid, hl_str, sl_str, sl_val,
+                                 meta->usage, avail,
+                                 sl ? "Yes" : "No", hl ? "Yes" : "No");
+                } else {
+                        cli_out ("%-20s %-20u %7s %7s(%s) %8s %7s %15s %20s",
+                                 path, meta->projid, hl_str, sl_str, sl_val, used_str,
+                                 avail_str, sl ? "Yes" : "No",
+                                 hl ? "Yes" : "No");
+                }
+        } else {
+                        cli_out ("%-18s %-18u %10s %10s %14s %9s %15s %18s",
+                                 path, meta->projid, "N/A", "N/A", used_str, "N/A",
+                                 "N/A", "N/A");
+        }
+
+        ret = 0;
+
+        GF_FREE (hl_str);
+        GF_FREE (used_str);
+        GF_FREE (avail_str);
+        GF_FREE (sl_val);
+
+        return ret;
+}
+
+static int
 print_quota_list_object_output (cli_local_t *local, char *path, int64_t avail,
                                char *sl_str, quota_limits_t *limits,
                                quota_meta_t *used_space, gf_boolean_t sl,
@@ -3580,6 +3634,54 @@ print_quota_list_output (cli_local_t *local, char *path, char *default_sl,
                                                       sl_final, limits,
                                                       used_space, sl, hl,
                                                       sl_num, limit_set);
+
+        return ret;
+}
+
+static int
+print_xquota_list_project_output (cli_local_t *local, char *path,
+                                  char *default_sl, xquota_meta_t *meta,
+                                  int type, gf_boolean_t limit_set)
+{
+        int64_t         avail            = 0;
+        char            percent_str[20]  = {0};
+        char           *sl_final         = NULL;
+        int             ret              = -1;
+        double          sl_num           = 0;
+        gf_boolean_t    sl               = _gf_false;
+        gf_boolean_t    hl               = _gf_false;
+
+        GF_ASSERT (local);
+        GF_ASSERT (path);
+
+        if (limit_set) {
+                if (meta->sl <= 0) {
+                        ret = gf_string2percent (default_sl, &sl_num);
+                        sl_num = (sl_num * meta->hl) / 100;
+                        sl_final = default_sl;
+                } else {
+                        sl_num = (meta->sl * meta->hl) / 100;
+                        snprintf (percent_str, sizeof (percent_str), "%"PRIu64"%%",
+                                        meta->sl);
+                        sl_final = percent_str;
+                }
+
+                if (meta->hl > meta->usage) {
+                        avail = meta->hl - meta->usage;
+                        hl = _gf_false;
+                        if (meta->usage > sl_num)
+                                sl = _gf_true;
+                        else
+                                sl = _gf_false;
+                } else {
+                        avail = 0;
+                        hl = sl = _gf_true;
+                }
+        }
+
+        ret = print_xquota_project_list_usage_output (local, path, avail,
+                                                      sl_final, meta,
+                                                      sl, hl, sl_num, limit_set);
 
         return ret;
 }
@@ -3881,6 +3983,88 @@ out:
         return ret;
 }
 
+int
+print_xquota_list_from_xquotad (call_frame_t *frame, dict_t *rsp_dict)
+{
+        char             *path          = NULL;
+        char             *default_sl    = NULL;
+        int              ret            = -1;
+        cli_local_t     *local          = NULL;
+        dict_t          *gd_rsp_dict    = NULL;
+        xquota_meta_t    meta           = {0, };
+        xquota_meta_t   *metaptr        = NULL;
+        int32_t          type           = 0;
+        int32_t          success_count  = 0;
+
+        GF_ASSERT (frame);
+
+        local = frame->local;
+        gd_rsp_dict = local->dict;
+
+        ret = dict_get_int32 (rsp_dict, "type", &type);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to get type");
+                goto out;
+        }
+
+        ret = dict_get_str (rsp_dict, GET_ANCESTRY_PATH_KEY, &path);
+        if (ret) {
+                gf_log ("cli", GF_LOG_WARNING, "path key is not present "
+                        "in dict");
+                goto out;
+        }
+
+        ret = dict_get_str (gd_rsp_dict, "xquota-default-soft-limit", &default_sl);
+        if (ret) {
+                gf_log (frame->this->name, GF_LOG_ERROR, "failed to "
+                        "get default soft limit");
+                goto out;
+        }
+
+        ret = dict_get_bin (rsp_dict, VIRTUAL_XQUOTA_USAGE_META_KEY,
+                            (void **)&metaptr);
+        if (ret) {
+                gf_log ("cli", GF_LOG_WARNING,
+                        "meta key not present in dict on %s",
+                        path);
+                goto out;
+        }
+
+        meta.hl = ntoh64 (metaptr->hl);
+        meta.sl = ntoh64 (metaptr->sl);
+        meta.usage = ntoh64 (metaptr->usage);
+        meta.projid = ntoh32 (metaptr->projid);
+
+        LOCK (&local->lock);
+        {
+                ret = dict_get_int32 (gd_rsp_dict, "xquota-list-success-count",
+                                      &success_count);
+                if (ret)
+                        success_count = 0;
+
+                ret = dict_set_int32 (gd_rsp_dict,
+                                      "xquota-list-success-count",
+                                      success_count + 1);
+        }
+        UNLOCK (&local->lock);
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set "
+                        "xquota-list-success-count in dict");
+                goto out;
+        }
+
+        if (success_count == 0) {
+                if (!(global_state->mode & GLUSTER_MODE_XML)) {
+                        print_xquota_project_list_header (type);
+                }
+        }
+
+        ret = print_xquota_list_project_output (local, path, default_sl,
+                                                &meta, type, _gf_true);
+out:
+        return ret;
+}
+
 void*
 cli_cmd_broadcast_response_detached (void *opaque)
 {
@@ -3919,6 +4103,38 @@ cli_quota_compare_path (struct list_head *list1,
                 return 0;
 
         return strcmp (path1, path2);
+}
+
+int32_t
+cli_xquota_compare_projid (struct list_head *list1,
+                           struct list_head *list2)
+{
+        struct list_node  *node1   = NULL;
+        struct list_node  *node2   = NULL;
+        dict_t            *dict1   = NULL;
+        dict_t            *dict2   = NULL;
+        xquota_meta_t     *meta1   = NULL;
+        xquota_meta_t     *meta2   = NULL;
+        uint32_t           projid1 = 0;
+        uint32_t           projid2 = 0;
+
+        node1 = list_entry (list1, struct list_node, list);
+        node2 = list_entry (list2, struct list_node, list);
+
+        dict1 = node1->ptr;
+        dict2 = node2->ptr;
+
+        (void) dict_get_bin (dict1, VIRTUAL_XQUOTA_USAGE_META_KEY,
+                            (void **)&meta1);
+
+        projid1 = ntoh32 (meta1->projid);
+
+        (void) dict_get_bin (dict2, VIRTUAL_XQUOTA_USAGE_META_KEY,
+                            (void **)&meta2);
+
+        projid2 = ntoh32 (meta2->projid);
+
+        return projid1 < projid2;
 }
 
 int
@@ -4065,6 +4281,149 @@ out:
 }
 
 int
+cli_xquotad_getlimit_cbk (struct rpc_req *req, struct iovec *iov,
+                          int count, void *myframe)
+{
+    /*TODO: we need to gather the path, hard-limit, soft-limit and used space*/
+        gf_cli_rsp         rsp         = {0,};
+        int                ret         = -1;
+        dict_t            *dict        = NULL;
+        struct list_node  *node        = NULL;
+        struct list_node  *tmpnode     = NULL;
+        call_frame_t      *frame       = NULL;
+        cli_local_t       *local       = NULL;
+        int32_t            list_count  = 0;
+        pthread_t          th_id       = {0, };
+        int32_t            max_count   = 0;
+
+        GF_ASSERT (myframe);
+
+        frame = myframe;
+
+        GF_ASSERT (frame->local);
+
+        local = frame->local;
+
+        LOCK (&local->lock);
+        {
+                ret = dict_get_int32 (local->dict, "xquota-list-count",
+                                      &list_count);
+                if (ret)
+                        list_count = 0;
+
+                list_count++;
+                ret = dict_set_int32 (local->dict, "xquota-list-count",
+                                      list_count);
+        }
+        UNLOCK (&local->lock);
+
+        if (ret) {
+                gf_log ("cli", GF_LOG_ERROR, "Failed to set "
+                        "quota-list-count in dict");
+                goto out;
+        }
+
+        if (-1 == req->rpc_status) {
+                if (list_count == 0)
+                        cli_err ("Connection failed. Please check if xquota "
+                                 "daemon is operational.");
+                ret = -1;
+                goto out;
+        }
+
+        ret = xdr_to_generic (*iov, &rsp, (xdrproc_t)xdr_gf_cli_rsp);
+        if (ret < 0) {
+                gf_log (frame->this->name, GF_LOG_ERROR,
+                        "Failed to decode xdr response");
+                goto out;
+        }
+
+        if (rsp.op_ret) {
+                ret = -1;
+                if (strcmp (rsp.op_errstr, ""))
+                        cli_err ("xquota command failed : %s", rsp.op_errstr);
+                else
+                        cli_err ("xquota command : failed");
+                goto out;
+        }
+
+        if (rsp.dict.dict_len) {
+                /* Unserialize the dictionary */
+                dict  = dict_new ();
+
+                ret = dict_unserialize (rsp.dict.dict_val,
+                                        rsp.dict.dict_len,
+                                        &dict);
+                if (ret < 0) {
+                        gf_log ("cli", GF_LOG_ERROR,
+                                "failed to "
+                                "unserialize req-buffer to dictionary");
+                        goto out;
+                }
+
+                node = list_node_add_order (dict, &local->dict_list,
+                                            cli_xquota_compare_projid);
+                if (node == NULL) {
+                        gf_log ("cli", GF_LOG_ERROR,
+                                "failed to add node to the list");
+                        dict_unref (dict);
+                        goto out;
+                }
+
+       }
+
+        ret = dict_get_int32 (local->dict, "max_count",
+                              &max_count);
+        if (ret < 0) {
+                gf_log ("cli", GF_LOG_ERROR,
+                        "failed to get max_count");
+                goto out;
+        }
+
+        if (list_count == max_count) {
+                list_for_each_entry_safe (node, tmpnode,
+                                          &local->dict_list, list) {
+                        dict = node->ptr;
+                        print_xquota_list_from_xquotad (frame, dict);
+                        list_node_del (node);
+                        dict_unref (dict);
+                }
+        }
+
+
+
+out:
+        /* Bad Fix: CLI holds the lock to process a command.
+         * When processing quota list command, below sequence of steps executed
+         * in the same thread and causing deadlock
+         *
+         * 1) CLI holds the lock
+         * 2) Send rpc_clnt_submit request to quotad for quota usage
+         * 3) If quotad is down, rpc_clnt_submit invokes cbk function with error
+         * 4) cbk function cli_quotad_getlimit_cbk invokes
+         *    cli_cmd_broadcast_response which tries to hold lock to broadcast
+         *    the results and hangs, because same thread has already holding
+         *    the lock
+         *
+         * Broadcasting response in a seperate thread which is not a
+         * good fix. This needs to be re-visted with better solution
+         */
+        if (ret == -1) {
+                ret = pthread_create (&th_id, NULL,
+                                cli_cmd_broadcast_response_detached,
+                                (void *)-1);
+                if (ret)
+                        gf_log ("cli", GF_LOG_ERROR, "pthread_create failed: "
+                                "%s", strerror (errno));
+        } else {
+                cli_cmd_broadcast_response (ret);
+        }
+
+        free (rsp.dict.dict_val);
+        return ret;
+}
+
+int
 cli_quotad_getlimit (call_frame_t *frame, xlator_t *this, void *data)
 {
         gf_cli_req          req = {{0,}};
@@ -4089,6 +4448,38 @@ cli_quotad_getlimit (call_frame_t *frame, xlator_t *this, void *data)
         ret = cli_cmd_submit (global_quotad_rpc, &req, frame, &cli_quotad_clnt,
                               GF_AGGREGATOR_GETLIMIT, NULL,
                               this, cli_quotad_getlimit_cbk,
+                              (xdrproc_t) xdr_gf_cli_req);
+
+out:
+        gf_log ("cli", GF_LOG_DEBUG, "Returning %d", ret);
+        return ret;
+}
+
+int
+cli_xquotad_getlimit (call_frame_t *frame, xlator_t *this, void *data)
+{
+        gf_cli_req          req = {{0,}};
+        int                 ret = 0;
+        dict_t             *dict = NULL;
+
+        if (!frame || !this ||  !data) {
+                ret = -1;
+                goto out;
+        }
+
+        dict = data;
+        ret = dict_allocate_and_serialize (dict, &req.dict.dict_val,
+                                           &req.dict.dict_len);
+        if (ret < 0) {
+                gf_log (this->name, GF_LOG_ERROR,
+                        "failed to serialize the data");
+
+                goto out;
+        }
+
+        ret = cli_cmd_submit (global_xquotad_rpc, &req, frame, &cli_xquotad_clnt,
+                              GF_XAGGREGATOR_GETLIMIT, NULL,
+                              this, cli_xquotad_getlimit_cbk,
                               (xdrproc_t) xdr_gf_cli_req);
 
 out:
@@ -4257,6 +4648,131 @@ out:
             || (type == GF_QUOTA_OPTION_TYPE_LIST_OBJECTS)) {
                 gluster_remove_auxiliary_mount (volname);
         }
+
+        cli_cmd_broadcast_response (ret);
+        if (dict)
+                dict_unref (dict);
+
+        free (rsp.dict.dict_val);
+
+        return ret;
+}
+
+int
+gf_cli_xquota_cbk (struct rpc_req *req, struct iovec *iov,
+                   int count, void *myframe)
+{
+        gf_cli_rsp         rsp             = {0,};
+        int                ret             = -1;
+        dict_t            *dict            = NULL;
+        char              *volname         = NULL;
+        int32_t            type            = 0;
+        call_frame_t      *frame           = NULL;
+        cli_local_t       *local           = NULL;
+        char              *default_sl      = NULL;
+        char              *default_sl_dup  = NULL;
+
+        GF_ASSERT (myframe);
+
+        if (-1 == req->rpc_status) {
+                goto out;
+        }
+
+        frame = myframe;
+
+        GF_ASSERT (frame->local);
+
+        local = frame->local;
+
+        ret = xdr_to_generic (*iov, &rsp, (xdrproc_t)xdr_gf_cli_rsp);
+        if (ret < 0) {
+                gf_log (frame->this->name, GF_LOG_ERROR,
+                        "Failed to decode xdr response");
+                goto out;
+        }
+
+        if (rsp.op_ret) {
+                ret = -1;
+                if (global_state->mode & GLUSTER_MODE_XML)
+                        goto xml_output;
+
+                if (strcmp (rsp.op_errstr, "")) {
+                        cli_err ("xquota command failed : %s", rsp.op_errstr);
+                        if (rsp.op_ret == -ENOENT)
+                                cli_err ("please enter the path relative to "
+                                         "the volume");
+                } else {
+                        cli_err ("xquota command : failed");
+                }
+
+                goto out;
+        }
+
+        if (rsp.dict.dict_len) {
+                /* Unserialize the dictionary */
+                dict  = dict_new ();
+
+                ret = dict_unserialize (rsp.dict.dict_val,
+                                        rsp.dict.dict_len,
+                                        &dict);
+                if (ret < 0) {
+                        gf_log ("cli", GF_LOG_ERROR,
+                                "failed to "
+                                "unserialize req-buffer to dictionary");
+                        goto out;
+                }
+        }
+
+        gf_log ("cli", GF_LOG_DEBUG, "Received resp to xquota command");
+
+        ret = dict_get_str (dict, "volname", &volname);
+        if (ret)
+                gf_log (frame->this->name, GF_LOG_ERROR,
+                        "failed to get volname");
+
+        ret = dict_get_str (dict, "xquota-default-soft-limit", &default_sl);
+        if (ret)
+                gf_log (frame->this->name, GF_LOG_TRACE, "failed to get "
+                        "default soft limit");
+
+        // xquota-default-soft-limit is part of rsp_dict only iff we sent
+        // GLUSTER_CLI_XQUOTA with type being GF_XQUOTA_OPTION_TYPE_PROJECT_LIST_USAGE
+        if (default_sl) {
+                default_sl_dup = gf_strdup (default_sl);
+                if (!default_sl_dup) {
+                        ret = -1;
+                        goto out;
+                }
+                ret = dict_set_dynstr (local->dict, "xquota-default-soft-limit",
+                                       default_sl_dup);
+                if (ret) {
+                        gf_log (frame->this->name, GF_LOG_TRACE,
+                                "failed to set xquota default soft limit");
+                        GF_FREE (default_sl_dup);
+                }
+        }
+
+        ret = dict_get_int32 (dict, "type", &type);
+        if (ret)
+                gf_log (frame->this->name, GF_LOG_TRACE,
+                        "failed to get type");
+
+xml_output:
+
+        if (global_state->mode & GLUSTER_MODE_XML) {
+                ret = cli_xml_output_str ("volXQuota", NULL, rsp.op_ret,
+                                          rsp.op_errno, rsp.op_errstr);
+                if (ret)
+                        gf_log ("cli", GF_LOG_ERROR,
+                                "Error outputting to xml");
+                goto out;
+        }
+
+        if (!rsp.op_ret)
+                cli_out ("volume xquota : success");
+
+        ret = rsp.op_ret;
+out:
 
         cli_cmd_broadcast_response (ret);
         if (dict)
@@ -5417,6 +5933,31 @@ gf_cli_quota (call_frame_t *frame, xlator_t *this,
         ret = cli_to_glusterd (&req, frame, gf_cli_quota_cbk,
                                (xdrproc_t) xdr_gf_cli_req, dict,
                                GLUSTER_CLI_QUOTA, this, cli_rpc_prog, NULL);
+
+out:
+        GF_FREE (req.dict.dict_val);
+
+        return ret;
+}
+
+int32_t
+gf_cli_xquota (call_frame_t *frame, xlator_t *this,
+               void *data)
+{
+        gf_cli_req          req = {{0,}};
+        int                 ret = 0;
+        dict_t             *dict = NULL;
+
+        if (!frame || !this ||  !data) {
+                ret = -1;
+                goto out;
+        }
+
+        dict = data;
+
+        ret = cli_to_glusterd (&req, frame, gf_cli_xquota_cbk,
+                               (xdrproc_t) xdr_gf_cli_req, dict,
+                               GLUSTER_CLI_XQUOTA, this, cli_rpc_prog, NULL);
 
 out:
         GF_FREE (req.dict.dict_val);
@@ -12015,7 +12556,8 @@ struct rpc_clnt_procedure gluster_cli_actors[GLUSTER_CLI_MAXVALUE] = {
         [GLUSTER_CLI_GET_STATE]        = {"GET_STATE", gf_cli_get_state},
         [GLUSTER_CLI_RESET_BRICK]      = {"RESET_BRICK", gf_cli_reset_brick},
         [GLUSTER_CLI_REMOVE_TIER_BRICK] = {"DETACH_TIER", gf_cli_remove_tier_brick},
-        [GLUSTER_CLI_ADD_TIER_BRICK]   = {"ADD_TIER_BRICK", gf_cli_add_tier_brick}
+        [GLUSTER_CLI_ADD_TIER_BRICK]   = {"ADD_TIER_BRICK", gf_cli_add_tier_brick},
+        [GLUSTER_CLI_XQUOTA]           = {"XQUOTA", gf_cli_xquota},
 };
 
 struct rpc_clnt_program cli_prog = {
@@ -12038,4 +12580,18 @@ struct rpc_clnt_program cli_quotad_clnt = {
         .progver   = GLUSTER_AGGREGATOR_VERSION,
         .numproc   = GF_AGGREGATOR_MAXVALUE,
         .proctable = cli_quotad_procs,
+};
+
+struct rpc_clnt_procedure cli_xquotad_procs[GF_XAGGREGATOR_MAXVALUE] = {
+        [GF_XAGGREGATOR_NULL]       = {"NULL", NULL},
+        [GF_XAGGREGATOR_LOOKUP]     = {"LOOKUP", NULL},
+        [GF_XAGGREGATOR_GETLIMIT]   = {"GETLIMIT", cli_xquotad_getlimit},
+};
+
+struct rpc_clnt_program cli_xquotad_clnt = {
+        .progname  = "CLI XQuotad client",
+        .prognum   = GLUSTER_XAGGREGATOR_PROGRAM,
+        .progver   = GLUSTER_XAGGREGATOR_VERSION,
+        .numproc   = GF_XAGGREGATOR_MAXVALUE,
+        .proctable = cli_xquotad_procs,
 };

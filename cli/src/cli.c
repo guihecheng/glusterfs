@@ -41,6 +41,7 @@
 
 #include "cli.h"
 #include "cli-quotad-client.h"
+#include "cli-xquotad-client.h"
 #include "cli-cmd.h"
 #include "cli-mem-types.h"
 
@@ -78,6 +79,7 @@ const char *argp_program_version = ""                                         \
 const char *argp_program_bug_address = "<" PACKAGE_BUGREPORT ">";
 
 struct rpc_clnt *global_quotad_rpc;
+struct rpc_clnt *global_xquotad_rpc;
 struct rpc_clnt *global_rpc;
 
 rpc_clnt_prog_t *cli_rpc_prog;
@@ -611,6 +613,45 @@ out:
 }
 
 struct rpc_clnt *
+cli_xquotad_clnt_rpc_init (void)
+{
+        struct rpc_clnt *rpc = NULL;
+        dict_t          *rpc_opts = NULL;
+        int             ret = -1;
+
+        rpc_opts = dict_new ();
+        if (!rpc_opts) {
+                        ret = -1;
+                        goto out;
+                }
+
+        ret = dict_set_str (rpc_opts, "transport.address-family", "unix");
+        if (ret)
+                goto out;
+
+        ret = dict_set_str (rpc_opts, "transport-type", "socket");
+        if (ret)
+                goto out;
+
+        ret = dict_set_str (rpc_opts, "transport.socket.connect-path",
+                                            "/var/run/gluster/xquotad.socket");
+        if (ret)
+                goto out;
+
+        rpc = cli_xquotad_clnt_init (THIS, rpc_opts);
+        if (!rpc)
+                goto out;
+
+        global_xquotad_rpc = rpc;
+out:
+        if (ret) {
+                if (rpc_opts)
+                        dict_unref(rpc_opts);
+        }
+        return rpc;
+}
+
+struct rpc_clnt *
 cli_rpc_init (struct cli_state *state)
 {
         struct rpc_clnt         *rpc = NULL;
@@ -772,6 +813,10 @@ main (int argc, char *argv[])
         if (!global_quotad_rpc)
                 goto out;
 
+        global_xquotad_rpc = cli_xquotad_clnt_rpc_init ();
+        if (!global_xquotad_rpc)
+                goto out;
+
         ret = cli_cmds_register (&state);
         if (ret)
                 goto out;
@@ -836,3 +881,35 @@ print_quota_list_empty (char *path, int type)
                          "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A");
 }
 
+void
+print_xquota_project_list_header (int type)
+{
+        if (type == GF_XQUOTA_OPTION_TYPE_PROJECT_LIST_USAGE) {
+                cli_out ("       Path            Project-ID          Hard-limit "
+                         " Soft-limit      Used  Available  Soft-limit "
+                         "exceeded? Hard-limit exceeded?");
+                cli_out ("-----------------------------------------------------"
+                         "-----------------------------------------------------"
+                         "---------------------");
+        } else {
+                cli_out ("       Path            Project-ID          Hard-limit "
+                         " Soft-limit      Count Available  Soft-limit "
+                         "exceeded? Hard-limit exceeded?");
+                cli_out ("-----------------------------------------------------"
+                         "-----------------------------------------------------"
+                         "-------------------------------------");
+        }
+}
+
+void
+print_xquota_project_list_empty (char *path, unsigned int projid, int type)
+{
+        if (type == GF_XQUOTA_OPTION_TYPE_PROJECT_LIST_USAGE)
+                cli_out ("%-20s %-20u %7s %9s %10s %7s %15s %20s",
+                         path, projid,
+                         "N/A", "N/A", "N/A", "N/A", "N/A", "N/A");
+        else
+                cli_out ("%-20s %-20u %9s %9s %12s %10s %15s %20s",
+                         path, projid,
+                         "N/A", "N/A", "N/A", "N/A", "N/A", "N/A");
+}

@@ -15,6 +15,7 @@
 #include "protocol-common.h"
 #include "logging.h"
 #include "quota-common-utils.h"
+#include "xquota-common-utils.h"
 
 #include "cli1-xdr.h"
 
@@ -248,6 +249,9 @@ cli_cmd_quota_parse (const char **words, int wordcount, dict_t **opt);
 
 int32_t
 cli_cmd_inode_quota_parse (const char **words, int wordcount, dict_t **opt);
+
+int32_t
+cli_cmd_xquota_parse (const char **words, int wordcount, dict_t **opt);
 
 int32_t
 cli_cmd_bitrot_parse (const char **words, int wordcount, dict_t **opt);
@@ -489,6 +493,12 @@ print_quota_list_header (int type);
 
 void
 print_quota_list_empty (char *path, int type);
+
+void
+print_xquota_project_list_header (int type);
+
+void
+print_xquota_project_list_empty (char *path, unsigned int projid, int type);
 
 int
 gf_gsync_status_t_comparator (const void *p, const void *q);
