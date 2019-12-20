@@ -1998,6 +1998,7 @@ afr_frame_return (call_frame_t *frame)
 static char *afr_ignore_xattrs[] = {
         GF_SELINUX_XATTR_KEY,
         QUOTA_SIZE_KEY,
+        VIRTUAL_XQUOTA_USAGE_META_KEY,
         NULL
 };
 

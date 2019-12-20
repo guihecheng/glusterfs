@@ -1809,6 +1809,14 @@
  * @recommendedaction
  *
  */
+#define LG_MSG_XQUOTA_CONF_ERROR                         (GLFS_LG_BASE + 212)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
 /*------------*/
 
 #define glfs_msg_end_lg GLFS_LG_MSGID_END, "Invalid: End of messages"

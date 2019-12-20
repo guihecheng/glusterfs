@@ -102,6 +102,13 @@ enum gf_aggregator_procnum {
         GF_AGGREGATOR_MAXVALUE,
 };
 
+enum gf_xaggregator_procnum {
+        GF_XAGGREGATOR_NULL = 0,
+        GF_XAGGREGATOR_LOOKUP,
+        GF_XAGGREGATOR_GETLIMIT,
+        GF_XAGGREGATOR_MAXVALUE,
+};
+
 enum gf_pmap_port_type {
         GF_PMAP_PORT_FREE = 0,
         GF_PMAP_PORT_FOREIGN,     /* it actually means, not sure who is using it, but it is in-use */
@@ -202,6 +209,7 @@ enum gluster_cli_procnum {
         GLUSTER_CLI_RESET_BRICK,
         GLUSTER_CLI_REMOVE_TIER_BRICK,
         GLUSTER_CLI_ADD_TIER_BRICK,
+        GLUSTER_CLI_XQUOTA,
         GLUSTER_CLI_MAXVALUE,
 };
 
@@ -334,6 +342,9 @@ typedef enum gf_get_snapshot_info_type gf_get_snapshot_info_type;
 /* Aggregator */
 #define GLUSTER_AGGREGATOR_PROGRAM 29852134 /* Completely random */
 #define GLUSTER_AGGREGATOR_VERSION 1
+
+#define GLUSTER_XAGGREGATOR_PROGRAM 29852135 /* Completely random */
+#define GLUSTER_XAGGREGATOR_VERSION 1
 
 /* Second version */
 #define GD_MGMT_PROGRAM          1238433 /* Completely random */

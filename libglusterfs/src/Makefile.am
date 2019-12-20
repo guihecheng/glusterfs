@@ -31,7 +31,7 @@ libglusterfs_la_SOURCES = dict.c xlator.c logging.c \
 	$(CONTRIBDIR)/libgen/basename_r.c \
 	$(CONTRIBDIR)/libgen/dirname_r.c $(CONTRIBDIR)/stdlib/gf_mkostemp.c \
 	strfd.c parse-utils.c $(CONTRIBDIR)/mount/mntent.c \
-	$(CONTRIBDIR)/libexecinfo/execinfo.c quota-common-utils.c rot-buffs.c \
+	$(CONTRIBDIR)/libexecinfo/execinfo.c quota-common-utils.c xquota-common-utils.c rot-buffs.c \
 	$(CONTRIBDIR)/timer-wheel/timer-wheel.c \
 	$(CONTRIBDIR)/timer-wheel/find_last_bit.c default-args.c locking.c \
 	$(CONTRIBDIR)/xxhash/xxhash.c \
@@ -56,7 +56,7 @@ libglusterfs_la_HEADERS = common-utils.h defaults.h default-args.h \
 	event-history.h gidcache.h client_t.h glusterfs-acl.h \
 	glfs-message-id.h template-component-messages.h strfd.h \
 	syncop-utils.h parse-utils.h libglusterfs-messages.h \
-	lvm-defaults.h quota-common-utils.h rot-buffs.h \
+	lvm-defaults.h quota-common-utils.h xquota-common-utils.h rot-buffs.h \
 	compat-uuid.h upcall-utils.h throttle-tbf.h events.h\
 	compound-fop-utils.h atomic.h
 

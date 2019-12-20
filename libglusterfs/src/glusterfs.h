@@ -181,6 +181,10 @@
 #define VIRTUAL_QUOTA_XATTR_CLEANUP_KEY "glusterfs.quota-xattr-cleanup"
 #define QUOTA_READ_ONLY_KEY "trusted.glusterfs.quota.read-only"
 
+/* xquota xattrs */
+#define VIRTUAL_XQUOTA_USAGE_META_KEY "glusterfs.xquota.usage-meta"
+#define XQUOTA_READ_ONLY_KEY "trusted.glusterfs.xquota.read-only"
+
 /* afr related */
 #define AFR_XATTR_PREFIX "trusted.afr"
 

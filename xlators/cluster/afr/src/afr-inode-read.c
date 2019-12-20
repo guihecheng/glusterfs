@@ -43,7 +43,6 @@
  * available ones for maximum quota size. This way if there is a source and
  * stale copies it always votes for the 'source'.
  * */
-
 int
 afr_handle_quota_size (call_frame_t *frame, xlator_t *this)
 {
@@ -111,7 +110,6 @@ afr_handle_quota_size (call_frame_t *frame, xlator_t *this)
 
         return read_subvol;
 }
-
 
 /* {{{ access */
 

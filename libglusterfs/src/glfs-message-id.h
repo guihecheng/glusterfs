@@ -195,7 +195,9 @@ GLFS_MSGID_COMP_SYMLINK_CACHE_END
 #define GLFS_MSGID_COMP_SL_END             (GLFS_MSGID_COMP_SL +\
                                             GLFS_MSGID_SEGMENT)
 
-
+#define GLFS_MSGID_COMP_XQUOTA             GLFS_MSGID_COMP_SL_END
+#define GLFS_MSGID_COMP_XQUOTA_END         (GLFS_MSGID_COMP_XQUOTA +\
+                                           GLFS_MSGID_SEGMENT)
 
 /* --- new segments for messages goes above this line --- */
 

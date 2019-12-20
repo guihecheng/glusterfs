@@ -1141,5 +1141,13 @@
  */
 #define DHT_MSG_MIGRATE_FILE_SKIPPED        (GLFS_DHT_BASE + 126)
 
+/*
+ * @messageid 109127
+ * @diagnosis
+ * @recommendedaction None
+ */
+
+#define DHT_MSG_AGGREGATE_XQUOTA_XATTR_FAILED   (GLFS_DHT_BASE + 127)
+
 #define glfs_msg_end_x GLFS_MSGID_END, "Invalid: End of messages"
 #endif /* _DHT_MESSAGES_H_ */

@@ -54,6 +54,11 @@
 #include "events.h"
 #include "glusterfsd.h"
 #include <sys/types.h>
+#include "run.h"
+#include "xquota-common-utils.h"
+
+#define XFS_QUOTA "/usr/sbin/xfs_quota"
+#define XFS_IO "/usr/sbin/xfs_io"
 
 char *marker_xattrs[] = {"trusted.glusterfs.quota.*",
                          "trusted.glusterfs.*.xtime",
@@ -153,6 +158,179 @@ static gf_boolean_t
 posix_xattr_ignorable (char *key)
 {
         return gf_get_index_by_elem (posix_ignore_xattrs, key) >= 0;
+}
+
+static int
+posix_get_brick_root (const char *path, char **mount_point)
+{
+        char           *ptr            = NULL;
+        char           *mnt_pt         = NULL;
+        struct stat     brickstat      = {0};
+        struct stat     buf            = {0};
+
+        if (!path)
+                goto err;
+        mnt_pt = gf_strdup (path);
+        if (!mnt_pt)
+                goto err;
+        if (sys_stat (mnt_pt, &brickstat))
+                goto err;
+
+        while ((ptr = strrchr (mnt_pt, '/')) &&
+               ptr != mnt_pt) {
+
+                *ptr = '\0';
+                if (sys_stat (mnt_pt, &buf)) {
+                        gf_msg (THIS->name, GF_LOG_ERROR, errno,
+                                P_MSG_FILE_OP_FAILED, "error in "
+                                "stat: %s", strerror (errno));
+                        goto err;
+                }
+
+                if (brickstat.st_dev != buf.st_dev) {
+                        *ptr = '/';
+                        break;
+                }
+        }
+
+        if (ptr == mnt_pt) {
+                if (sys_stat ("/", &buf)) {
+                        gf_msg (THIS->name, GF_LOG_ERROR, errno,
+                                P_MSG_FILE_OP_FAILED, "error in "
+                                "stat: %s", strerror (errno));
+                        goto err;
+                }
+                if (brickstat.st_dev == buf.st_dev)
+                        strcpy (mnt_pt, "/");
+        }
+
+        *mount_point = mnt_pt;
+        return 0;
+
+ err:
+        GF_FREE (mnt_pt);
+        return -1;
+}
+
+static int
+posix_get_xfs_projid (posix_xattr_filler_t *filler, uint32_t *projid)
+{
+        runner_t     runner         = {0,};
+        int          ret            = 0;
+        char         msg[1024]      = {0,};
+        char         buf[1024]      = {0,};
+        char        *token          = NULL;
+        const char  *delim          = " \t";
+        char        *saveptr        = NULL;
+        int          i              = 0;
+
+        runinit (&runner);
+        runner_add_args (&runner, XFS_IO, filler->real_path, "-c", "lsproj", NULL);
+        snprintf (msg, sizeof (msg), "Get projid of path %s", filler->real_path);
+        runner_log (&runner, THIS->name, GF_LOG_DEBUG, msg);
+        runner_redir (&runner, STDOUT_FILENO, RUN_PIPE);
+        ret = runner_start (&runner);
+        if (ret) {
+                gf_msg (THIS->name, GF_LOG_ERROR, errno,
+                        P_MSG_FILE_OP_FAILED, "failed to get projid for "
+                        "path: %s stat: %s",
+                        filler->real_path, strerror (errno));
+                runner_end (&runner);
+                goto out;
+        }
+
+        fgets (buf, sizeof (buf), runner_chio (&runner, STDOUT_FILENO));
+        runner_end (&runner);
+
+        for (token = strtok_r (buf, delim, &saveptr); token;
+                token = strtok_r (NULL, delim, &saveptr), i++) {
+            if (i == 2) {
+                ret = gf_string2uint32 (gf_trim (token), projid);
+                if (ret) {
+                        gf_msg (THIS->name, GF_LOG_ERROR, errno,
+                                P_MSG_FILE_OP_FAILED, "failed to parse projid for "
+                                "path: %s token: %s stat: %s",
+                                filler->real_path, gf_trim (token), strerror (errno));
+                }
+                break;
+            }
+        }
+out:
+        return ret;
+
+}
+
+static int
+posix_get_xfs_quota (posix_xattr_filler_t *filler, xquota_meta_t *meta)
+{
+        runner_t     runner         = {0,};
+        char        *mnt_pt         = NULL;
+        int          ret            = 0;
+        char         cmd[1024]      = {0,};
+        char         msg[1024]      = {0,};
+        char         buf[1024]      = {0,};
+        char        *token          = NULL;
+        const char  *delim          = " \t";
+        char        *saveptr        = NULL;
+        int          i              = 0;
+
+        ret = posix_get_brick_root (filler->real_path, &mnt_pt);
+        if (ret < 0) {
+            goto out;
+        }
+
+        snprintf (cmd, sizeof (cmd), "report -p -N -L %u -U %u",
+                  meta->projid, meta->projid);
+
+        runinit (&runner);
+        runner_add_args (&runner, XFS_QUOTA, "-x", "-c", cmd, mnt_pt, NULL);
+        snprintf (msg, sizeof (msg), "Get XFS Quota of project %u", meta->projid);
+        runner_log (&runner, THIS->name, GF_LOG_DEBUG, msg);
+        runner_redir (&runner, STDOUT_FILENO, RUN_PIPE);
+        ret = runner_start (&runner);
+        if (ret) {
+                gf_msg (THIS->name, GF_LOG_ERROR, errno,
+                        P_MSG_FILE_OP_FAILED, "failed to get xfs quota for "
+                        "project: %u mnt: %s cmd: %s stat: %s",
+                        meta->projid, mnt_pt, cmd, strerror (errno));
+                runner_end (&runner);
+                goto out;
+        }
+
+        fgets (buf, sizeof (buf), runner_chio (&runner, STDOUT_FILENO));
+        runner_end (&runner);
+
+        for (token = strtok_r (buf, delim, &saveptr); token;
+                token = strtok_r (NULL, delim, &saveptr), i++) {
+            if (i == 1) {
+                ret = gf_string2uint64 (gf_trim (token), &(meta->usage));
+                if (ret) {
+                        gf_msg (THIS->name, GF_LOG_ERROR, errno,
+                                P_MSG_FILE_OP_FAILED, "failed to parse xquota usage for "
+                                "project: %u token: %s stat: %s",
+                                meta->projid, gf_trim (token), strerror (errno));
+                }
+            } else if (i == 2) {
+                ret = gf_string2uint64 (gf_trim (token), &(meta->sl));
+                if (ret) {
+                        gf_msg (THIS->name, GF_LOG_ERROR, errno,
+                                P_MSG_FILE_OP_FAILED, "failed to parse xquota soft limit for "
+                                "project: %u token: %s stat: %s",
+                                meta->projid, gf_trim (token), strerror (errno));
+                }
+            } else if (i == 3) {
+                ret = gf_string2uint64 (gf_trim (token), &(meta->hl));
+                if (ret) {
+                        gf_msg (THIS->name, GF_LOG_ERROR, errno,
+                                P_MSG_FILE_OP_FAILED, "failed to parse xquota hard limit for "
+                                "project: %u token: %s stat: %s",
+                                meta->projid, gf_trim (token), strerror (errno));
+                }
+            }
+        }
+out:
+        GF_FREE (mnt_pt);
+        return ret;
 }
 
 static int
@@ -494,6 +672,41 @@ _posix_xattr_get_set (dict_t *xattr_req, char *key, data_t *data,
                         GF_FREE (path);
                         goto out;
                 }
+        } else if (!strcmp (key, VIRTUAL_XQUOTA_USAGE_META_KEY)) {
+                char *memptr           = NULL;
+                xquota_meta_t *meta    = NULL;
+
+                memptr = GF_CALLOC (1, sizeof (xquota_meta_t), gf_common_xquota_meta_t);
+                if (!memptr)
+                        goto out;
+
+                meta = (xquota_meta_t*) memptr;
+                ret = posix_get_xfs_projid (filler, &meta->projid);
+                if (ret < 0) {
+                        GF_FREE (memptr);
+                        goto out;
+                }
+
+                ret = posix_get_xfs_quota (filler, meta);
+                if (ret < 0) {
+                        GF_FREE (memptr);
+                        goto out;
+                }
+
+                meta->usage *= 1024; // xfs_quota account for 1k blocks
+                meta->hl *= 1024;
+                meta->sl *= 1024;
+
+                meta->usage = hton64 (meta->usage);
+                meta->hl = hton64 (meta->hl);
+                meta->sl = hton64 (meta->sl);
+                meta->projid = hton32 (meta->projid);
+                ret = dict_set_bin (filler->xattr, VIRTUAL_XQUOTA_USAGE_META_KEY,
+                                    memptr, sizeof (*meta));
+                if (ret < 0) {
+                        GF_FREE (memptr);
+                        goto out;
+                }
 
         } else if (fnmatch (marker_contri_key, key, 0) == 0) {
                 ret = _posix_get_marker_quota_contributions (filler, key);
@@ -508,6 +721,7 @@ _posix_xattr_get_set (dict_t *xattr_req, char *key, data_t *data,
         } else {
                 ret = _posix_xattr_get_set_from_backend (filler, key);
         }
+
 out:
         return 0;
 }

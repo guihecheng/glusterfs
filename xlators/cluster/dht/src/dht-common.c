@@ -20,6 +20,7 @@
 #include "byte-order.h"
 #include "glusterfs-acl.h"
 #include "quota-common-utils.h"
+#include "xquota-common-utils.h"
 #include "upcall-utils.h"
 
 #include <sys/time.h>
@@ -132,6 +133,51 @@ out:
         return ret;
 }
 
+int
+dht_aggregate_xquota_xattr (dict_t *dst, char *key, data_t *value)
+{
+        int               ret            = -1;
+        xquota_meta_t    *meta_dst       = NULL;
+        xquota_meta_t    *meta_src       = NULL;
+
+        if (value == NULL) {
+                gf_msg ("dht", GF_LOG_WARNING, 0,
+                        DHT_MSG_DATA_NULL, "data value is NULL");
+                ret = -1;
+                goto out;
+        }
+
+        ret = dict_get_bin (dst, key, (void **)&meta_dst);
+        if (ret < 0) {
+                meta_dst = GF_CALLOC (1, sizeof (xquota_meta_t),
+                                      gf_common_xquota_meta_t);
+                if (meta_dst == NULL) {
+                        gf_msg ("dht", GF_LOG_WARNING, ENOMEM,
+                                DHT_MSG_NO_MEMORY,
+                                "Memory allocation failed");
+                        ret = -1;
+                        goto out;
+                }
+                ret = dict_set_bin (dst, key, meta_dst,
+                                    sizeof (xquota_meta_t));
+                if (ret < 0) {
+                        gf_msg ("dht", GF_LOG_WARNING, EINVAL,
+                                DHT_MSG_DICT_SET_FAILED,
+                                "dht aggregate dict set failed");
+                        GF_FREE (meta_dst);
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        meta_src = data_to_bin (value);
+        meta_dst->usage = hton64 (ntoh64 (meta_dst->usage) +
+                                  ntoh64 (meta_src->usage));
+
+        ret = 0;
+out:
+        return ret;
+}
 
 int add_opt(char **optsp, const char *opt)
 {
@@ -340,6 +386,14 @@ dht_aggregate (dict_t *this, char *key, data_t *value, void *data)
                                 "Failed to aggregate quota xattr");
                 }
                 goto out;
+        } else if (strcmp (key, VIRTUAL_XQUOTA_USAGE_META_KEY) == 0) {
+                ret = dht_aggregate_xquota_xattr (dst, key, value);
+                if (ret) {
+                        gf_msg ("dht", GF_LOG_WARNING, 0,
+                                DHT_MSG_AGGREGATE_XQUOTA_XATTR_FAILED,
+                                "Failed to aggregate xquota xattr");
+                }
+                goto out;
         } else if (fnmatch (GF_XATTR_STIME_PATTERN, key, FNM_NOESCAPE) == 0) {
                 ret = gf_get_min_stime (THIS, dst, key, value);
                 goto out;
@@ -432,20 +486,22 @@ out:
 int
 dht_discover_complete (xlator_t *this, call_frame_t *discover_frame)
 {
-        dht_local_t     *local           = NULL;
-        dht_local_t     *heal_local      = NULL;
-        call_frame_t    *main_frame      = NULL;
-        call_frame_t    *heal_frame      = NULL;
-        int              op_errno        = 0;
-        int              ret             = -1;
-        dht_layout_t    *layout          = NULL;
-        dht_conf_t      *conf            = NULL;
-        uint32_t         vol_commit_hash = 0;
-        xlator_t        *source          = NULL;
-        int              heal_path       = 0;
-        int              i               = 0;
-        loc_t            loc             = {0 };
-        int8_t           is_read_only    = 0, layout_anomalies = 0;
+        dht_local_t     *local                 = NULL;
+        dht_local_t     *heal_local            = NULL;
+        call_frame_t    *main_frame            = NULL;
+        call_frame_t    *heal_frame            = NULL;
+        int              op_errno              = 0;
+        int              ret                   = -1;
+        dht_layout_t    *layout                = NULL;
+        dht_conf_t      *conf                  = NULL;
+        uint32_t         vol_commit_hash       = 0;
+        xlator_t        *source                = NULL;
+        int              heal_path             = 0;
+        int              i                     = 0;
+        loc_t            loc                   = {0 };
+        int8_t           is_quota_read_only    = 0;
+        int8_t           is_xquota_read_only   = 0;
+        int8_t           layout_anomalies      = 0;
 
         local = discover_frame->local;
         layout = local->layout;
@@ -462,10 +518,16 @@ dht_discover_complete (xlator_t *this, call_frame_t *discover_frame)
                 return 0;
 
         ret = dict_get_int8 (local->xattr_req, QUOTA_READ_ONLY_KEY,
-                             &is_read_only);
+                             &is_quota_read_only);
         if (ret < 0)
                 gf_msg_debug (this->name, 0, "key = %s not present in dict",
                               QUOTA_READ_ONLY_KEY);
+
+        ret = dict_get_int8 (local->xattr_req, XQUOTA_READ_ONLY_KEY,
+                             &is_xquota_read_only);
+        if (ret < 0)
+                gf_msg_debug (this->name, 0, "key = %s not present in dict",
+                              XQUOTA_READ_ONLY_KEY);
 
         if (local->file_count && local->dir_count) {
                 gf_msg (this->name, GF_LOG_ERROR, 0,
@@ -515,7 +577,7 @@ dht_discover_complete (xlator_t *this, call_frame_t *discover_frame)
                 }
         }
 
-        if (IA_ISDIR (local->stbuf.ia_type) && !is_read_only) {
+        if (IA_ISDIR (local->stbuf.ia_type) && !is_quota_read_only && !is_xquota_read_only) {
                 for (i = 0; i < layout->cnt; i++) {
                        if (!source && !layout->list[i].err)
                                 source = layout->list[i].xlator;
@@ -3338,6 +3400,8 @@ dht_getxattr_cbk (call_frame_t *frame, void *cookie, xlator_t *this,
                 if (frame->root->pid >= 0) {
                         GF_REMOVE_INTERNAL_XATTR
                                 ("trusted.glusterfs.quota*", xattr);
+                        GF_REMOVE_INTERNAL_XATTR
+                                ("trusted.glusterfs.xquota*", xattr);
                         GF_REMOVE_INTERNAL_XATTR("trusted.pgfid*", xattr);
                 }
 
@@ -3711,7 +3775,7 @@ dht_getxattr (call_frame_t *frame, xlator_t *this,
 
         if (key && (!strcmp (QUOTA_LIMIT_KEY, key) ||
                     !strcmp (QUOTA_LIMIT_OBJECTS_KEY, key))) {
-                /* quota hardlimit and aggregated size of a directory is stored
+                /* quota/xquota hardlimit and aggregated size of a directory is stored
                  * in inode contexts of each brick. Hence its good enough that
                  * we send getxattr for this key to any brick.
                  */
