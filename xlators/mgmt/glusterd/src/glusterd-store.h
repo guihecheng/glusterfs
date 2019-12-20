@@ -60,6 +60,7 @@ typedef enum glusterd_store_ver_ac_{
 #define GLUSTERD_STORE_KEY_VOL_OP_VERSION       "op-version"
 #define GLUSTERD_STORE_KEY_VOL_CLIENT_OP_VERSION "client-op-version"
 #define GLUSTERD_STORE_KEY_VOL_QUOTA_VERSION    "quota-version"
+#define GLUSTERD_STORE_KEY_VOL_XQUOTA_VERSION   "xquota-version"
 
 #define GLUSTERD_STORE_KEY_VOL_TIER_STATUS      "tier_status"
 #define GLUSTERD_STORE_KEY_TIER_DETACH_OP       "tier_op"
@@ -201,5 +202,20 @@ glusterd_quota_conf_write_header (int fd);
 
 int32_t
 glusterd_quota_conf_write_gfid (int fd, void *buf, char type);
+
+int32_t
+glusterd_store_create_xquota_conf_sh_on_absence (glusterd_volinfo_t *volinfo);
+
+int
+glusterd_store_retrieve_xquota_version (glusterd_volinfo_t *volinfo);
+
+int
+glusterd_store_save_xquota_version_and_cksum (glusterd_volinfo_t *volinfo);
+
+int32_t
+glusterd_xquota_conf_write_header (int fd);
+
+int32_t
+glusterd_xquota_conf_write_gfid (int fd, void *buf, char type);
 
 #endif

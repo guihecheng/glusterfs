@@ -24,6 +24,7 @@
 #include "glusterd-tierd-svc-helper.h"
 #include "glusterd-volgen.h"
 #include "glusterd-quotad-svc.h"
+#include "glusterd-xquotad-svc.h"
 #include "glusterd-messages.h"
 #include "glusterfs3.h"
 #include "protocol-common.h"

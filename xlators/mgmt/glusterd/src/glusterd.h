@@ -131,6 +131,7 @@ typedef enum glusterd_op_ {
         GD_OP_DETACH_NOT_STARTED,
         GD_OP_REMOVE_TIER_BRICK,
         GD_OP_ADD_TIER_BRICK,
+        GD_OP_XQUOTA,
         GD_OP_MAX,
 } glusterd_op_t;
 
@@ -155,6 +156,7 @@ typedef struct {
         glusterd_svc_t           bitd_svc;
         glusterd_svc_t           scrub_svc;
         glusterd_svc_t           quotad_svc;
+        glusterd_svc_t           xquotad_svc;
         struct pmap_registry    *pmap;
         struct cds_list_head     volumes;
         struct cds_list_head     snapshots; /*List of snap volumes */
@@ -424,6 +426,7 @@ struct glusterd_volinfo_ {
         gf_store_handle_t        *shandle;
         gf_store_handle_t        *node_state_shandle;
         gf_store_handle_t        *quota_conf_shandle;
+        gf_store_handle_t        *xquota_conf_shandle;
 
         /* Defrag/rebalance related */
         glusterd_rebalance_t      rebal;
@@ -438,8 +441,10 @@ struct glusterd_volinfo_ {
 
         int                       version;
         uint32_t                  quota_conf_version;
+        uint32_t                  xquota_conf_version;
         uint32_t                  cksum;
         uint32_t                  quota_conf_cksum;
+        uint32_t                  xquota_conf_cksum;
         gf_transport_type         transport_type;
 
         dict_t                   *dict;
@@ -466,6 +471,7 @@ struct glusterd_volinfo_ {
         glusterd_snapdsvc_t       snapd;
         glusterd_tierdsvc_t       tierd;
         int32_t                   quota_xattr_version;
+        int32_t                   xquota_xattr_version;
 };
 
 typedef enum gd_snap_status_ {
@@ -516,7 +522,8 @@ typedef enum gd_node_type_ {
         GD_NODE_SNAPD,
         GD_NODE_BITD,
         GD_NODE_SCRUB,
-        GD_NODE_TIERD
+        GD_NODE_TIERD,
+        GD_NODE_XQUOTAD,
 } gd_node_type;
 
 typedef enum missed_snap_stat {
@@ -564,6 +571,7 @@ typedef enum {
 #define GLUSTERD_DEFAULT_PORT    GF_DEFAULT_BASE_PORT
 #define GLUSTERD_INFO_FILE      "glusterd.info"
 #define GLUSTERD_VOLUME_QUOTA_CONFIG "quota.conf"
+#define GLUSTERD_VOLUME_XQUOTA_CONFIG "xquota.conf"
 #define GLUSTERD_VOLUME_DIR_PREFIX "vols"
 #define GLUSTERD_PEER_DIR_PREFIX "peers"
 #define GLUSTERD_VOLUME_INFO_FILE "info"
@@ -573,6 +581,7 @@ typedef enum {
 #define GLUSTERD_BRICK_INFO_DIR "bricks"
 #define GLUSTERD_CKSUM_FILE "cksum"
 #define GLUSTERD_VOL_QUOTA_CKSUM_FILE "quota.cksum"
+#define GLUSTERD_VOL_XQUOTA_CKSUM_FILE "xquota.cksum"
 #define GLUSTERD_TRASH "trash"
 #define GLUSTERD_NODE_STATE_FILE "node_state.info"
 #define GLUSTERD_MISSED_SNAPS_LIST_FILE "missed_snaps_list"
@@ -584,6 +593,7 @@ typedef enum {
 #define GLUSTERD_GLUSTERSHD_RUN_DIR          "/glustershd"
 #define GLUSTERD_NFS_RUN_DIR                 "/nfs"
 #define GLUSTERD_QUOTAD_RUN_DIR              "/quotad"
+#define GLUSTERD_XQUOTAD_RUN_DIR             "/xquotad"
 #define GLUSTER_SHARED_STORAGE_BRICK_DIR     GLUSTERD_DEFAULT_WORKDIR"/ss_brick"
 #define GLUSTERD_VAR_RUN_DIR                 "/var/run"
 #define GLUSTERD_RUN_DIR                     "/run"
@@ -657,6 +667,9 @@ do {                                                                       \
 #define GLUSTERD_GET_QUOTAD_DIR(path, priv) \
         snprintf (path, PATH_MAX, "%s/quotad", priv->workdir);
 
+#define GLUSTERD_GET_XQUOTAD_DIR(path, priv) \
+        snprintf (path, PATH_MAX, "%s/xquotad", priv->workdir);
+
 #define GLUSTERD_GET_QUOTA_LIMIT_MOUNT_PATH(abspath, volname, path) do {      \
         snprintf (abspath, sizeof (abspath)-1,                                \
                  DEFAULT_VAR_RUN_DIRECTORY"/%s_quota_limit%s", volname, path);\
@@ -698,6 +711,11 @@ do {                                                                       \
 #define GLUSTERD_GET_QUOTAD_PIDFILE(pidfile, quotadpath, priv) {         \
                 snprintf (pidfile, PATH_MAX, "%s/quotad/quotad.pid",     \
                            priv->rundir);                                \
+        }
+
+#define GLUSTERD_GET_XQUOTAD_PIDFILE(pidfile, xquotadpath, priv) {         \
+                snprintf (pidfile, PATH_MAX, "%s/xquotad/xquotad.pid",     \
+                          priv->rundir);                                \
         }
 
 #define GLUSTERD_GET_QUOTA_CRAWL_PIDDIR(piddir, volinfo, type) do {           \
@@ -1019,6 +1037,9 @@ glusterd_gsync_set (rpcsvc_request_t *req, dict_t *dict);
 int32_t
 glusterd_quota (rpcsvc_request_t *req, dict_t *dict);
 
+int32_t
+glusterd_xquota (rpcsvc_request_t *req, dict_t *dict);
+
 int
 glusterd_handle_set_volume (rpcsvc_request_t *req);
 
@@ -1036,6 +1057,9 @@ glusterd_handle_gsync_set (rpcsvc_request_t *req);
 
 int
 glusterd_handle_quota (rpcsvc_request_t *req);
+
+int
+glusterd_handle_xquota (rpcsvc_request_t *req);
 
 int
 glusterd_handle_bitrot (rpcsvc_request_t *req);
@@ -1141,10 +1165,12 @@ int glusterd_op_sys_exec (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 int glusterd_op_stage_gsync_create (dict_t *dict, char **op_errstr);
 int glusterd_op_gsync_create (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 int glusterd_op_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
+int glusterd_op_xquota (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 
 int glusterd_op_bitrot (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 
 int glusterd_op_stage_quota (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
+int glusterd_op_stage_xquota (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 
 int glusterd_op_stage_bitrot (dict_t *dict, char **op_errstr, dict_t *rsp_dict);
 

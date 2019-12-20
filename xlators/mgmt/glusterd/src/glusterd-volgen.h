@@ -37,6 +37,7 @@
 #define VKEY_READDIR_AHEAD        "performance.readdir-ahead"
 #define VKEY_RDA_CACHE_LIMIT      "performance.rda-cache-limit"
 #define VKEY_RDA_REQUEST_SIZE     "performance.rda-request-size"
+#define VKEY_FEATURES_XQUOTA      "features.xquota"
 
 #define AUTH_ALLOW_MAP_KEY "auth.allow"
 #define AUTH_REJECT_MAP_KEY "auth.reject"
@@ -65,6 +66,7 @@ typedef enum {
         GF_REBALANCED = 1,
         GF_QUOTAD,
         GF_SNAPD,
+        GF_XQUOTAD,
 } glusterd_graph_type_t;
 
 struct volgen_graph {
@@ -207,6 +209,9 @@ build_nfs_graph (volgen_graph_t *graph, dict_t *mod_dict);
 
 int
 build_quotad_graph (volgen_graph_t *graph, dict_t *mod_dict);
+
+int
+build_xquotad_graph (volgen_graph_t *graph, dict_t *mod_dict);
 
 int
 build_rebalance_volfile (glusterd_volinfo_t *volinfo, char *filepath,

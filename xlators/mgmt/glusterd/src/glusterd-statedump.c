@@ -12,6 +12,7 @@
 #include "glusterd.h"
 #include "glusterd-shd-svc.h"
 #include "glusterd-quotad-svc.h"
+#include "glusterd-xquotad-svc.h"
 #include "glusterd-nfs-svc.h"
 #include "glusterd-locks.h"
 #include "glusterd-messages.h"
@@ -227,6 +228,9 @@ glusterd_dump_priv (xlator_t *this)
 
                 gf_proc_dump_build_key (key, "glusterd", "quotad.online");
                 gf_proc_dump_write (key, "%d", priv->quotad_svc.online);
+
+                gf_proc_dump_build_key (key, "glusterd", "xquotad.online");
+                gf_proc_dump_write (key, "%d", priv->xquotad_svc.online);
 
                 gf_proc_dump_build_key (key, "glusterd", "bitd.online");
                 gf_proc_dump_write (key, "%d", priv->bitd_svc.online);

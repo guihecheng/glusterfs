@@ -41,6 +41,7 @@
 #include "glusterd-bitd-svc.h"
 #include "glusterd-scrub-svc.h"
 #include "glusterd-quotad-svc.h"
+#include "glusterd-xquotad-svc.h"
 #include "glusterd-snapd-svc.h"
 #include "glusterd-messages.h"
 #include "common-utils.h"
@@ -126,6 +127,7 @@ const char *gd_op_list[GD_OP_MAX + 1] = {
         [GD_OP_SNAP]                    = "Snapshot",
         [GD_OP_RESET_BRICK]             = "Reset Brick",
         [GD_OP_MAX_OPVERSION]           = "Maximum supported op-version",
+        [GD_OP_XQUOTA]                  = "XQuota",
         [GD_OP_MAX]                     = "Invalid op"
 };
 
@@ -1559,6 +1561,15 @@ init (xlator_t *this)
                 exit (1);
         }
 
+        ret = glusterd_init_var_run_dirs (this, rundir,
+                                          GLUSTERD_XQUOTAD_RUN_DIR);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_CRITICAL, 0,
+                        GD_MSG_CREATE_DIR_FAILED, "Unable to create "
+                        "xquota running directory");
+                exit (1);
+        }
+
         snprintf (cmd_log_filename, PATH_MAX, "%s/cmd_history.log",
                   DEFAULT_LOG_FILE_DIRECTORY);
         ret = gf_cmd_log_init (cmd_log_filename);
@@ -1675,6 +1686,16 @@ init (xlator_t *this)
                 gf_msg (this->name, GF_LOG_CRITICAL, errno,
                         GD_MSG_CREATE_DIR_FAILED,
                         "Unable to create quotad directory %s"
+                        " ,errno = %d", storedir, errno);
+                exit (1);
+        }
+
+        snprintf (storedir, PATH_MAX, "%s/xquotad", workdir);
+        ret = sys_mkdir (storedir, 0777);
+        if ((-1 == ret) && (errno != EEXIST)) {
+                gf_msg (this->name, GF_LOG_CRITICAL, errno,
+                        GD_MSG_CREATE_DIR_FAILED,
+                        "Unable to create xquotad directory %s"
                         " ,errno = %d", storedir, errno);
                 exit (1);
         }
@@ -1859,6 +1880,7 @@ init (xlator_t *this)
         glusterd_shdsvc_build (&conf->shd_svc);
         glusterd_nfssvc_build (&conf->nfs_svc);
         glusterd_quotadsvc_build (&conf->quotad_svc);
+        glusterd_xquotadsvc_build (&conf->xquotad_svc);
         glusterd_bitdsvc_build (&conf->bitd_svc);
         glusterd_scrubsvc_build (&conf->scrub_svc);
 

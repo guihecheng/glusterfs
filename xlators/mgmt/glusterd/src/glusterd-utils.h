@@ -231,7 +231,8 @@ glusterd_compare_friend_data (dict_t *peer_data, int32_t *status,
 
 int
 glusterd_compute_cksum (glusterd_volinfo_t  *volinfo,
-                        gf_boolean_t is_quota_conf);
+                        gf_boolean_t is_quota_conf,
+                        gf_boolean_t is_xquota_conf);
 
 void
 glusterd_set_socket_filepath (char *sock_filepath, char *sockpath, size_t len);
@@ -421,6 +422,9 @@ glusterd_client_statedump (char *volname, char *options, int option_cnt,
 int
 glusterd_quotad_statedump (char *options, int option_cnt, char **op_errstr);
 
+int
+glusterd_xquotad_statedump (char *options, int option_cnt, char **op_errstr);
+
 gf_boolean_t
 glusterd_is_volume_replicate (glusterd_volinfo_t *volinfo);
 
@@ -537,8 +541,15 @@ glusterd_volume_heal_use_rsp_dict (dict_t *aggr, dict_t *rsp_dict);
 int32_t
 glusterd_check_if_quota_trans_enabled (glusterd_volinfo_t *volinfo);
 
+int32_t
+glusterd_check_if_xquota_trans_enabled (glusterd_volinfo_t *volinfo);
+
 int
 glusterd_volume_quota_copy_to_op_ctx_dict (dict_t *aggr, dict_t *rsp);
+
+int
+glusterd_volume_xquota_copy_to_op_ctx_dict (dict_t *aggr, dict_t *rsp);
+
 int
 _profile_volume_add_brick_rsp (dict_t *this, char *key, data_t *value,
                              void *data);
@@ -646,6 +657,15 @@ glusterd_clean_up_quota_store (glusterd_volinfo_t *volinfo);
 int
 glusterd_remove_auxiliary_mount (char *volname);
 
+int
+glusterd_is_volume_xquota_enabled (glusterd_volinfo_t *volinfo);
+
+gf_boolean_t
+glusterd_all_volumes_with_xquota_stopped ();
+
+void
+glusterd_clean_up_xquota_store (glusterd_volinfo_t *volinfo);
+
 gf_boolean_t
 glusterd_status_has_tasks (int cmd);
 
@@ -746,6 +766,10 @@ int
 glusterd_vol_add_quota_conf_to_dict (glusterd_volinfo_t *volinfo, dict_t *load,
                                      int vol_idx, char *prefix);
 
+int
+glusterd_vol_add_xquota_conf_to_dict (glusterd_volinfo_t *volinfo, dict_t *load,
+                                      int vol_idx, char *prefix);
+
 int32_t
 glusterd_import_volinfo (dict_t *peer_data, int count,
                          glusterd_volinfo_t **volinfo,
@@ -755,6 +779,11 @@ int
 glusterd_import_quota_conf (dict_t *peer_data, int vol_idx,
                             glusterd_volinfo_t *new_volinfo,
                             char *prefix);
+
+int
+glusterd_import_xquota_conf (dict_t *peer_data, int vol_idx,
+                             glusterd_volinfo_t *new_volinfo,
+                             char *prefix);
 
 gf_boolean_t
 glusterd_is_shd_compatible_volume (glusterd_volinfo_t *volinfo);

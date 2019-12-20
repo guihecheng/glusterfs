@@ -636,6 +636,45 @@ out:
 }
 
 static int
+validate_xquota (glusterd_volinfo_t *volinfo, dict_t *dict, char *key,
+                 char *value, char **op_errstr)
+{
+        char                 errstr[2048] = "";
+        glusterd_conf_t     *priv         = NULL;
+        int                  ret          = 0;
+        xlator_t            *this         = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+        priv = this->private;
+        GF_ASSERT (priv);
+
+        ret = glusterd_volinfo_get_boolean (volinfo, VKEY_FEATURES_XQUOTA);
+        if (ret == -1) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_XQUOTA_GET_STAT_FAIL,
+                        "failed to get the xquota status");
+                goto out;
+        }
+
+        if (ret == _gf_false) {
+                snprintf (errstr, sizeof (errstr),
+                          "Cannot set %s. Enable xquota first.", key);
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_XQUOTA_DISABLED, "%s", errstr);
+                *op_errstr = gf_strdup (errstr);
+                ret = -1;
+                goto out;
+        }
+
+        ret = 0;
+out:
+        gf_msg_debug (this->name, 0, "Returning %d", ret);
+
+        return ret;
+}
+
+static int
 validate_uss (glusterd_volinfo_t *volinfo, dict_t *dict, char *key,
               char *value, char **op_errstr)
 {
@@ -2369,6 +2408,54 @@ struct volopt_map_entry glusterd_volopt_map[] = {
           .type          = DOC,
           .op_version    = 2,
           .validate_fn   = validate_quota,
+        },
+
+        /* XQuota xlator options */
+        { .key           = VKEY_FEATURES_XQUOTA,
+          .voltype       = "features/xquota",
+          .option        = "xquota",
+          .value         = "off",
+          .type          = NO_DOC,
+          .flags         = OPT_FLAG_NEVER_RESET,
+          .op_version    = 1
+        },
+        { .key           = "features.xquota-limit-usage-project",
+          .voltype       = "features/xquota",
+          .option        = "limit-usage-project",
+          .type          = NO_DOC,
+          .op_version    = 1,
+        },
+        { .key           = "features.xquota-default-soft-limit",
+          .voltype       = "features/xquota",
+          .option        = "default-soft-limit",
+          .type          = NO_DOC,
+          .op_version    = 1,
+        },
+        { .key           = "features.xquota-soft-timeout",
+          .voltype       = "features/xquota",
+          .option        = "soft-timeout",
+          .type          = NO_DOC,
+          .op_version    = 1,
+        },
+        { .key           = "features.xquota-hard-timeout",
+          .voltype       = "features/xquota",
+          .option        = "hard-timeout",
+          .type          = NO_DOC,
+          .op_version    = 1,
+        },
+        { .key           = "features.xquota-alert-time",
+          .voltype       = "features/xquota",
+          .option        = "alert-time",
+          .type          = NO_DOC,
+          .op_version    = 1,
+        },
+        { .key           = "features.xquota-quota-deem-statfs",
+          .voltype       = "features/xquota",
+          .option        = "deem-statfs",
+          .value         = "off",
+          .type          = DOC,
+          .op_version    = 1,
+          .validate_fn   = validate_xquota,
         },
 
         /* Marker xlator options */

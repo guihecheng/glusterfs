@@ -5804,6 +5804,12 @@ glusterd_get_state (rpcsvc_request_t *req, dict_t *dict)
                          priv->quotad_svc.online ? "Online" : "Offline");
         }
 
+        if (priv->xquotad_svc.inited) {
+                fprintf (fp, "svc%d.name: %s\n", ++count, priv->xquotad_svc.name);
+                fprintf (fp, "svc%d.online_status: %s\n\n", count,
+                         priv->xquotad_svc.online ? "Online" : "Offline");
+        }
+
         fprintf (fp, "\n[Misc]\n");
         if (priv->pmap) {
                 fprintf (fp, "Base port: %d\n", priv->pmap->base_port);
@@ -6444,6 +6450,7 @@ rpcsvc_actor_t gd_svc_cli_actors[GLUSTER_CLI_MAXVALUE] = {
         [GLUSTER_CLI_TIER]               = {"TIER",               GLUSTER_CLI_TIER,             glusterd_handle_tier,                  NULL, 0, DRC_NA},
         [GLUSTER_CLI_REMOVE_TIER_BRICK]  = {"REMOVE_TIER_BRICK",  GLUSTER_CLI_REMOVE_TIER_BRICK,             glusterd_handle_tier,                  NULL, 0, DRC_NA},
         [GLUSTER_CLI_ADD_TIER_BRICK]     = {"ADD_TIER_BRICK",     GLUSTER_CLI_ADD_TIER_BRICK,      glusterd_handle_add_tier_brick,           NULL, 0, DRC_NA},
+        [GLUSTER_CLI_XQUOTA]             = {"XQUOTA",             GLUSTER_CLI_XQUOTA,           glusterd_handle_xquota,                NULL, 0, DRC_NA},
 };
 
 struct rpcsvc_program gd_svc_cli_prog = {

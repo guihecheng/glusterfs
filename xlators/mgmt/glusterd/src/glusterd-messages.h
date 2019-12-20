@@ -4937,6 +4937,86 @@
  */
 #define GD_MSG_GARBAGE_ARGS                         (GLUSTERD_COMP_BASE + 611)
 
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_XQUOTA_CONF_WRITE_FAIL                  (GLUSTERD_COMP_BASE + 612)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_XQUOTA_CKSUM_VER_STORE_FAIL             (GLUSTERD_COMP_BASE + 613)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_XQUOTA_GET_STAT_FAIL                    (GLUSTERD_COMP_BASE + 614)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_XQUOTA_CONF_CORRUPT                     (GLUSTERD_COMP_BASE + 615)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_OP_STAGE_XQUOTA_FAIL                    (GLUSTERD_COMP_BASE + 616)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_XQUOTAD_NOT_RUNNING                     (GLUSTERD_COMP_BASE + 617)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_XQUOTA_DISABLED                         (GLUSTERD_COMP_BASE + 618)
+
+/*!
+ * @messageid
+ * @diagnosis A volume quota-conf version mismatch occurred while adding a peer
+ * @recommendedaction None
+ */
+#define GD_MSG_XQUOTA_CONFIG_VERS_MISMATCH             (GLUSTERD_COMP_BASE + 619)
+
+/*!
+ * @messageid
+ * @diagnosis A xquota-conf checksum mismatch occurred while adding a peer
+ * @recommendedaction Check for which node the checksum mismatch happens
+ *                    and delete the volume configuration files from it and
+ *                    restart glusterd
+ */
+#define GD_MSG_XQUOTA_CONFIG_CKSUM_MISMATCH            (GLUSTERD_COMP_BASE + 620)
+
+/*!
+ * @messageid
+ * @diagnosis
+ * @recommendedaction
+ *
+ */
+#define GD_MSG_FAILED_INIT_XQUOTASVC                   (GLUSTERD_COMP_BASE + 621)
+
 /*------------*/
 
 #define glfs_msg_end_x GLFS_MSGID_END, "Invalid: End of messages"

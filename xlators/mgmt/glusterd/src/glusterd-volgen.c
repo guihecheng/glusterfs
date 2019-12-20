@@ -2110,6 +2110,35 @@ out:
 }
 
 static int
+brick_graph_add_xquota (volgen_graph_t *graph, glusterd_volinfo_t *volinfo,
+                        dict_t *set_dict, glusterd_brickinfo_t *brickinfo)
+{
+        int             ret = -1;
+        xlator_t        *xl = NULL;
+        char            *value = NULL;
+
+        if (!graph || !volinfo || !set_dict)
+                goto out;
+
+        xl = volgen_graph_add (graph, "features/xquota", volinfo->volname);
+        if (!xl)
+                goto out;
+
+        ret = xlator_set_option (xl, "volume-uuid", volinfo->volname);
+        if (ret)
+                goto out;
+
+        ret = glusterd_volinfo_get (volinfo, VKEY_FEATURES_XQUOTA, &value);
+        if (value) {
+                ret = xlator_set_option (xl, "server-xquota", value);
+                if (ret)
+                        goto out;
+        }
+out:
+        return ret;
+}
+
+static int
 brick_graph_add_ro (volgen_graph_t *graph, glusterd_volinfo_t *volinfo,
                      dict_t *set_dict, glusterd_brickinfo_t *brickinfo)
 {
@@ -2484,6 +2513,7 @@ static volgen_brick_xlator_t server_graph_table[] = {
         {brick_graph_add_io_stats, "NULL"},
         {brick_graph_add_cdc, NULL},
         {brick_graph_add_quota, "quota"},
+        {brick_graph_add_xquota, "xquota"},
         {brick_graph_add_index, "index"},
         {brick_graph_add_barrier, NULL},
         {brick_graph_add_marker, "marker"},
@@ -3469,6 +3499,7 @@ volgen_graph_build_readdir_ahead (volgen_graph_t *graph,
 
         if (graph->type == GF_QUOTAD ||
             graph->type == GF_SNAPD ||
+            graph->type == GF_XQUOTAD ||
             !glusterd_volinfo_get_boolean (volinfo, VKEY_PARALLEL_READDIR) ||
             !glusterd_volinfo_get_boolean (volinfo, VKEY_READDIR_AHEAD))
                 goto out;
@@ -3857,6 +3888,7 @@ client_graph_set_rda_options (volgen_graph_t *graph,
 
         if (graph->type == GF_QUOTAD ||
             graph->type == GF_SNAPD ||
+            graph->type == GF_XQUOTAD ||
             !glusterd_volinfo_get_boolean (volinfo, VKEY_PARALLEL_READDIR) ||
             !glusterd_volinfo_get_boolean (volinfo, VKEY_READDIR_AHEAD))
                 goto out;
@@ -5452,6 +5484,111 @@ build_quotad_graph (volgen_graph_t *graph, dict_t *mod_dict)
                         goto out;
                 }
                 ret = xlator_set_option(quotad_xl, skey, voliter->volname);
+                GF_FREE(skey);
+                if (ret)
+                        goto out;
+
+                memset (&cgraph, 0, sizeof (cgraph));
+                ret = volgen_graph_build_clients (&cgraph, voliter, set_dict,
+                                                  NULL);
+                if (ret)
+                        goto out;
+
+                if (voliter->type == GF_CLUSTER_TYPE_TIER)
+                        ret = volume_volgen_graph_build_clusters_tier
+                                                (&cgraph, voliter, _gf_true);
+                else
+                        ret = volume_volgen_graph_build_clusters
+                                                (&cgraph, voliter, _gf_true);
+                if (ret) {
+                        ret = -1;
+                        goto out;
+                }
+
+                if (mod_dict) {
+                        dict_copy (mod_dict, set_dict);
+                        ret = volgen_graph_set_options_generic (&cgraph, set_dict,
+                                                        voliter,
+                                                        basic_option_handler);
+                } else {
+                        ret = volgen_graph_set_options_generic (&cgraph,
+                                                                voliter->dict,
+                                                                voliter,
+                                                                basic_option_handler);
+                }
+                if (ret)
+                        goto out;
+
+                ret = volgen_graph_merge_sub (graph, &cgraph, 1);
+                if (ret)
+                        goto out;
+
+                ret = dict_reset (set_dict);
+                if (ret)
+                        goto out;
+        }
+
+out:
+        if (set_dict)
+                dict_unref (set_dict);
+        return ret;
+}
+
+int
+build_xquotad_graph (volgen_graph_t *graph, dict_t *mod_dict)
+{
+        volgen_graph_t     cgraph         = {0};
+        glusterd_volinfo_t *voliter       = NULL;
+        xlator_t           *this          = NULL;
+        glusterd_conf_t    *priv          = NULL;
+        dict_t             *set_dict      = NULL;
+        int                ret            = 0;
+        xlator_t           *xquotad_xl    = NULL;
+        char               *skey          = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        priv = this->private;
+        GF_ASSERT (priv);
+
+        graph->type = GF_XQUOTAD;
+
+        set_dict = dict_new ();
+        if (!set_dict) {
+                ret = -ENOMEM;
+                goto out;
+        }
+
+        xquotad_xl = volgen_graph_add_as (graph, "features/xquotad", "xquotad");
+        if (!xquotad_xl) {
+                ret = -1;
+                goto out;
+        }
+
+        cds_list_for_each_entry (voliter, &priv->volumes, vol_list) {
+                if (voliter->status != GLUSTERD_STATUS_STARTED)
+                        continue;
+
+                if (1 != glusterd_is_volume_xquota_enabled (voliter))
+                        continue;
+
+                ret = dict_set_uint32 (set_dict, "trusted-client",
+                                       GF_CLIENT_TRUSTED);
+                if (ret)
+                        goto out;
+
+                dict_copy (voliter->dict, set_dict);
+                if (mod_dict)
+                        dict_copy (mod_dict, set_dict);
+
+                ret = gf_asprintf(&skey, "%s.volume-id", voliter->volname);
+                if (ret == -1) {
+                        gf_msg ("glusterd", GF_LOG_ERROR, ENOMEM,
+                                GD_MSG_NO_MEMORY, "Out of memory");
+                        goto out;
+                }
+                ret = xlator_set_option(xquotad_xl, skey, voliter->volname);
                 GF_FREE(skey);
                 if (ret)
                         goto out;

@@ -2056,6 +2056,14 @@ glusterd_op_stage_statedump_volume (dict_t *dict, char **op_errstr)
                     ret = -1;
                     goto out;
         }
+
+        if ((strstr (options, "xquotad")) &&
+            (!glusterd_is_volume_xquota_enabled (volinfo))) {
+                    snprintf (msg, sizeof (msg), "XQuota is not enabled on "
+                              "volume %s", volname);
+                    ret = -1;
+                    goto out;
+        }
 out:
         if (ret && msg[0] != '\0')
                 *op_errstr = gf_strdup (msg);
@@ -2854,6 +2862,12 @@ glusterd_op_statedump_volume (dict_t *dict, char **op_errstr)
         } else if (strstr (options, "quotad")) {
                 ret = glusterd_quotad_statedump (options, option_cnt,
                                                  op_errstr);
+                if (ret)
+                        goto out;
+
+        } else if (strstr (options, "xquotad")) {
+                ret = glusterd_xquotad_statedump (options, option_cnt,
+                                                  op_errstr);
                 if (ret)
                         goto out;
 

@@ -16,6 +16,7 @@
 #include "glusterd-svc-mgmt.h"
 #include "glusterd-shd-svc.h"
 #include "glusterd-quotad-svc.h"
+#include "glusterd-xquotad-svc.h"
 #include "glusterd-nfs-svc.h"
 #include "glusterd-bitd-svc.h"
 #include "glusterd-tierd-svc.h"
@@ -55,6 +56,11 @@ glusterd_svcs_reconfigure ()
         if (ret)
                 goto out;
 
+        svc_name = "xquotad";
+        ret = glusterd_xquotadsvc_reconfigure ();
+        if (ret)
+                goto out;
+
         svc_name = "bitd";
         ret = glusterd_bitdsvc_reconfigure ();
         if (ret)
@@ -91,6 +97,10 @@ glusterd_svcs_stop ()
                 goto out;
 
         ret = glusterd_svc_stop (&(priv->quotad_svc), SIGTERM);
+        if (ret)
+                goto out;
+
+        ret = glusterd_svc_stop (&(priv->xquotad_svc), SIGTERM);
         if (ret)
                 goto out;
 
@@ -135,6 +145,13 @@ glusterd_svcs_manager (glusterd_volinfo_t *volinfo)
 
         ret = conf->quotad_svc.manager (&(conf->quotad_svc), volinfo,
                                         PROC_START_NO_WAIT);
+        if (ret == -EINVAL)
+                ret = 0;
+        if (ret)
+                goto out;
+
+        ret = conf->xquotad_svc.manager (&(conf->xquotad_svc), volinfo,
+                                         PROC_START_NO_WAIT);
         if (ret == -EINVAL)
                 ret = 0;
         if (ret)

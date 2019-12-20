@@ -255,7 +255,8 @@ glusterd_svc_build_volfile_path (char *server, char *workdir, char *volfile,
 
         glusterd_svc_build_svcdir (server, workdir, dir, sizeof (dir));
 
-        if (!strcmp(server, "quotad")) /*quotad has different volfile name*/
+        /*quotad/xquotad has different volfile name*/
+        if (!strcmp(server, "quotad") || !strcmp(server, "xquotad"))
                 snprintf (volfile, len, "%s/%s.vol", dir, server);
        else
                 snprintf (volfile, len, "%s/%s-server.vol", dir, server);

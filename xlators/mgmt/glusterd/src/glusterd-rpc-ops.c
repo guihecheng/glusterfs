@@ -141,6 +141,7 @@ glusterd_op_send_cli_response (glusterd_op_t op, int32_t op_ret,
         case GD_OP_CLEARLOCKS_VOLUME:
         case GD_OP_HEAL_VOLUME:
         case GD_OP_QUOTA:
+        case GD_OP_XQUOTA:
         case GD_OP_SNAP:
         case GD_OP_BARRIER:
         case GD_OP_BITROT:
@@ -2310,6 +2311,7 @@ glusterd_brick_op (call_frame_t *frame, xlator_t *this,
 
                 if ((pending_node->type == GD_NODE_NFS) ||
                     (pending_node->type == GD_NODE_QUOTAD) ||
+                    (pending_node->type == GD_NODE_XQUOTAD) ||
                     (pending_node->type == GD_NODE_SNAPD) ||
                     (pending_node->type == GD_NODE_SCRUB) ||
                     ((pending_node->type == GD_NODE_SHD) &&

@@ -56,10 +56,12 @@
 #include "glusterd-shd-svc.h"
 #include "glusterd-nfs-svc.h"
 #include "glusterd-quotad-svc.h"
+#include "glusterd-xquotad-svc.h"
 #include "glusterd-snapd-svc.h"
 #include "glusterd-bitd-svc.h"
 #include "glusterd-server-quorum.h"
 #include "quota-common-utils.h"
+#include "xquota-common-utils.h"
 #include "common-utils.h"
 
 #include "xdr-generic.h"
@@ -726,9 +728,12 @@ glusterd_volinfo_dup (glusterd_volinfo_t *volinfo,
         new_volinfo->brick_count = volinfo->brick_count;
         new_volinfo->tier_info = volinfo->tier_info;
         new_volinfo->quota_conf_version = volinfo->quota_conf_version;
+        new_volinfo->xquota_conf_version = volinfo->xquota_conf_version;
         new_volinfo->quota_xattr_version = volinfo->quota_xattr_version;
+        new_volinfo->xquota_xattr_version = volinfo->xquota_xattr_version;
         new_volinfo->snap_max_hard_limit = volinfo->snap_max_hard_limit;
         new_volinfo->quota_conf_cksum = volinfo->quota_conf_cksum;
+        new_volinfo->xquota_conf_cksum = volinfo->xquota_conf_cksum;
 
         dict_copy (volinfo->dict, new_volinfo->dict);
         dict_copy (volinfo->gsync_slaves, new_volinfo->gsync_slaves);
@@ -1027,6 +1032,7 @@ glusterd_volinfo_delete (glusterd_volinfo_t *volinfo)
                 dict_unref (volinfo->rebal.dict);
 
         gf_store_handle_destroy (volinfo->quota_conf_shandle);
+        gf_store_handle_destroy (volinfo->xquota_conf_shandle);
         gf_store_handle_destroy (volinfo->shandle);
         gf_store_handle_destroy (volinfo->node_state_shandle);
         gf_store_handle_destroy (volinfo->snapd.handle);
@@ -2600,7 +2606,7 @@ glusterd_sort_and_redirect (const char *src_filepath, int dest_fd)
 int
 glusterd_volume_compute_cksum (glusterd_volinfo_t  *volinfo, char *cksum_path,
                                char *filepath, gf_boolean_t is_quota_conf,
-                               uint32_t *cs)
+                               gf_boolean_t is_xquota_conf, uint32_t *cs)
 {
         int32_t                 ret                     = -1;
         uint32_t                cksum                   = 0;
@@ -2629,7 +2635,7 @@ glusterd_volume_compute_cksum (glusterd_volinfo_t  *volinfo, char *cksum_path,
                 goto out;
         }
 
-        if (!is_quota_conf) {
+        if (!is_quota_conf && !is_xquota_conf) {
                 snprintf (sort_filepath, sizeof (sort_filepath),
                           "/tmp/%s.XXXXXX", volinfo->volname);
 
@@ -2661,7 +2667,8 @@ glusterd_volume_compute_cksum (glusterd_volinfo_t  *volinfo, char *cksum_path,
                         goto out;
         }
 
-        cksum_path_final = is_quota_conf ? filepath : sort_filepath;
+        cksum_path_final = (is_quota_conf || is_xquota_conf)
+                            ? filepath : sort_filepath;
 
         ret = get_checksum_for_path (cksum_path_final, &cksum);
         if (ret) {
@@ -2670,7 +2677,7 @@ glusterd_volume_compute_cksum (glusterd_volinfo_t  *volinfo, char *cksum_path,
                         "checksum for path: %s", cksum_path_final);
                 goto out;
         }
-        if (!is_quota_conf) {
+        if (!is_quota_conf && !is_xquota_conf) {
                 snprintf (buf, sizeof (buf), "%s=%u\n", "info", cksum);
                 ret = sys_write (fd, buf, strlen (buf));
                 if (ret <= 0) {
@@ -2696,7 +2703,8 @@ out:
 }
 
 int glusterd_compute_cksum (glusterd_volinfo_t *volinfo,
-                            gf_boolean_t is_quota_conf)
+                            gf_boolean_t is_quota_conf,
+                            gf_boolean_t is_xquota_conf)
 {
         int               ret                  = -1;
         uint32_t          cs                   = 0;
@@ -2718,6 +2726,11 @@ int glusterd_compute_cksum (glusterd_volinfo_t *volinfo,
                           GLUSTERD_VOL_QUOTA_CKSUM_FILE);
                 snprintf (filepath, sizeof (filepath), "%s/%s", path,
                           GLUSTERD_VOLUME_QUOTA_CONFIG);
+        } else if (is_xquota_conf) {
+                snprintf (cksum_path, sizeof (cksum_path), "%s/%s", path,
+                          GLUSTERD_VOL_XQUOTA_CKSUM_FILE);
+                snprintf (filepath, sizeof (filepath), "%s/%s", path,
+                          GLUSTERD_VOLUME_XQUOTA_CONFIG);
         } else {
                 snprintf (cksum_path, sizeof (cksum_path), "%s/%s", path,
                           GLUSTERD_CKSUM_FILE);
@@ -2726,7 +2739,8 @@ int glusterd_compute_cksum (glusterd_volinfo_t *volinfo,
         }
 
         ret = glusterd_volume_compute_cksum (volinfo, cksum_path, filepath,
-                                             is_quota_conf, &cs);
+                                             is_quota_conf, is_xquota_conf,
+                                             &cs);
         if (ret) {
                 gf_msg (this->name, GF_LOG_ERROR, 0,
                         GD_MSG_CKSUM_COMPUTE_FAIL, "Failed to compute checksum "
@@ -2736,6 +2750,8 @@ int glusterd_compute_cksum (glusterd_volinfo_t *volinfo,
 
         if (is_quota_conf)
                 volinfo->quota_conf_cksum = cs;
+        else if (is_xquota_conf)
+                volinfo->xquota_conf_cksum = cs;
         else
                 volinfo->cksum = cs;
 
@@ -3149,6 +3165,10 @@ glusterd_add_volume_to_dict (glusterd_volinfo_t *volinfo,
         memset (key, 0, sizeof (key));
         snprintf (key, sizeof (key), "%s%d.quota-xattr-version", prefix, count);
         ret = dict_set_int32 (dict, key, volinfo->quota_xattr_version);
+
+        memset (key, 0, sizeof (key));
+        snprintf (key, sizeof (key), "%s%d.xquota-xattr-version", prefix, count);
+        ret = dict_set_int32 (dict, key, volinfo->xquota_xattr_version);
 out:
         GF_FREE (volume_id_str);
         GF_FREE (rebalance_id_str);
@@ -3242,6 +3262,86 @@ out:
         return ret;
 }
 
+int
+glusterd_vol_add_xquota_conf_to_dict (glusterd_volinfo_t *volinfo, dict_t* load,
+                                      int vol_idx, char *prefix)
+{
+        int            fd                    = -1;
+        unsigned char  buf[16]               = {0};
+        char           key[PATH_MAX]         = {0};
+        int            gfid_idx              = 0;
+        int            ret                   = -1;
+        xlator_t      *this                  = NULL;
+        char           type                  = 0;
+        float          version               = 0.0f;
+
+        this = THIS;
+        GF_ASSERT (this);
+        GF_ASSERT (prefix);
+
+        ret = glusterd_store_create_xquota_conf_sh_on_absence (volinfo);
+        if (ret)
+                goto out;
+
+        fd = open (volinfo->xquota_conf_shandle->path, O_RDONLY);
+        if (fd == -1) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = xquota_conf_read_version (fd, &version);
+        if (ret)
+                goto out;
+
+        for (gfid_idx=0; ; gfid_idx++) {
+                ret = xquota_conf_read_gfid (fd, buf, &type, version);
+                if (ret == 0) {
+                        break;
+                } else if (ret < 0) {
+                        gf_msg (this->name, GF_LOG_CRITICAL, 0,
+                                GD_MSG_XQUOTA_CONF_CORRUPT, "XQuota "
+                                "configuration store may be corrupt.");
+                        goto out;
+                }
+
+                snprintf (key, sizeof(key)-1, "%s%d.gfid%d", prefix,
+                          vol_idx, gfid_idx);
+                ret = dict_set_dynstr_with_alloc (load, key, uuid_utoa (buf));
+                if (ret)
+                        goto out;
+
+                snprintf (key, sizeof(key)-1, "%s%d.gfid-type%d", prefix,
+                          vol_idx, gfid_idx);
+                ret = dict_set_int8 (load, key, type);
+                if (ret)
+                        goto out;
+        }
+
+        snprintf (key, sizeof(key)-1, "%s%d.gfid-count", prefix, vol_idx);
+        key[sizeof(key)-1] = '\0';
+        ret = dict_set_int32 (load, key, gfid_idx);
+        if (ret)
+                goto out;
+
+        snprintf (key, sizeof(key)-1, "%s%d.xquota-cksum", prefix, vol_idx);
+        key[sizeof(key)-1] = '\0';
+        ret = dict_set_uint32 (load, key, volinfo->xquota_conf_cksum);
+        if (ret)
+                goto out;
+
+        snprintf (key, sizeof(key)-1, "%s%d.xquota-version", prefix, vol_idx);
+        key[sizeof(key)-1] = '\0';
+        ret = dict_set_uint32 (load, key, volinfo->xquota_conf_version);
+        if (ret)
+                goto out;
+
+        ret = 0;
+out:
+        if (fd != -1)
+                sys_close (fd);
+        return ret;
+}
+
 int32_t
 glusterd_add_volumes_to_export_dict (dict_t **peer_data)
 {
@@ -3272,6 +3372,12 @@ glusterd_add_volumes_to_export_dict (dict_t **peer_data)
                         continue;
                 ret = glusterd_vol_add_quota_conf_to_dict (volinfo, dict,
                                                            count, "volume");
+                if (ret)
+                        goto out;
+                if (!glusterd_is_volume_xquota_enabled (volinfo))
+                        continue;
+                ret = glusterd_vol_add_xquota_conf_to_dict (volinfo, dict,
+                                                            count, "volume");
                 if (ret)
                         goto out;
         }
@@ -3310,8 +3416,10 @@ glusterd_compare_friend_volume (dict_t *peer_data, int32_t count,
         glusterd_volinfo_t      *volinfo = NULL;
         char                    *volname = NULL;
         uint32_t                cksum = 0;
-        uint32_t                quota_cksum = 0;
-        uint32_t                quota_version = 0;
+        uint32_t                quota_cksum  = 0;
+        uint32_t                xquota_cksum = 0;
+        uint32_t                quota_version  = 0;
+        uint32_t                xquota_version = 0;
         int32_t                 version = 0;
         xlator_t                *this = NULL;
 
@@ -3399,6 +3507,34 @@ glusterd_compare_friend_volume (dict_t *peer_data, int32_t count,
                 }
         }
 
+        memset (key, 0, sizeof (key));
+        snprintf (key, sizeof (key), "volume%d.xquota-version", count);
+        ret = dict_get_uint32 (peer_data, key, &xquota_version);
+        if (ret) {
+                gf_msg_debug (this->name, 0, "xquota-version key absent for"
+                        " volume %s in peer %s's response", volinfo->volname,
+                        hostname);
+                ret = 0;
+        } else {
+                if (xquota_version > volinfo->xquota_conf_version) {
+                        //Mismatch detected
+                        ret = 0;
+                        gf_msg (this->name, GF_LOG_INFO, 0,
+                                GD_MSG_XQUOTA_CONFIG_VERS_MISMATCH,
+                                "XQuota configuration versions of volume %s "
+                                "differ. local version = %d, remote version = "
+                                "%d on peer %s", volinfo->volname,
+                                volinfo->xquota_conf_version,
+                                xquota_version, hostname);
+                        *status = GLUSTERD_VOL_COMP_UPDATE_REQ;
+                        goto out;
+                } else if (xquota_version < volinfo->xquota_conf_version) {
+                        *status = GLUSTERD_VOL_COMP_SCS;
+                        goto out;
+                }
+        }
+
+
         //Now, versions are same, compare cksums.
         //
         memset (key, 0, sizeof (key));
@@ -3418,6 +3554,28 @@ glusterd_compare_friend_volume (dict_t *peer_data, int32_t count,
                                 " cksum = %u, remote  cksum = %u on peer %s",
                                 volinfo->volname, volinfo->quota_conf_cksum,
                                 quota_cksum, hostname);
+                        *status = GLUSTERD_VOL_COMP_RJT;
+                        goto out;
+                }
+        }
+
+        memset (key, 0, sizeof (key));
+        snprintf (key, sizeof (key), "volume%d.xquota-cksum", count);
+        ret = dict_get_uint32 (peer_data, key, &xquota_cksum);
+        if (ret) {
+                gf_msg_debug (this->name, 0, "xquota checksum absent for "
+                        "volume %s in peer %s's response", volinfo->volname,
+                        hostname);
+                ret = 0;
+        } else {
+                if (xquota_cksum != volinfo->xquota_conf_cksum) {
+                        ret = 0;
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_XQUOTA_CONFIG_CKSUM_MISMATCH, "Cksums of "
+                                "xquota configuration of volume %s differ. local"
+                                " cksum = %u, remote  cksum = %u on peer %s",
+                                volinfo->volname, volinfo->xquota_conf_cksum,
+                                xquota_cksum, hostname);
                         *status = GLUSTERD_VOL_COMP_RJT;
                         goto out;
                 }
@@ -3796,7 +3954,7 @@ glusterd_import_quota_conf (dict_t *peer_data, int vol_idx,
 
 out:
         if (!ret) {
-                ret = glusterd_compute_cksum (new_volinfo, _gf_true);
+                ret = glusterd_compute_cksum (new_volinfo, _gf_true, _gf_false);
                 if (ret) {
                         gf_msg (this->name, GF_LOG_ERROR, 0,
                                 GD_MSG_CKSUM_COMPUTE_FAIL,
@@ -3817,6 +3975,125 @@ clear_quota_conf:
                 (void) gf_store_handle_destroy
                                               (new_volinfo->quota_conf_shandle);
                 new_volinfo->quota_conf_shandle = NULL;
+        }
+
+        return ret;
+}
+
+int
+glusterd_import_xquota_conf (dict_t *peer_data, int vol_idx,
+                             glusterd_volinfo_t *new_volinfo,
+                             char *prefix)
+{
+        int       gfid_idx         = 0;
+        int       gfid_count       = 0;
+        int       ret              = -1;
+        int       fd               = -1;
+        char      key[PATH_MAX]    = {0};
+        char     *gfid_str         = NULL;
+        uuid_t    gfid             = {0,};
+        xlator_t *this             = NULL;
+        int8_t    gfid_type        = 0;
+
+        this = THIS;
+        GF_ASSERT (this);
+        GF_ASSERT (peer_data);
+        GF_ASSERT (prefix);
+
+        if (!glusterd_is_volume_xquota_enabled (new_volinfo)) {
+                (void) glusterd_clean_up_xquota_store (new_volinfo);
+                return 0;
+        }
+
+        ret = glusterd_store_create_xquota_conf_sh_on_absence (new_volinfo);
+        if (ret)
+                goto out;
+
+        fd = gf_store_mkstemp (new_volinfo->xquota_conf_shandle);
+        if (fd < 0) {
+                ret = -1;
+                goto out;
+        }
+
+        snprintf (key, sizeof (key)-1, "%s%d.xquota-cksum", prefix, vol_idx);
+        key[sizeof(key)-1] = '\0';
+        ret = dict_get_uint32 (peer_data, key, &new_volinfo->xquota_conf_cksum);
+        if (ret)
+                gf_msg_debug (this->name, 0, "Failed to get xquota cksum");
+
+        snprintf (key, sizeof (key)-1, "%s%d.xquota-version", prefix, vol_idx);
+        key[sizeof(key)-1] = '\0';
+        ret = dict_get_uint32 (peer_data, key,
+                               &new_volinfo->xquota_conf_version);
+        if (ret)
+                gf_msg_debug (this->name, 0, "Failed to get xquota "
+                                                  "version");
+
+        snprintf (key, sizeof (key)-1, "%s%d.gfid-count", prefix, vol_idx);
+        key[sizeof(key)-1] = '\0';
+        ret = dict_get_int32 (peer_data, key, &gfid_count);
+        if (ret)
+                goto out;
+
+        ret = glusterd_xquota_conf_write_header (fd);
+        if (ret)
+                goto out;
+
+        gfid_idx = 0;
+        for (gfid_idx = 0; gfid_idx < gfid_count; gfid_idx++) {
+
+                snprintf (key, sizeof (key)-1, "%s%d.gfid%d",
+                          prefix, vol_idx, gfid_idx);
+                ret = dict_get_str (peer_data, key, &gfid_str);
+                if (ret)
+                        goto out;
+
+                snprintf (key, sizeof (key)-1, "%s%d.gfid-type%d",
+                          prefix, vol_idx, gfid_idx);
+                ret = dict_get_int8 (peer_data, key, &gfid_type);
+                if (ret)
+                        gfid_type = GF_XQUOTA_CONF_TYPE_USAGE;
+
+                gf_uuid_parse (gfid_str, gfid);
+                ret = glusterd_xquota_conf_write_gfid (fd, gfid,
+                                                      (char)gfid_type);
+                if (ret < 0) {
+                        gf_msg (this->name, GF_LOG_CRITICAL, errno,
+                                GD_MSG_XQUOTA_CONF_WRITE_FAIL, "Unable to write "
+                                "gfid %s into xquota.conf for %s", gfid_str,
+                                new_volinfo->volname);
+                        ret = -1;
+                        goto out;
+                }
+        }
+
+        ret = gf_store_rename_tmppath (new_volinfo->xquota_conf_shandle);
+
+        ret = 0;
+
+out:
+        if (!ret) {
+                ret = glusterd_compute_cksum (new_volinfo, _gf_true, _gf_false);
+                if (ret) {
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_CKSUM_COMPUTE_FAIL,
+                                "Failed to compute checksum");
+                        goto clear_xquota_conf;
+                }
+
+                ret = glusterd_store_save_xquota_version_and_cksum (new_volinfo);
+                if (ret)
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_XQUOTA_CKSUM_VER_STORE_FAIL,
+                                "Failed to save xquota version and checksum");
+        }
+
+clear_xquota_conf:
+        if (ret && (fd > 0)) {
+                gf_store_unlink_tmppath (new_volinfo->xquota_conf_shandle);
+                (void) gf_store_handle_destroy
+                                              (new_volinfo->xquota_conf_shandle);
+                new_volinfo->xquota_conf_shandle = NULL;
         }
 
         return ret;
@@ -4249,6 +4526,12 @@ glusterd_import_volinfo (dict_t *peer_data, int count,
         ret = dict_get_int32 (peer_data, key,
                               &new_volinfo->quota_xattr_version);
 
+        memset (key, 0, sizeof (key));
+        snprintf (key, sizeof (key), "%s%d.xquota-xattr-version", prefix, count);
+        /*This is not present in older glusterfs versions, so ignore ret value*/
+        ret = dict_get_int32 (peer_data, key,
+                              &new_volinfo->xquota_xattr_version);
+
         ret = glusterd_import_bricks (peer_data, count, new_volinfo, prefix);
         if (ret)
                 goto out;
@@ -4598,6 +4881,15 @@ glusterd_import_friend_volume (dict_t *peer_data, size_t count)
                           new_volinfo->volname);
                 goto out;
         }
+
+        ret = glusterd_import_xquota_conf (peer_data, count,
+                                           new_volinfo, "volume");
+        if (ret) {
+                gf_event (EVENT_IMPORT_XQUOTA_CONF_FAILED, "volume=%s",
+                          new_volinfo->volname);
+                goto out;
+        }
+
         glusterd_list_add_order (&new_volinfo->vol_list, &priv->volumes,
                                  glusterd_compare_volume_name);
 
@@ -4866,6 +5158,7 @@ glusterd_pending_node_get_rpc (glusterd_pending_node_t *pending_node)
         } else if (pending_node->type == GD_NODE_SHD ||
                    pending_node->type == GD_NODE_NFS ||
                    pending_node->type == GD_NODE_QUOTAD ||
+                   pending_node->type == GD_NODE_XQUOTAD ||
                    pending_node->type == GD_NODE_SCRUB) {
                 svc = pending_node->node;
                 rpc = svc->conn.rpc;
@@ -5017,6 +5310,8 @@ glusterd_add_node_to_dict (char *server, dict_t *dict, int count,
                 svc = &(priv->bitd_svc);
         else if (strcmp(server, priv->scrub_svc.name) == 0)
                 svc = &(priv->scrub_svc);
+        else if (strcmp(server, priv->xquotad_svc.name) == 0)
+                svc = &(priv->xquotad_svc);
 
         //Consider service to be running only when glusterd sees it Online
         if (svc->online)
@@ -5042,6 +5337,8 @@ glusterd_add_node_to_dict (char *server, dict_t *dict, int count,
                 ret = dict_set_str (dict, key, "Bitrot Daemon");
         else if (!strcmp (server, priv->scrub_svc.name))
                 ret = dict_set_str (dict, key, "Scrubber Daemon");
+        else if (!strcmp (server, priv->xquotad_svc.name))
+                ret = dict_set_str (dict, key, "XQuota Daemon");
         if (ret)
                 goto out;
 
@@ -5182,6 +5479,28 @@ glusterd_all_volumes_with_quota_stopped ()
 
         cds_list_for_each_entry (voliter, &priv->volumes, vol_list) {
                 if (!glusterd_is_volume_quota_enabled (voliter))
+                        continue;
+                if (voliter->status == GLUSTERD_STATUS_STARTED)
+                        return _gf_false;
+        }
+
+        return _gf_true;
+}
+
+gf_boolean_t
+glusterd_all_volumes_with_xquota_stopped ()
+{
+        glusterd_conf_t                   *priv     = NULL;
+        xlator_t                          *this     = NULL;
+        glusterd_volinfo_t                *voliter  = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+        priv = this->private;
+        GF_ASSERT (priv);
+
+        cds_list_for_each_entry (voliter, &priv->volumes, vol_list) {
+                if (!glusterd_is_volume_xquota_enabled (voliter))
                         continue;
                 if (voliter->status == GLUSTERD_STATUS_STARTED)
                         return _gf_false;
@@ -8280,6 +8599,87 @@ out:
         return ret;
 }
 
+int
+glusterd_xquotad_statedump (char *options, int option_cnt, char **op_errstr)
+{
+        int                     ret = -1;
+        xlator_t                *this = NULL;
+        glusterd_conf_t         *conf = NULL;
+        char                    pidfile_path[PATH_MAX] = {0,};
+        char                    path[PATH_MAX] = {0,};
+        FILE                    *pidfile = NULL;
+        pid_t                   pid = -1;
+        char                    dumpoptions_path[PATH_MAX] = {0,};
+        char                    *option = NULL;
+        char                    *tmpptr = NULL;
+        char                    *dup_options = NULL;
+        char                    msg[256] = {0,};
+
+        this = THIS;
+        GF_ASSERT (this);
+        conf = this->private;
+        GF_ASSERT (conf);
+
+        dup_options = gf_strdup (options);
+        option = strtok_r (dup_options, " ", &tmpptr);
+        if (strcmp (option, conf->xquotad_svc.name)) {
+                snprintf (msg, sizeof (msg), "for xquotad statedump, options "
+                          "should be after the key 'xquotad'");
+                *op_errstr = gf_strdup (msg);
+                ret = -1;
+                goto out;
+        }
+
+        GLUSTERD_GET_XQUOTAD_DIR (path, conf);
+        GLUSTERD_GET_XQUOTAD_PIDFILE (pidfile_path, path, conf);
+
+        pidfile = fopen (pidfile_path, "r");
+        if (!pidfile) {
+                gf_msg (this->name, GF_LOG_ERROR, errno,
+                        GD_MSG_FILE_OP_FAILED, "Unable to open pidfile: %s",
+                        pidfile_path);
+                ret = -1;
+                goto out;
+        }
+
+        ret = fscanf (pidfile, "%d", &pid);
+        if (ret <= 0) {
+                gf_msg (this->name, GF_LOG_ERROR, errno,
+                        GD_MSG_FILE_OP_FAILED, "Unable to get pid of xquotad "
+                        "process");
+                ret = -1;
+                goto out;
+        }
+
+        snprintf (dumpoptions_path, sizeof (dumpoptions_path),
+                  DEFAULT_VAR_RUN_DIRECTORY"/glusterdump.%d.options", pid);
+        ret = glusterd_set_dump_options (dumpoptions_path, options, option_cnt);
+        if (ret < 0) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_BRK_STATEDUMP_FAIL, "error while parsing "
+                        "statedump options");
+                ret = -1;
+                goto out;
+        }
+
+        gf_msg (this->name, GF_LOG_INFO, 0,
+                GD_MSG_STATEDUMP_INFO,
+                "Performing statedump on xquotad with "
+                "pid %d", pid);
+
+        kill (pid, SIGUSR1);
+
+        sleep (1);
+
+        ret = 0;
+out:
+        if (pidfile)
+                fclose (pidfile);
+        sys_unlink (dumpoptions_path);
+        GF_FREE (dup_options);
+        return ret;
+}
+
 /* Checks if the given peer contains bricks belonging to the given volume.
  * Returns,
  *   2 - if peer contains all the bricks
@@ -11074,6 +11474,100 @@ out:
 }
 
 int
+glusterd_volume_xquota_copy_to_op_ctx_dict (dict_t *dict, dict_t *rsp_dict)
+{
+        int        ret            = -1;
+        int        i              = 0;
+        int        count          = 0;
+        int        rsp_dict_count = 0;
+        char      *uuid_str       = NULL;
+        char      *uuid_str_dup   = NULL;
+        char       key[256]       = {0,};
+        xlator_t  *this           = NULL;
+        int        type           = GF_XQUOTA_OPTION_TYPE_NONE;
+
+        this = THIS;
+        GF_ASSERT (this);
+
+        ret = dict_get_int32 (dict, "type", &type);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED,
+                        "Failed to get xquota opcode");
+                goto out;
+        }
+
+        if ((type != GF_XQUOTA_OPTION_TYPE_PROJECT_LIMIT_USAGE) &&
+            (type != GF_XQUOTA_OPTION_TYPE_PROJECT_REMOVE_USAGE)) {
+                dict_copy (rsp_dict, dict);
+                ret = 0;
+                goto out;
+        }
+
+        ret = dict_get_int32 (rsp_dict, "count", &rsp_dict_count);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_GET_FAILED,
+                        "Failed to get the count of "
+                        "gfids from the rsp dict");
+                goto out;
+        }
+
+        ret = dict_get_int32 (dict, "count", &count);
+        if (ret)
+                /* The key "count" is absent in op_ctx when this function is
+                 * called after self-staging on the originator. This must not
+                 * be treated as error.
+                 */
+                gf_msg_debug (this->name, 0, "Failed to get count of gfids"
+                        " from req dict. This could be because count is not yet"
+                        " copied from rsp_dict into op_ctx");
+
+        for (i = 0; i < rsp_dict_count; i++) {
+                snprintf (key, sizeof(key)-1, "gfid%d", i);
+
+                ret = dict_get_str (rsp_dict, key, &uuid_str);
+                if (ret) {
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_DICT_GET_FAILED,
+                                "Failed to get gfid "
+                                "from rsp dict");
+                        goto out;
+                }
+
+                snprintf (key, sizeof (key)-1, "gfid%d", i + count);
+
+                uuid_str_dup = gf_strdup (uuid_str);
+                if (!uuid_str_dup) {
+                        ret = -1;
+                        goto out;
+                }
+
+                ret = dict_set_dynstr (dict, key, uuid_str_dup);
+                if (ret) {
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_DICT_SET_FAILED,
+                                "Failed to set gfid "
+                                "from rsp dict into req dict");
+                        GF_FREE (uuid_str_dup);
+                        goto out;
+                }
+        }
+
+        ret = dict_set_int32 (dict, "count", rsp_dict_count + count);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_DICT_SET_FAILED,
+                        "Failed to set aggregated "
+                        "count in req dict");
+                goto out;
+        }
+
+out:
+        return ret;
+}
+
+int
 glusterd_profile_volume_brick_rsp (void *pending_entry,
                                    dict_t *rsp_dict, dict_t *op_ctx,
                                    char **op_errstr, gd_node_type type)
@@ -11905,6 +12399,12 @@ glusterd_is_volume_inode_quota_enabled (glusterd_volinfo_t *volinfo)
 }
 
 int
+glusterd_is_volume_xquota_enabled (glusterd_volinfo_t *volinfo)
+{
+        return (glusterd_volinfo_get_boolean (volinfo, VKEY_FEATURES_XQUOTA));
+}
+
+int
 glusterd_is_tierd_enabled (glusterd_volinfo_t *volinfo)
 {
         return volinfo->is_tier_enabled;
@@ -11940,14 +12440,16 @@ glusterd_validate_and_set_gfid (dict_t *op_ctx, dict_t *req_dict,
         if (ret) {
                 gf_msg (this->name, GF_LOG_ERROR, 0,
                         GD_MSG_DICT_GET_FAILED,
-                        "Failed to get quota opcode");
+                        "Failed to get quota/xquota opcode");
                 goto out;
         }
 
         if ((op_code != GF_QUOTA_OPTION_TYPE_LIMIT_USAGE) &&
             (op_code != GF_QUOTA_OPTION_TYPE_LIMIT_OBJECTS) &&
             (op_code != GF_QUOTA_OPTION_TYPE_REMOVE) &&
-            (op_code != GF_QUOTA_OPTION_TYPE_REMOVE_OBJECTS)) {
+            (op_code != GF_QUOTA_OPTION_TYPE_REMOVE_OBJECTS) &&
+            (op_code != GF_XQUOTA_OPTION_TYPE_PROJECT_LIMIT_USAGE) &&
+            (op_code != GF_XQUOTA_OPTION_TYPE_PROJECT_REMOVE_USAGE)) {
                 ret = 0;
                 goto out;
         }
@@ -12079,6 +12581,36 @@ glusterd_clean_up_quota_store (glusterd_volinfo_t *volinfo)
         gf_store_handle_destroy (volinfo->quota_conf_shandle);
         volinfo->quota_conf_shandle = NULL;
         volinfo->quota_conf_version = 0;
+
+}
+
+void
+glusterd_clean_up_xquota_store (glusterd_volinfo_t *volinfo)
+{
+        char      voldir[PATH_MAX]          = {0,};
+        char      xquota_confpath[PATH_MAX] = {0,};
+        char      cksum_path[PATH_MAX]      = {0,};
+        xlator_t  *this                     = NULL;
+        glusterd_conf_t *conf               = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+        conf = this->private;
+        GF_ASSERT (conf);
+
+        GLUSTERD_GET_VOLUME_DIR (voldir, volinfo, conf);
+
+        snprintf (xquota_confpath, sizeof (xquota_confpath), "%s/%s", voldir,
+                  GLUSTERD_VOLUME_XQUOTA_CONFIG);
+        snprintf (cksum_path, sizeof (cksum_path), "%s/%s", voldir,
+                  GLUSTERD_VOL_XQUOTA_CKSUM_FILE);
+
+        sys_unlink (xquota_confpath);
+        sys_unlink (cksum_path);
+
+        gf_store_handle_destroy (volinfo->xquota_conf_shandle);
+        volinfo->xquota_conf_shandle = NULL;
+        volinfo->xquota_conf_version = 0;
 
 }
 

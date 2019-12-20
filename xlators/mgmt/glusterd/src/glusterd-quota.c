@@ -1007,7 +1007,7 @@ out:
                         return ret;
                 }
 
-                ret = glusterd_compute_cksum (volinfo, _gf_true);
+                ret = glusterd_compute_cksum (volinfo, _gf_true, _gf_false);
                 if (ret) {
                         gf_msg (this->name, GF_LOG_ERROR, 0,
                                 GD_MSG_CKSUM_COMPUTE_FAIL, "Failed to "
@@ -1243,7 +1243,7 @@ out:
         } else if (!ret && GF_QUOTA_OPTION_TYPE_UPGRADE != opcode) {
                 ret = gf_store_rename_tmppath (volinfo->quota_conf_shandle);
                 if (modified) {
-                        ret = glusterd_compute_cksum (volinfo, _gf_true);
+                        ret = glusterd_compute_cksum (volinfo, _gf_true, _gf_false);
                         if (ret) {
                                 gf_msg (this->name, GF_LOG_ERROR, 0,
                                         GD_MSG_CKSUM_COMPUTE_FAIL, "Failed to "

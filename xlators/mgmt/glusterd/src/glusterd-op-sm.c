@@ -37,6 +37,7 @@
 #include "glusterd-messages.h"
 #include "glusterd-utils.h"
 #include "glusterd-quota.h"
+#include "glusterd-xquota.h"
 #include "syscall.h"
 #include "cli1-xdr.h"
 #include "common-utils.h"
@@ -47,6 +48,7 @@
 #include "glusterd-shd-svc.h"
 #include "glusterd-nfs-svc.h"
 #include "glusterd-quotad-svc.h"
+#include "glusterd-xquotad-svc.h"
 #include "glusterd-server-quorum.h"
 #include "glusterd-volgen.h"
 #include <sys/types.h>
@@ -1897,6 +1899,13 @@ glusterd_op_stage_status_volume (dict_t *dict, char **op_errstr)
                                   "quota enabled", volname);
                         goto out;
                 }
+        } else if ((cmd & GF_CLI_STATUS_XQUOTAD) != 0) {
+                if (!glusterd_is_volume_xquota_enabled (volinfo)) {
+                        ret = -1;
+                        snprintf (msg, sizeof (msg), "Volume %s does not have "
+                                  "xquota enabled", volname);
+                        goto out;
+                }
         } else if ((cmd & GF_CLI_STATUS_BITD) != 0) {
                 if (!glusterd_is_bitrot_enabled (volinfo)) {
                         ret = -1;
@@ -2597,6 +2606,14 @@ glusterd_op_set_all_volume_options (xlator_t *this, dict_t *dict,
                                               NULL);
                                 if (ret)
                                         goto out;
+
+                                ret = glusterd_store_xquota_config
+                                             (volinfo, NULL, NULL,
+                                              GF_XQUOTA_OPTION_TYPE_NONE,
+                                              NULL);
+                                if (ret)
+                                        goto out;
+
                                 ret = glusterd_update_volumes_dict (volinfo);
                                 if (ret)
                                         goto out;
@@ -3592,6 +3609,13 @@ glusterd_op_status_volume (dict_t *dict, char **op_errstr,
                         goto out;
                 other_count++;
                 node_count++;
+        } else if ((cmd & GF_CLI_STATUS_XQUOTAD) != 0) {
+                ret = glusterd_add_node_to_dict (priv->xquotad_svc.name,
+                                                 rsp_dict, 0, vol_opts);
+                if (ret)
+                        goto out;
+                other_count++;
+                node_count++;
         } else if ((cmd & GF_CLI_STATUS_BITD) != 0) {
                 ret = glusterd_add_node_to_dict (priv->bitd_svc.name,
                                                  rsp_dict, 0, vol_opts);
@@ -3723,6 +3747,19 @@ glusterd_op_status_volume (dict_t *dict, char **op_errstr,
                         if (glusterd_is_volume_quota_enabled (volinfo)) {
                                 ret = glusterd_add_node_to_dict
                                                         (priv->quotad_svc.name,
+                                                         rsp_dict,
+                                                         other_index,
+                                                         vol_opts);
+                                if (ret)
+                                        goto out;
+                                other_count++;
+                                node_count++;
+                                other_index++;
+                        }
+
+                        if (glusterd_is_volume_xquota_enabled (volinfo)) {
+                                ret = glusterd_add_node_to_dict
+                                                        (priv->xquotad_svc.name,
                                                          rsp_dict,
                                                          other_index,
                                                          vol_opts);
@@ -4501,6 +4538,7 @@ glusterd_op_build_payload (dict_t **req, char **op_errstr, dict_t *op_ctx)
                 case GD_OP_RESET_VOLUME:
                 case GD_OP_LOG_ROTATE:
                 case GD_OP_QUOTA:
+                case GD_OP_XQUOTA:
                 case GD_OP_PROFILE_VOLUME:
                 case GD_OP_HEAL_VOLUME:
                 case GD_OP_STATEDUMP_VOLUME:
@@ -6061,6 +6099,11 @@ glusterd_op_stage_validate (glusterd_op_t op, dict_t *dict, char **op_errstr,
                                                        rsp_dict);
                         break;
 
+                case GD_OP_XQUOTA:
+                        ret = glusterd_op_stage_xquota (dict, op_errstr,
+                                                        rsp_dict);
+                        break;
+
                 case GD_OP_STATUS_VOLUME:
                         ret = glusterd_op_stage_status_volume (dict, op_errstr);
                         break;
@@ -6197,6 +6240,10 @@ glusterd_op_commit_perform (glusterd_op_t op, dict_t *dict, char **op_errstr,
 
                 case GD_OP_QUOTA:
                         ret = glusterd_op_quota (dict, op_errstr, rsp_dict);
+                        break;
+
+                case GD_OP_XQUOTA:
+                        ret = glusterd_op_xquota (dict, op_errstr, rsp_dict);
                         break;
 
                 case GD_OP_STATUS_VOLUME:
@@ -7273,6 +7320,7 @@ glusterd_bricks_select_status_volume (dict_t *dict, char **op_errstr,
         case GF_CLI_STATUS_NFS:
         case GF_CLI_STATUS_SHD:
         case GF_CLI_STATUS_QUOTAD:
+        case GF_CLI_STATUS_XQUOTAD:
         case GF_CLI_STATUS_SNAPD:
         case GF_CLI_STATUS_TIERD:
         case GF_CLI_STATUS_BITD:
@@ -7379,6 +7427,26 @@ glusterd_bricks_select_status_volume (dict_t *dict, char **op_errstr,
                 }
                 pending_node->node = &(priv->quotad_svc);
                 pending_node->type = GD_NODE_QUOTAD;
+                pending_node->index = 0;
+                cds_list_add_tail (&pending_node->list, selected);
+
+                ret = 0;
+        } else if ((cmd & GF_CLI_STATUS_XQUOTAD) != 0) {
+                if (!priv->xquotad_svc.online) {
+                        gf_msg (this->name, GF_LOG_ERROR, 0,
+                                GD_MSG_XQUOTAD_NOT_RUNNING, "XQuotad is not "
+                                "running");
+                        ret = -1;
+                        goto out;
+                }
+                pending_node = GF_CALLOC (1, sizeof (*pending_node),
+                                          gf_gld_mt_pending_node_t);
+                if (!pending_node) {
+                        ret = -1;
+                        goto out;
+                }
+                pending_node->node = &(priv->xquotad_svc);
+                pending_node->type = GD_NODE_XQUOTAD;
                 pending_node->index = 0;
                 cds_list_add_tail (&pending_node->list, selected);
 
@@ -8360,6 +8428,7 @@ glusterd_op_free_ctx (glusterd_op_t op, void *ctx)
                 case GD_OP_RESET_VOLUME:
                 case GD_OP_GSYNC_SET:
                 case GD_OP_QUOTA:
+                case GD_OP_XQUOTA:
                 case GD_OP_PROFILE_VOLUME:
                 case GD_OP_STATUS_VOLUME:
                 case GD_OP_REBALANCE:

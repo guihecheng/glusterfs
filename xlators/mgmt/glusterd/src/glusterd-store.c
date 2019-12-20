@@ -39,6 +39,7 @@
 #include "rpc-clnt.h"
 #include "common-utils.h"
 #include "quota-common-utils.h"
+#include "xquota-common-utils.h"
 
 #include <sys/resource.h>
 #include <inttypes.h>
@@ -1041,6 +1042,14 @@ glusterd_volume_exclude_options_write (int fd, glusterd_volinfo_t *volinfo)
                 if (ret)
                         goto out;
 
+                snprintf (buf, sizeof (buf), "%d",
+                          volinfo->xquota_xattr_version);
+                ret = gf_store_save_value (fd,
+                                           GLUSTERD_STORE_KEY_VOL_XQUOTA_VERSION,
+                                           buf);
+                if (ret)
+                        goto out;
+
                 snprintf (buf, sizeof (buf), "%d", volinfo->is_tier_enabled);
                 ret = gf_store_save_value (fd, GF_TIER_ENABLED, buf);
                 if (ret)
@@ -1253,6 +1262,21 @@ glusterd_store_quota_conf_path_set (glusterd_volinfo_t *volinfo,
 }
 
 static void
+glusterd_store_xquota_conf_path_set (glusterd_volinfo_t *volinfo,
+                                     char *xquota_conf_path, size_t len)
+{
+        char    voldirpath[PATH_MAX] = {0,};
+        GF_ASSERT (volinfo);
+        GF_ASSERT (xquota_conf_path);
+        GF_ASSERT (len <= PATH_MAX);
+
+        glusterd_store_voldirpath_set (volinfo, voldirpath,
+                                       sizeof (voldirpath));
+        snprintf (xquota_conf_path, len, "%s/%s", voldirpath,
+                  GLUSTERD_VOLUME_XQUOTA_CONFIG);
+}
+
+static void
 glusterd_store_missed_snaps_list_path_set (char *missed_snaps_list,
                                            size_t len)
 {
@@ -1325,6 +1349,23 @@ glusterd_store_create_quota_conf_sh_on_absence (glusterd_volinfo_t *volinfo)
         ret =
           gf_store_handle_create_on_absence (&volinfo->quota_conf_shandle,
                                              quota_conf_path);
+
+        return ret;
+}
+
+int32_t
+glusterd_store_create_xquota_conf_sh_on_absence (glusterd_volinfo_t *volinfo)
+{
+        char            xquota_conf_path[PATH_MAX] = {0};
+        int32_t         ret                       = 0;
+
+        GF_ASSERT (volinfo);
+
+        glusterd_store_xquota_conf_path_set (volinfo, xquota_conf_path,
+                                             sizeof (xquota_conf_path));
+        ret =
+          gf_store_handle_create_on_absence (&volinfo->xquota_conf_shandle,
+                                             xquota_conf_path);
 
         return ret;
 }
@@ -1824,7 +1865,7 @@ glusterd_store_volinfo (glusterd_volinfo_t *volinfo, glusterd_volinfo_ver_ac_t a
                 goto out;
 
         /* checksum should be computed at the end */
-        ret = glusterd_compute_cksum (volinfo, _gf_false);
+        ret = glusterd_compute_cksum (volinfo, _gf_false, _gf_false);
         if (ret)
                 goto out;
 
@@ -2983,6 +3024,9 @@ glusterd_store_update_volinfo (glusterd_volinfo_t *volinfo)
                 } else if (!strncmp (key, GLUSTERD_STORE_KEY_VOL_QUOTA_VERSION,
                             strlen (GLUSTERD_STORE_KEY_VOL_QUOTA_VERSION))) {
                         volinfo->quota_xattr_version = atoi (value);
+                } else if (!strncmp (key, GLUSTERD_STORE_KEY_VOL_XQUOTA_VERSION,
+                            strlen (GLUSTERD_STORE_KEY_VOL_XQUOTA_VERSION))) {
+                        volinfo->xquota_xattr_version = atoi (value);
                 } else {
 
                         if (is_key_glusterd_hooks_friendly (key)) {
@@ -3157,7 +3201,7 @@ glusterd_store_retrieve_volume (char *volname, glusterd_snap_t *snap)
         if (ret)
                 goto out;
 
-        ret = glusterd_compute_cksum (volinfo, _gf_false);
+        ret = glusterd_compute_cksum (volinfo, _gf_false, _gf_false);
         if (ret)
                 goto out;
 
@@ -3169,7 +3213,7 @@ glusterd_store_retrieve_volume (char *volname, glusterd_snap_t *snap)
         if (ret)
                 goto out;
 
-        ret = glusterd_compute_cksum (volinfo, _gf_true);
+        ret = glusterd_compute_cksum (volinfo, _gf_true, _gf_false);
         if (ret)
                 goto out;
 
@@ -3177,6 +3221,21 @@ glusterd_store_retrieve_volume (char *volname, glusterd_snap_t *snap)
         if (ret)
                 goto out;
 
+        ret = glusterd_store_retrieve_xquota_version (volinfo);
+        if (ret)
+                goto out;
+
+        ret = glusterd_store_create_xquota_conf_sh_on_absence (volinfo);
+        if (ret)
+                goto out;
+
+        ret = glusterd_compute_cksum (volinfo, _gf_false, _gf_true);
+        if (ret)
+                goto out;
+
+        ret = glusterd_store_save_xquota_version_and_cksum (volinfo);
+        if (ret)
+                goto out;
 
         if (!snap) {
                 glusterd_list_add_order (&volinfo->vol_list, &priv->volumes,
@@ -4746,6 +4805,59 @@ out:
 }
 
 int
+glusterd_store_retrieve_xquota_version (glusterd_volinfo_t *volinfo)
+{
+        int                 ret                  = -1;
+        uint32_t            version              = 0;
+        char                cksum_path[PATH_MAX] = {0,};
+        char                path[PATH_MAX]       = {0,};
+        char               *version_str          = NULL;
+        char               *tmp                  = NULL;
+        xlator_t           *this                 = NULL;
+        glusterd_conf_t    *conf                 = NULL;
+        gf_store_handle_t  *handle               = NULL;
+
+        this = THIS;
+        GF_ASSERT (this);
+        conf = this->private;
+        GF_ASSERT (conf);
+
+        GLUSTERD_GET_VOLUME_DIR (path, volinfo, conf);
+        snprintf (cksum_path, sizeof (cksum_path), "%s/%s", path,
+                  GLUSTERD_VOL_XQUOTA_CKSUM_FILE);
+
+        ret = gf_store_handle_new (cksum_path, &handle);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_STORE_HANDLE_GET_FAIL,
+                        "Unable to get store handle "
+                        "for %s", cksum_path);
+                goto out;
+        }
+
+        ret = gf_store_retrieve_value (handle, "version", &version_str);
+        if (ret) {
+                gf_msg_debug (this->name, 0, "Version absent");
+                ret = 0;
+                goto out;
+        }
+
+        version = strtoul (version_str, &tmp, 10);
+	if ((errno == ERANGE) || (errno == EINVAL)) {
+                gf_msg_debug (this->name, 0, "Invalid version number");
+                goto out;
+        }
+        volinfo->xquota_conf_version = version;
+        ret = 0;
+
+out:
+        if (version_str)
+                GF_FREE (version_str);
+        gf_store_handle_destroy (handle);
+        return ret;
+}
+
+int
 glusterd_store_save_quota_version_and_cksum (glusterd_volinfo_t *volinfo)
 {
         gf_store_handle_t               *shandle = NULL;
@@ -4784,6 +4896,63 @@ glusterd_store_save_quota_version_and_cksum (glusterd_volinfo_t *volinfo)
 
         memset (buf, 0, sizeof (buf));
         snprintf (buf, sizeof (buf)-1, "%u", volinfo->quota_conf_version);
+        ret = gf_store_save_value (fd, "version", buf);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_VERS_STORE_FAIL, "Failed to store version");
+                goto out;
+        }
+
+        ret = gf_store_rename_tmppath (shandle);
+        if (ret)
+                goto out;
+
+out:
+        if ((ret < 0) && (fd > 0))
+                gf_store_unlink_tmppath (shandle);
+        gf_store_handle_destroy (shandle);
+        return ret;
+}
+
+int
+glusterd_store_save_xquota_version_and_cksum (glusterd_volinfo_t *volinfo)
+{
+        gf_store_handle_t               *shandle = NULL;
+        glusterd_conf_t                 *conf = NULL;
+        xlator_t                        *this = NULL;
+        char                            path[PATH_MAX] = {0};
+        char                            cksum_path[PATH_MAX] = {0,};
+        char                            buf[256] = {0};
+        int                             fd = -1;
+        int32_t                         ret = -1;
+
+        this = THIS;
+        conf = this->private;
+
+        GLUSTERD_GET_VOLUME_DIR (path, volinfo, conf);
+        snprintf (cksum_path, sizeof (cksum_path), "%s/%s", path,
+                  GLUSTERD_VOL_XQUOTA_CKSUM_FILE);
+
+        ret = gf_store_handle_new (cksum_path, &shandle);
+        if (ret)
+                goto out;
+
+        fd = gf_store_mkstemp (shandle);
+        if (fd <= 0) {
+                ret = -1;
+                goto out;
+        }
+
+        snprintf (buf, sizeof (buf)-1, "%u", volinfo->xquota_conf_cksum);
+        ret = gf_store_save_value (fd, "cksum", buf);
+        if (ret) {
+                gf_msg (this->name, GF_LOG_ERROR, 0,
+                        GD_MSG_CKSUM_STORE_FAIL, "Failed to store cksum");
+                goto out;
+        }
+
+        memset (buf, 0, sizeof (buf));
+        snprintf (buf, sizeof (buf)-1, "%u", volinfo->xquota_conf_version);
         ret = gf_store_save_value (fd, "version", buf);
         if (ret) {
                 gf_msg (this->name, GF_LOG_ERROR, 0,
@@ -4843,6 +5012,41 @@ out:
 }
 
 int32_t
+glusterd_xquota_conf_write_header (int fd)
+{
+        int                 header_len    = 0;
+        int                 ret           = -1;
+        xlator_t           *this          = NULL;
+        glusterd_conf_t    *conf          = NULL;
+
+        this = THIS;
+        GF_VALIDATE_OR_GOTO ("xquota", this, out);
+
+        conf = this->private;
+        GF_VALIDATE_OR_GOTO (this->name, conf, out);
+
+
+        header_len = strlen (XQUOTA_CONF_HEADER);
+        ret = gf_nwrite (fd, XQUOTA_CONF_HEADER, header_len);
+
+        if (ret != header_len) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = 0;
+
+out:
+        if (ret < 0)
+                gf_msg_callingfn ("xquota", GF_LOG_ERROR, 0,
+                                  GD_MSG_XQUOTA_CONF_WRITE_FAIL,
+                                  "failed to write "
+                                  "header to a xquota conf");
+
+        return ret;
+}
+
+int32_t
 glusterd_quota_conf_write_gfid (int fd, void *buf, char type)
 {
         int                 ret        = -1;
@@ -4878,6 +5082,44 @@ out:
                                   GD_MSG_QUOTA_CONF_WRITE_FAIL,
                                   "failed to write "
                                   "gfid %s to a quota conf", uuid_utoa (buf));
+
+        return ret;
+}
+
+int32_t
+glusterd_xquota_conf_write_gfid (int fd, void *buf, char type)
+{
+        int                 ret        = -1;
+        xlator_t           *this       = NULL;
+        glusterd_conf_t    *conf       = NULL;
+
+        this = THIS;
+        GF_VALIDATE_OR_GOTO ("xquota", this, out);
+
+        conf = this->private;
+        GF_VALIDATE_OR_GOTO (this->name, conf, out);
+
+
+        ret = gf_nwrite (fd, buf, 16);
+        if (ret != 16) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = gf_nwrite (fd, &type, 1);
+        if (ret != 1) {
+                ret = -1;
+                goto out;
+        }
+
+        ret = 0;
+
+out:
+        if (ret < 0)
+                gf_msg_callingfn ("xquota", GF_LOG_ERROR, 0,
+                                  GD_MSG_XQUOTA_CONF_WRITE_FAIL,
+                                  "failed to write "
+                                  "gfid %s to a xquota conf", uuid_utoa (buf));
 
         return ret;
 }
