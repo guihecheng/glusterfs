@@ -57,6 +57,7 @@ void trap (void);
 #define gf_floor(a, b) (((a) / ((b) ? (b) : 1)) * (b))
 
 #define IPv4_ADDR_SIZE 32
+#define IPv6_ADDR_SIZE 128
 
 
 #define GF_UNIT_KB    1024ULL
@@ -798,6 +799,7 @@ gf_boolean_t next_token (char **tokenp, token_iter_t *tit);
 void drop_token (char *token, token_iter_t *tit);
 
 gf_boolean_t mask_match (const uint32_t a, const uint32_t b, const uint32_t m);
+gf_boolean_t addr_match(const uint8_t *addr1, const uint8_t *addr2, size_t n);
 gf_boolean_t gf_is_ip_in_net (const char *network, const char *ip_str);
 char valid_host_name (char *address, int length);
 char valid_ipv4_address (char *address, int length, gf_boolean_t wildcard_acc);

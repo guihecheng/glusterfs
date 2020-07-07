@@ -1417,6 +1417,21 @@ mnt3_match_subnet_v4 (struct addrinfo *ai, uint32_t saddr, uint32_t mask)
         return _gf_false;
 }
 
+static gf_boolean_t
+mnt3_match_subnet_v6 (struct addrinfo *ai, uint8_t *saddr, uint32_t mask)
+{
+        for (; ai; ai = ai->ai_next) {
+                struct sockaddr_in6 *sin = (struct sockaddr_in6 *)ai->ai_addr;
+
+                if (sin->sin6_family != AF_INET6)
+                        continue;
+
+                if (addr_match (saddr, sin->sin6_addr.s6_addr, sizeof(sin->sin6_addr)))
+                        return _gf_true;
+        }
+
+        return _gf_false;
+}
 
 /**
  * This function will verify if the client is allowed to mount
@@ -1431,19 +1446,25 @@ mnt3_match_subnet_v4 (struct addrinfo *ai, uint32_t saddr, uint32_t mask)
  * TODO: Support IPv6 subnetwork
  */
 int
-mnt3_verify_auth (struct sockaddr_in *client_addr, struct mnt3_export *export)
+mnt3_verify_auth (struct sockaddr_storage *client_addr, struct mnt3_export *export)
 {
         int                     retvalue = -EACCES;
         int                     ret = 0;
         struct host_auth_spec   *host = NULL;
         struct sockaddr_in      *allowed_addr = NULL;
+        struct sockaddr_in6     *allowed_addr6 = NULL;
         struct addrinfo         *allowed_addrinfo = NULL;
-
         struct addrinfo         hint = {
                 .ai_family      = AF_INET,
                 .ai_protocol    = (int)IPPROTO_TCP,
                 .ai_flags       = AI_CANONNAME,
         };
+        struct addrinfo         hint6 = {
+                .ai_family      = AF_INET6,
+                .ai_protocol    = (int)IPPROTO_TCP,
+                .ai_flags       = AI_CANONNAME,
+        };
+        struct addrinfo        *hintptr = &hint;
 
         /* Sanity check */
         if ((NULL == client_addr) ||
@@ -1454,18 +1475,11 @@ mnt3_verify_auth (struct sockaddr_in *client_addr, struct mnt3_export *export)
                 return retvalue;
         }
 
-        host = export->hostspec;
-
-        /*
-         * Currently IPv4 subnetwork is supported i.e. AF_INET.
-         * TODO: IPv6 subnetwork i.e. AF_INET6.
-         */
-        if (client_addr->sin_family != AF_INET) {
-                gf_msg (GF_MNT, GF_LOG_ERROR, EAFNOSUPPORT,
-                        NFS_MSG_UNSUPPORTED_VERSION,
-                        "Only IPv4 is supported for subdir-auth");
-                return retvalue;
+        if (client_addr->ss_family == AF_INET6) {
+            hintptr = &hint6;
         }
+
+        host = export->hostspec;
 
         /* Try to see if the client IP matches the allowed IP list.*/
         while (NULL != host){
@@ -1478,7 +1492,7 @@ mnt3_verify_auth (struct sockaddr_in *client_addr, struct mnt3_export *export)
 
                 /* Get the addrinfo for the allowed host (host_addr). */
                 ret = getaddrinfo (host->host_addr, NULL,
-                                   &hint, &allowed_addrinfo);
+                                   hintptr, &allowed_addrinfo);
                 if (0 != ret){
                         /*
                          * getaddrinfo() FAILED for the host IP addr. Continue
@@ -1490,21 +1504,37 @@ mnt3_verify_auth (struct sockaddr_in *client_addr, struct mnt3_export *export)
                         continue;
                 }
 
-                allowed_addr = (struct sockaddr_in *)(allowed_addrinfo->ai_addr);
-                if (NULL == allowed_addr) {
-                        gf_msg (GF_MNT, GF_LOG_ERROR, EINVAL,
-                                NFS_MSG_INVALID_ENTRY, "Invalid structure");
-                        break;
-                }
+                if (client_addr->ss_family == AF_INET6) {
+                    allowed_addr6 = (struct sockaddr_in6 *)(allowed_addrinfo->ai_addr);
+                    if (NULL == allowed_addr6) {
+                            gf_msg (GF_MNT, GF_LOG_ERROR, EINVAL,
+                                    NFS_MSG_INVALID_ENTRY, "Invalid structure");
+                            break;
+                    }
 
-                /* Check if the network addr of both IPv4 socket match */
-                if (mnt3_match_subnet_v4 (allowed_addrinfo,
-                                          client_addr->sin_addr.s_addr,
-                                          host->netmask)) {
-                        retvalue = 0;
-                        break;
-                }
+                    /* Check if the network addr of both IPv6 socket match */
+                    if (mnt3_match_subnet_v6 (allowed_addrinfo,
+                                              ((struct sockaddr_in6*)client_addr)->sin6_addr.s6_addr,
+                                              host->netmask)) {
+                            retvalue = 0;
+                            break;
+                    }
+                } else {
+                    allowed_addr = (struct sockaddr_in *)(allowed_addrinfo->ai_addr);
+                    if (NULL == allowed_addr) {
+                            gf_msg (GF_MNT, GF_LOG_ERROR, EINVAL,
+                                    NFS_MSG_INVALID_ENTRY, "Invalid structure");
+                            break;
+                    }
 
+                    /* Check if the network addr of both IPv4 socket match */
+                    if (mnt3_match_subnet_v4 (allowed_addrinfo,
+                                              ((struct sockaddr_in*)client_addr)->sin_addr.s_addr,
+                                              host->netmask)) {
+                            retvalue = 0;
+                            break;
+                    }
+                }
                 /* No match yet, continue the search */
                host = host->next;
         }
@@ -1522,19 +1552,19 @@ mnt3_resolve_subdir (rpcsvc_request_t *req, struct mount3_state *ms,
                      struct mnt3_export *exp, char *subdir,
                      gf_boolean_t send_reply)
 {
-        mnt3_resolve_t        *mres = NULL;
-        int                   ret = -EFAULT;
-        struct nfs3_fh        pfh = GF_NFS3FH_STATIC_INITIALIZER;
-        struct sockaddr_in    *sin = NULL;
+        mnt3_resolve_t            *mres = NULL;
+        int                        ret = -EFAULT;
+        struct nfs3_fh             pfh = GF_NFS3FH_STATIC_INITIALIZER;
+        struct sockaddr_storage   *ss = NULL;
 
         if ((!req) || (!ms) || (!exp) || (!subdir))
                 return ret;
 
-        sin = (struct sockaddr_in *)(&(req->trans->peerinfo.sockaddr));
+        ss = &(req->trans->peerinfo.sockaddr);
 
         /* Need to check AUTH */
         if (NULL != exp->hostspec) {
-                ret = mnt3_verify_auth (sin, exp);
+                ret = mnt3_verify_auth (ss, exp);
                 if (0 != ret) {
                         gf_msg (GF_MNT, GF_LOG_ERROR, EACCES,
                                 NFS_MSG_AUTH_VERIFY_FAILED,
@@ -2844,22 +2874,11 @@ __mnt3udp_get_export_subdir_inode (struct svc_req *req, char *subdir,
 
         /* AUTH check for subdir i.e. nfs.export-dir */
         if (exp->hostspec) {
-                struct sockaddr_in *sin = NULL;
+                struct sockaddr_storage *ss = NULL;
 
-#if !defined(_TIRPC_SVC_H)
-                sin = svc_getcaller (req->rq_xprt);
-#else
-                sin = (struct sockaddr_in *)svc_getcaller (req->rq_xprt);
-                /* TIRPC's svc_getcaller() returns a pointer to a
-                 * sockaddr_in6, even though it might actually be an
-                 * IPv4 address. It ought return a struct sockaddr and
-                 * make the caller upcast it to the proper address family.
-                 */
-#endif
-                /* And let's make sure that it's actually an IPv4 address. */
-                GF_ASSERT (sin->sin_family == AF_INET);
+                ss = (struct sockaddr_storage*)svc_getcaller (req->rq_xprt);
 
-                ret = mnt3_verify_auth (sin, exp);
+                ret = mnt3_verify_auth (ss, exp);
                 if (ret) {
                         gf_msg (GF_MNT, GF_LOG_ERROR, EACCES,
                                 NFS_MSG_AUTH_VERIFY_FAILED,
@@ -3109,8 +3128,9 @@ mnt3_export_fill_hostspec (struct host_auth_spec* hostspec, const char* hostip)
         char     *token = NULL;
         int      ret = -1;
         long     prefixlen = IPv4_ADDR_SIZE; /* default */
+        long     addrsize = IPv4_ADDR_SIZE;
         uint32_t shiftbits = 0;
-        size_t   length = 0;
+        int      length = 0;
 
         /* Create copy of the string so that the source won't change
          */
@@ -3122,15 +3142,17 @@ mnt3_export_fill_hostspec (struct host_auth_spec* hostspec, const char* hostip)
         }
 
         ip = strtok_r (ipdupstr, "/", &savptr);
-        /* Validate the Hostname or IPv4 address
-         * TODO: IPv6 support for subdir auth.
-         */
-        length = strlen (ip);
-        if ((!valid_ipv4_address (ip, (int)length, _gf_false)) &&
-            (!valid_host_name (ip, (int)length))) {
+
+        if (!valid_internet_address(ip, _gf_false)) {
                 gf_msg (GF_MNT, GF_LOG_ERROR, EINVAL, NFS_MSG_INVALID_ENTRY,
-                        "Invalid hostname or IPv4 address: %s", ip);
+                        "Invalid hostname or IPv4/IPv6 address: %s", ip);
                 goto err;
+        }
+
+        length = strlen (ip);
+        if (valid_ipv6_address(ip, length, _gf_false)) {
+            prefixlen = IPv6_ADDR_SIZE;
+            addrsize = IPv6_ADDR_SIZE;
         }
 
         hostspec->host_addr = gf_strdup (ip);
@@ -3159,10 +3181,10 @@ mnt3_export_fill_hostspec (struct host_auth_spec* hostspec, const char* hostip)
         if (token != NULL) {
               prefixlen = strtol (token, &endptr, 10);
               if ((errno != 0) || (*endptr != '\0') ||
-                  (prefixlen < 0) || (prefixlen > IPv4_ADDR_SIZE)) {
+                  (prefixlen < 0) || (prefixlen > addrsize)) {
                         gf_msg (THIS->name, GF_LOG_WARNING, EINVAL,
                                 NFS_MSG_INVALID_ENTRY,
-                                "Invalid IPv4 subnetwork mask");
+                                "Invalid IPv4/IPv6 subnetwork mask");
                       goto err;
               }
         }
@@ -3172,7 +3194,7 @@ mnt3_export_fill_hostspec (struct host_auth_spec* hostspec, const char* hostip)
          * 2. Convert it into Big-Endian format.
          * 3. Store it in hostspec netmask.
          */
-        shiftbits = IPv4_ADDR_SIZE - prefixlen;
+        shiftbits = addrsize - prefixlen;
         hostspec->netmask = htonl ((uint32_t)~0 << shiftbits);
 
         ret = 0; /* SUCCESS */

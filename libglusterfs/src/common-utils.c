@@ -2843,6 +2843,11 @@ mask_match(const uint32_t a, const uint32_t b, const uint32_t m)
         return (((a ^ b) & m) == 0);
 }
 
+gf_boolean_t
+addr_match(const uint8_t *addr1, const uint8_t *addr2, size_t n)
+{
+    return memcmp((void*)addr1, (void*)addr2, n) == 0;
+}
 
 /*Thread safe conversion function*/
 char *
