@@ -1464,7 +1464,8 @@ mnt3_verify_auth (struct sockaddr_storage *client_addr, struct mnt3_export *expo
                 .ai_protocol    = (int)IPPROTO_TCP,
                 .ai_flags       = AI_CANONNAME,
         };
-        struct addrinfo        *hintptr = &hint;
+        struct addrinfo         *hintptr = &hint;
+        struct sockaddr_storage  alt_addr = {0,};
 
         /* Sanity check */
         if ((NULL == client_addr) ||
@@ -1474,6 +1475,8 @@ mnt3_verify_auth (struct sockaddr_storage *client_addr, struct mnt3_export *expo
                         "Invalid argument");
                 return retvalue;
         }
+
+        client_addr = adjust_sockaddr_proto(client_addr, &alt_addr);
 
         if (client_addr->ss_family == AF_INET6) {
             hintptr = &hint6;

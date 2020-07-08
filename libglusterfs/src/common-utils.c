@@ -4160,6 +4160,44 @@ gf_compare_sockaddr (const struct sockaddr *addr1,
 }
 
 /*
+ * Nfs client request will always have an sockaddr_storage of ipv6
+ * with ipv6 support switched on, event client use ipv4 as proto indeed.
+ * We chould detect this and convert ipv6 to ipv4 properly.
+ *
+ * An ipv4 address should be in an ipv6 form like this:
+ * 0          80 bits
+ * FFFF       16 bits
+ * ipv4 addr  32 bits
+ */
+struct sockaddr_storage*
+adjust_sockaddr_proto(struct sockaddr_storage *ipv6, struct sockaddr_storage *ipv4) {
+    struct sockaddr_in6 *sin6         = (struct sockaddr_in6 *)ipv6;
+    struct sockaddr_in  *sin          = (struct sockaddr_in *)ipv4;
+    char                 zerobits[10] = {0,};
+    void                *ptr          = NULL;
+
+    /* no action for other cases */
+    if (ipv6->ss_family != AF_INET6)
+        return ipv6;
+
+    /* no action for normal ipv6 */
+    if (memcmp(sin6->sin6_addr.s6_addr, zerobits, 10)
+     || sin6->sin6_addr.s6_addr[10] != 0xFF
+     || sin6->sin6_addr.s6_addr[11] != 0xFF)
+        return ipv6;
+
+    memset(ipv4, 0, sizeof(*ipv4));
+    ptr = &(sin6->sin6_addr.s6_addr[12]);
+
+    sin->sin_port = sin6->sin6_port;
+    sin->sin_addr.s_addr = *(in_addr_t*)ptr;
+
+    ipv4->ss_family = AF_INET;
+
+    return ipv4;
+}
+
+/*
  * gf_set_timestamp:
  *      It sets the mtime and atime of 'dest' file as of 'src'.
  */

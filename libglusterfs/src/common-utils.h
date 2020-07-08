@@ -809,6 +809,8 @@ gf_boolean_t valid_mount_auth_address (char *address);
 gf_boolean_t valid_ipv4_subnetwork (const char *address);
 gf_boolean_t gf_sock_union_equal_addr (union gf_sock_union *a,
                                        union gf_sock_union *b);
+struct sockaddr_storage*
+adjust_sockaddr_proto(struct sockaddr_storage *ipv6, struct sockaddr_storage *ipv4);
 char *gf_rev_dns_lookup (const char *ip);
 
 char *uuid_utoa (uuid_t uuid);
